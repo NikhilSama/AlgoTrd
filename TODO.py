@@ -1,0 +1,24 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Mar  9 17:15:23 2023
+
+@author: nikhilsama
+"""
+
+TODO 
+
+1) Check graph of PE/CE/Price to see if it moves minute by minute w bol bands
+-- Also check minute volume candles for PE/CE to ensure these is enough volume .. at least 30 lacs on a minute candle (so we can take 30%)
+2) Add in logic for long and short via PE/CE in performance
+
+
+3) Restrict BB strat to flat ma scenarios.  
+When MA is sloping up (but slope is const) we usually bounce between ma and upper bound, often breaching upper bound
+When MA is sloping up (and slope is also growing) we breach the upper bands w high volume
+- breakout strategy(vol based).  Test each of these strategies independently before combining into one. flat bb, const slope bb, breakout
+
+4) Write code to get all nifty 50 constituents with option data, and run the backtest on all
+5) Convert Ticks to candles for live
+6) Live trade 
+7) check how sql data insert works - if one row is duplicate do others at least get added ?
