@@ -21,7 +21,10 @@ from DatabaseLogin import DBBasic
 import kite_init as ki 
 import tickerdata as td
 import logging
+import pytz
 
+# set timezone to IST
+ist = pytz.timezone('Asia/Kolkata')
 
 db = DBBasic() 
 kite = ki.initKite()
@@ -36,14 +39,19 @@ def zget(from_date, to_date, symbol,interval='minute',continuous=False):
     token = db.get_instrument_token(symbol)
     if token == -1:
         logging.warning(f'Invalid symbol ({symbol}) provided')
-        return 'None'
-    
-    records = kite.historical_data(token, from_date=from_date, to_date=to_date, 
-                                   continuous=continuous, interval=interval)
+        return pd.DataFrame()
+    try:
+        records = kite.historical_data(token, from_date=from_date, to_date=to_date, 
+                                       continuous=continuous, interval=interval)
+    except Exception as e:
+        print(f'Get Historical Data Failed T: {token} from: {from_date} to: {to_date} continueous:{continuous} interval:{interval} FAILED.')
+        print(e.args[0])
+        return pd.DataFrame()
+
     df = pd.DataFrame(records)
     if len(df) == 0:
         logging.info('No data returned')
-        return
+        return df
     #df.drop('volume', inplace=True, axis=1)   
     df['symbol'] = symbol
     df.set_index('date',inplace=True)
@@ -64,7 +72,7 @@ def zget_w_db_save(from_date, to_date, symbol,interval='minute',continuous=False
             
 def zsplit_and_get(from_date, symbol, interval = 'minute', continuous = False):
 #    token = db.get_instrument_token(symbol)
-    to_date = date.today()
+    to_date = dt.datetime.now(ist)
     #data = pd.DataFrame(columns=['date', 'open', 'high', 'low', 'close', 'volume'])
     days = 60
     
@@ -87,10 +95,18 @@ def getAllNiftyHistoricalData(from_date, interval = 'minute', continuous = False
 
     for t in tickers:
         zsplit_and_get(from_date,t) 
+
+def dbUpdatetoCurrent():
+    end = dt.datetime.now(ist)
+    start = db.next_tick(end)
+    
+    getAllNiftyHistoricalData((start))
+    
+#dbUpdatetoCurrent()
         
         
-sdate = '2023-01-15'
-edate = '2023-03-12'
+sdate = '2023-03-13'
+edate = '2023-03-14'
 
 
 #getAllNiftyHistoricalData(dt.datetime.strptime(sdate, '%Y-%m-%d'))

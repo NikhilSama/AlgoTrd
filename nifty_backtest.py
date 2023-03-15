@@ -23,24 +23,24 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import pprint
 
+import DownloadHistorical as downloader
 
-#tickers = td.get_sp500_tickers()
+tickers = td.get_sp500_tickers()
 
-tickers = ['RELIANCE','KOTAKBANK','WIPRO']
 nifty = td.get_nifty_tickers()
 index_tickers = td.get_index_tickers()
 
-
 #td.get_all_ticker_data()
-end =date.today()
-start =date.today() - timedelta(days=90)
+end =datetime.now()
+start =end - timedelta(days=1)
 
 niftydf = {}
 
-# for t in nifty:
-#     niftydf[t] = td.get_ticker_data(t, start,end, incl_options=False)
+for t in nifty:
+    niftydf[t]= downloader.zget(start,end,t) 
+    niftydf[t]=downloader.zColsToDbCols(niftydf[t])
 
-# results = pd.DataFrame()
+results = pd.DataFrame()
 
 def backtest(sl,ml,bw,sbw):
     performance = pd.DataFrame()
@@ -60,7 +60,7 @@ def backtest(sl,ml,bw,sbw):
         performance = pd.concat([performance, tearsheetdf])
 
     results = pd.concat([results,performance.mean().to_frame().T])
-    performance.to_csv(f"Data/backtest/{sl}sl-{ml}ml-{bw}bw-{sbw}sbw-CX_Super.csv")
+    performance.to_csv(f"Data/backtest/NS{sl}sl-{ml}ml-{bw}bw-{sbw}sbw-CX_Super.csv")
     
     for t in nifty:
         df = niftydf[t]
@@ -77,7 +77,7 @@ def backtest(sl,ml,bw,sbw):
         performance = pd.concat([performance, tearsheetdf])
 
     results = pd.concat([results,performance.mean().to_frame().T])
-    performance.to_csv("Data/backtest/{sl}sl-{ml}ml-{bw}bw-{sbw}sbw-CX.csv")
+    performance.to_csv("Data/backtest/NS{sl}sl-{ml}ml-{bw}bw-{sbw}sbw-CX.csv")
     
 def combinator():
     for sl in [100,200,300]:
@@ -90,7 +90,17 @@ def combinator():
                     print(sbw)
                     backtest(sl,ml,bw,sbw)
 
+def groupByDay(df):
+    # Split the DataFrame by day using the 'groupby' function and list comprehension
+    dfs_by_day = [group[1] for group in df.groupby(pd.Grouper(freq='D'))]
+
+    # Print the split DataFrames
+    for i, df_by_day in enumerate(dfs_by_day):
+        print(f'DataFrame for Day {i+1}:')
+        print(df_by_day)
+
 #combinator()
+backtest(200,20,2,2.5)
 #results.to_csv("Data/backtest/NIFTY-TUNING-BACKTEST.csv")
 # sl = 100
 # ml = 10

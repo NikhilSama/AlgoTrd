@@ -21,12 +21,22 @@ import performance as perf
 from freezegun import freeze_time
 import pytz
 import logging
+import signal
+import sys
+
+
+def sigterm_handler(_signo, _stack_frame):
+    # Raises SystemExit(0):
+    print("SIGTERM -- EXITING POSITIONS")
+    ki.exit_positions(kite)            
+    sys.exit(0)
+signal.signal(signal.SIGTERM, sigterm_handler)
 
 ## TEST FREEZESR START
 
-from freezegun import freeze_time
-freezer = freeze_time("Mar 10th, 2023 13:00:00+0530", tick=True)
-freezer.start()
+# from freezegun import freeze_time
+# freezer = freeze_time("Mar 10th, 2023 13:00:00+0530", tick=True)
+# freezer.start()
 
 ## END 
 
@@ -66,13 +76,13 @@ def Tick():
 
         #Get latest minute tick from zerodha
         df = downloader.zget(frm,now,t) 
+        if (df == -1 or len(df) == 0):
+            continue
+        
         df = downloader.zColsToDbCols(df)
         
         #Get data from db
         #df = td.get_ticker_data(t, frm_ma, now, incl_options=False)
-        
-        if (len(df) <2):
-            continue
         
         #update moving averages and get signals
         df = signals.bollinger_band_cx(df)
@@ -92,22 +102,22 @@ def Tick():
         #place orders
         if (df['signal'][-1] == 1 and df['position'][-1] != 1): 
             #Go Long --  Sell Put AND buy back any pre-sold Calls
-            ki.nse_exit(kite,t)
+            logging.info(f"GO LONG {t}")
+            ki.exit_positions(kite,t,tput_lot_size,tput_tick_size)            
             ki.nse_buy(kite,t)
-           # ki.nfo_exit(kite,t,tput_lot_size,tput_tick_size)            
-           # ki.nfo_sell(kite,tput,tput_lot_size,tput_tick_size)
+            #ki.nfo_sell(kite,tput,tput_lot_size,tput_tick_size)
 
         if (df['signal'][-1] == -1 and df['position'][-1] != -1): 
             #Go Short --  Sell Call AND buy back any pre-sold Puts
-            ki.nse_exit(kite,t)
+            logging.info(f"GO SHORT {t}")
+            ki.exit_positions(kite,t,tput_lot_size,tput_tick_size)            
             ki.nse_sell(kite,t)
-          #  ki.nfo_exit(kite,t,tcall_lot_size,tcall_tick_size)            
-          #  ki.nfo_sell(kite,tcall,tcall_lot_size,tcall_tick_size)
+            #ki.nfo_sell(kite,tcall,tcall_lot_size,tcall_tick_size)
         
         
 ### MAIN LOOP RUNS 9:15 AM to 3:15###
 
-while (now.hour >= 9 and now.hour < 15) or (now.hour == 15 and now.minute < 30):
+while (now.hour >= 9 and now.hour < 15) or (now.hour == 15 and now.minute < 19):
     nxt_tick = now + timedelta(minutes=1)
 
     #Tick during market hours only
@@ -126,4 +136,7 @@ while (now.hour >= 9 and now.hour < 15) or (now.hour == 15 and now.minute < 30):
 
     #update now
     now = datetime.now(ist)
+    
+#Exit all positions at end of trading
+ki.exit_positions(kite)            
 

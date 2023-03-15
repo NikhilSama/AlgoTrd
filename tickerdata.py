@@ -89,8 +89,9 @@ def get_sp500_tickers():
     return tickers
 
 def get_nifty_tickers():
-    #return ['HDFC','HDFCBANK','HDFCLIFE','TATASTEEL','POWERGRID','ONGC','COALINDIA',
-     #       'ITC','BPCL','HINDALCO','WIPRO','JSWSTEEL','NTPC','TATAMOTORS']
+    return ['HDFC','HDFCBANK','HDFCLIFE','TATASTEEL','POWERGRID','ONGC','COALINDIA',
+           'NIFTY 50']
+#'ITC','BPCL','HINDALCO','WIPRO','JSWSTEEL','NTPC','TATAMOTORS',
     file_name = "Data/niftytickers.pickle"
     tickers = []
 

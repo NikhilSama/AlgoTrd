@@ -27,9 +27,9 @@ def addSMA(df,fast=8,slow=26,superTrend=200):
 def addBBStats(df,superLen=200,maLen=20,bandWidth=2,superBandWidth=2.5):
     # creating bollinger band indicators
     df['ma_superTrend'] = df['Adj Close'].ewm(com=superLen, min_periods=superLen).mean()
-    df['ma_superTrend_pct_change'] = df['ma_superTrend'].pct_change()
+    df['ma_superTrend_pct_change'] = 10000*df['ma_superTrend'].pct_change()
     df['ma20'] = df['Adj Close'].rolling(window=maLen).mean()
-    df['ma20_pct_change'] = df['ma20'].pct_change()
+    df['ma20_pct_change'] = 10000*df['ma20'].pct_change()
     df['ma20_pct_change_ma'] = df['ma20_pct_change'].ewm(com=maLen, min_periods=maLen).mean()
     df['std'] = df['Adj Close'].rolling(window=maLen).std()
     df['upper_band'] = df['ma20'] + (bandWidth * df['std'])
@@ -134,6 +134,35 @@ def closePositionsEODandSOD(df):
     # Dont Open Positions before 10 am, so warm up ma in the morning
     df['signal'] = np.where(((df.index.hour == 9)),0,df['signal'])
 
+def exitExtremeTrendConditions(df):
+    ## IMPORTANT CALL THIS FUNCTIN IN THE BEGINNING, so that other
+    ## MEAN REVERSION SIGNALS OVERRIDE THIS ONE
+
+    ## EXIT MA 20 extreme slope conditions override BB signals.  Heavy slope up, 
+    # just buy, and heavy slope down, just sell.
+    df['signal'] = np.where((df.index.hour <15) &  
+                            (df['ma20_pct_change'] < 1) &
+                            (df['ma20_pct_change'].shift(1) > 1), 
+                            0,df['signal'])
+
+    df['signal'] = np.where((df.index.hour <15) &  
+                            (df['ma20_pct_change'] > -1) &
+                            (df['ma20_pct_change'].shift(1) < -1),
+                            0,df['signal'])
+
+def enterExtremeTrendPositions(df):
+    ## IMPORTANT CALL THIS FUNCTIN IN THE END, so that it overrides other
+    ## MEAN REVERSION SIGNALS
+    ## MA 20 extreme slope conditions override BB signals.  Heavy slope up, 
+    # just buy, and heavy slope down, just sell.
+    df['signal'] = np.where((df.index.hour <15) &  
+                            (df['ma20_pct_change'] > 1),
+                            1,df['signal'])
+
+    df['signal'] = np.where((df.index.hour <15) &  
+                            (df['ma20_pct_change'] < -1),
+                            -1,df['signal'])
+
 def bollinger_band_cx(df,superLen=200,maLen=20,bandWidth=2,superBandWidth=2.5):
     addBBStats(df,superLen,maLen,bandWidth,superBandWidth)
     
@@ -158,6 +187,49 @@ def bollinger_band_cx(df,superLen=200,maLen=20,bandWidth=2,superBandWidth=2.5):
                             (df['Adj Close'] > df['upper_band']) &
                             (df['Adj Close'].shift(1) <= df['upper_band']),
                             -1,df['signal'])
+    
+    closePositionsEODandSOD(df)
+    
+    return df
+
+def bollinger_band_cx_w_basis_breakout (df,superLen=200,maLen=20,bandWidth=2,superBandWidth=2.5):
+    addBBStats(df,superLen,maLen,bandWidth,superBandWidth)
+    
+    #EXIT CONDITIONS
+    setInitialExitSignalonBBandBreach(df)
+    
+    ## IMPORTANT CALL THIS FUNCTIN IN THE BEGINNING, so that other
+    ## MEAN REVERSION SIGNALS OVERRIDE THIS ONE
+
+    ## EXIT MA 20 extreme slope conditions override BB signals.  Heavy slope up, 
+    # just buy, and heavy slope down, just sell.
+    exitExtremeTrendConditions(df)
+    
+    # BUY condition
+    # 1) Trading Hours, 2) Price crossing under lower band
+    # 3) Super trend below super lower band, or if it is higher then at least it is 
+    # trending down
+    df['signal'] = np.where((df.index.hour <15) &  
+                            (df['Adj Close'] < df['lower_band']) &
+                            (df['Adj Close'].shift(1) >= df['lower_band']),
+                            1,df['signal'])
+    # SELL condition
+    # 1) Trading Hours, 2) Price crossing over upper band
+    # 3) Super trend below super upper band, or if it is higher then at least it is 
+    # trending down
+
+    df['signal'] = np.where((df.index.hour <15) & 
+                            (df['Adj Close'] > df['upper_band']) &
+                            (df['Adj Close'].shift(1) <= df['upper_band']),
+                            -1,df['signal'])
+    
+    
+    ## IMPORTANT CALL THIS FUNCTIN IN THE BEGINNING, so that other
+    ## MEAN REVERSION SIGNALS OVERRIDE THIS ONE
+
+    ## EXIT MA 20 extreme slope conditions override BB signals.  Heavy slope up, 
+    # just buy, and heavy slope down, just sell.
+    enterExtremeTrendPositions(df)
     
     closePositionsEODandSOD(df)
     
