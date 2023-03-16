@@ -41,7 +41,7 @@ def calculate_bnh_returns (df):
         df['bnh_returns-P'] = df["Adj Close-P"].pct_change()
 
 
-def calculate_positions (df):
+def calculate_positions (df,close_at_end=True):
     
     
     # creating long and short positions 
@@ -58,7 +58,8 @@ def calculate_positions (df):
 
     #CLOSE all positions at end of df; this will always be the last trade
     #return on last candle will always be zero
-    df.iloc[-1, df.columns.get_loc('position')] = 0
+    if (close_at_end):
+        df.iloc[-1, df.columns.get_loc('position')] = 0
 
     #signal (eg crossover) can be buy or 1 for several consecutive periods.  If we already
     #bought in the first period, then the second signal is not a trade as such

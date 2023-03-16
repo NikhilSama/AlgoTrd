@@ -36,9 +36,12 @@ def zgetNDays(t,n,e=datetime.now(ist)):
 
 def getTotalChange(df):
     return round(100*(df['Open'][0] - df['Adj Close'][-1])/df['Open'][0],2)
-def backetest():
 
-    df = zgetLastNDays('COALINDIA',10)
+
+
+def backtest(t):
+
+    df = zgetNDays(t,1)
     #df = td.get_ticker_data("NIFTY 50", start,end, incl_options=False)
     #ce_ticker = td.get_option_ticker("RELIANCE", df['Adj Close'][-1], 'CE')
     #ddf = td.get_ticker_data(ce_ticker, start,end)
@@ -93,8 +96,20 @@ def backetest():
     pprint.pprint(tearsheet)
     
     df.to_csv("export.csv")
-    
 
+def plot(tickers,day=30):
+    df={}
+    i=0
+    color=['blue','green','red']
+    fig, (ax1) = plt.subplots(1, 1, figsize=(8, 8))
+    for t in tickers:
+        df[t] = zgetNDays(t,10)
+        df[t]['pct_change'] = df[t]['Adj Close'].pct_change()
+        df[t]['cum_pct_change']=(1 + df[t]['pct_change']).cumprod() - 1
+        df[t].insert(0, 'i', range(1, 1 + len(df[t])))
+        ax1.plot(df[t]['i'], df[t]['cum_pct_change'], color=color[i], linewidth=2)
+        i = i+1
+    
 def compareDayByDayPerformance(t,days=90):
     i = 0
     while i<days:
@@ -107,7 +122,9 @@ def compareDayByDayPerformance(t,days=90):
             change = getTotalChange(df)
             ret = round(tearsheet['return'] *100,2)
             print(f"{t} Day:{s} Return:{ret}% Change; {change}%")
-        
-compareDayByDayPerformance('ONGC')
-        
+
+backtest('COALINDIA')
+#compareDayByDayPerformance('ONGC')
+ 
+#plot(['NIFTY23MAR17300PE','NIFTY23MAR16850CE'])       
     

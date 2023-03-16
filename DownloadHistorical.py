@@ -78,12 +78,12 @@ def zsplit_and_get(from_date, symbol, interval = 'minute', continuous = False):
     
     while from_date.date() < date.today():
         if from_date.date() >= (date.today() - timedelta(days)):
-            zget(from_date, dt.datetime.now(), symbol,interval,continuous)
+            zget_w_db_save(from_date, dt.datetime.now(ist), symbol,interval,continuous)
             #data = data.append(pd.DataFrame(kite.historical_data(instrument,from_date,dt.date.today(),interval)),ignore_index=True)
             break
         else:
             to_date = from_date + timedelta(days)
-            zget(from_date, to_date, symbol,interval,continuous)
+            zget_w_db_save(from_date, to_date, symbol,interval,continuous)
             #data = data.append(pd.DataFrame(kite.historical_data(instrument,from_date,to_date,interval)),ignore_index=True)
             from_date = to_date
     #data.set_index("date",inplace=True)

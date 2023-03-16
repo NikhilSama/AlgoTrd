@@ -335,6 +335,28 @@ def exit_positions (kite,t='day',lot_size=1,tick_size=0.5):
                     print("Unhandled Exchange type in positions")
 
 
+def get_positions (kite,t):
+    q = 0
+    ltp = 0
+    try:
+        positions = kite.positions()
+    except Exception as e:
+         print(f'Exit Positions T: {t} FAILED.  Unable to Exit')
+         print(e.args[0])
+         return 0,0
+       
+    for position in positions['day']:
+        #print(position)
+        symb = position['tradingsymbol']
+        q = position['quantity']
+        prod = position['product']
+        
+        if q != 0 and prod == 'MIS' and(t == 'day' or t == gettFromOpt(symb)) :
+            #print ("has it")
+            ltp = position['last_price']
+            return q,ltp
+    return 0,0
+
 # import signal
 # import sys
 
