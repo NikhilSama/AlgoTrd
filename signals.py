@@ -6,7 +6,37 @@ Created on Sun Feb  5 14:26:36 2023
 @author: nikhilsama
 """
 import numpy as np
+import pandas as pd
 import math 
+from datetime import date,timedelta,timezone
+import datetime
+import pytz
+
+# set timezone to IST
+ist = pytz.timezone('Asia/Kolkata')
+
+def tenAMToday (now=0):
+    if (now == 0):
+        now = datetime.datetime.now(ist)
+
+    # Set the target time to 8:00 AM
+    tenAM = datetime.time(hour=10, minute=0, second=0, tzinfo=ist)
+    
+    # Combine the current date with the target time
+    tenAMToday = datetime.datetime.combine(now.date(), tenAM)
+    return tenAMToday
+
+def addATR(df,n=14):
+    dfc = df.copy()
+    dfc['H-L'] = df['High'] - df['Low']
+    dfc['H-PC'] = df['High'] - df['Adj Close'].shift(1)
+    dfc['L-PC'] = df['Low'] - df['Adj Close'].shift(1)
+
+    dfc['TR'] = df[['H-L','H-PC','L-PC']].max(axis=1)
+    dfc['ATR'] = df['TR'].ewm(com=n,min_periods=n).mean()
+    return dfc['ATR']
+
+
 
 def addSMA(df,fast=8,slow=26,superTrend=200):
     
@@ -163,7 +193,12 @@ def enterExtremeTrendPositions(df):
                             (df['ma20_pct_change'] < -1),
                             -1,df['signal'])
 
-def bollinger_band_cx(df,superLen=200,maLen=20,bandWidth=2,superBandWidth=2.5):
+def bollinger_band_cx(df,superLen=200,maLen=20,bandWidth=2,superBandWidth=2.5,
+                      startTime = 0):
+    if startTime == 0:
+        startTime = datetime.datetime(2000,1,1,10,0,0) #Long ago :-)
+        startTime = ist.localize(startTime)
+        
     addBBStats(df,superLen,maLen,bandWidth,superBandWidth)
     
     #EXIT CONDITIONS
@@ -172,21 +207,23 @@ def bollinger_band_cx(df,superLen=200,maLen=20,bandWidth=2,superBandWidth=2.5):
     # BUY condition
     # 1) Trading Hours, 2) Price crossing under lower band
     # 3) Super trend below super lower band, or if it is higher then at least it is 
-    # trending down
-    df['signal'] = np.where((df.index.hour <15) &  
-                            (df['Adj Close'] < df['lower_band']) &
-                            (df['Adj Close'].shift(1) >= df['lower_band']),
-                            1,df['signal'])
+    # trending downs
+    df['signal'] = np.where((df.index >= startTime) &
+                            (df.index.hour <15) &  
+                            (df['Adj Close'] < df['lower_band']) #&
+                            #(df['Adj Close'].shift(1) >= df['lower_band'])
+                            ,1,df['signal'])
     
     # SELL condition
     # 1) Trading Hours, 2) Price crossing over upper band
     # 3) Super trend below super upper band, or if it is higher then at least it is 
     # trending down
 
-    df['signal'] = np.where((df.index.hour <15) & 
-                            (df['Adj Close'] > df['upper_band']) &
-                            (df['Adj Close'].shift(1) <= df['upper_band']),
-                            -1,df['signal'])
+    df['signal'] = np.where((df.index >= startTime) &
+                            (df.index.hour <15) & 
+                            (df['Adj Close'] > df['upper_band']) #&
+#                            (df['Adj Close'].shift(1) <= df['upper_band'])
+                            ,-1,df['signal'])
     
     closePositionsEODandSOD(df)
     

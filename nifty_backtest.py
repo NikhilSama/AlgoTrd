@@ -31,38 +31,42 @@ nifty = td.get_nifty_tickers()
 index_tickers = td.get_index_tickers()
 
 #td.get_all_ticker_data()
-end =datetime.now()
-start =end - timedelta(days=1)
 
 niftydf = {}
-
-for t in nifty:
-    niftydf[t]= downloader.zget(start,end,t) 
-    niftydf[t]=downloader.zColsToDbCols(niftydf[t])
-
 results = pd.DataFrame()
 
-def backtest(sl,ml,bw,sbw):
+def zget(interval='minute'):
+    global niftydf
+    end =datetime.now()
+    start =end - timedelta(days=2)
+    niftydf = {}
+    for t in nifty:
+        niftydf[t]= downloader.zget(start,end,t,interval) 
+        niftydf[t]=downloader.zColsToDbCols(niftydf[t])
+    
+
+def backtest(sl=200,ml=20,bw=2,sbw=2.5):
     performance = pd.DataFrame()
     global results 
-    for t in nifty:
-        df = niftydf[t]
-        df = signals.bollinger_band_cx_w_flat_superTrend(df,sl,ml,bw,sbw)
-        tearsheet,tearsheetdf = perf.tearsheet(df)
-        tearsheetdf.insert(0, 'sl', sl)
-        tearsheetdf.insert(0, 'ml', ml)
-        tearsheetdf.insert(0, 'bw', bw)
-        tearsheetdf.insert(0, 'sbw', sbw)
-        tearsheetdf.insert(0, 'ticker', t)
-        tearsheetdf.insert(0, 'type', 1)
+    # for t in nifty:
+    #     print(f"{datetime.now()}runngin {t} {sl} {ml} {bw} {sbw}")
+    #     df = niftydf[t]
+    #     df = signals.bollinger_band_cx_w_flat_superTrend(df,sl,ml,bw,sbw)
+    #     tearsheet,tearsheetdf = perf.tearsheet(df)
+    #     tearsheetdf.insert(0, 'sl', sl)
+    #     tearsheetdf.insert(0, 'ml', ml)
+    #     tearsheetdf.insert(0, 'bw', bw)
+    #     tearsheetdf.insert(0, 'sbw', sbw)
+    #     tearsheetdf.insert(0, 'ticker', t)
+    #     tearsheetdf.insert(0, 'type', 1)
 
-        print(f"{datetime.now()}runngin {t} {sl} {ml} {bw} {sbw}")
-        performance = pd.concat([performance, tearsheetdf])
+    #     performance = pd.concat([performance, tearsheetdf])
 
-    results = pd.concat([results,performance.mean().to_frame().T])
-    performance.to_csv(f"Data/backtest/NS{sl}sl-{ml}ml-{bw}bw-{sbw}sbw-CX_Super.csv")
+    # results = pd.concat([results,performance.mean().to_frame().T])
+    # performance.to_csv(f"Data/backtest/NS{sl}sl-{ml}ml-{bw}bw-{sbw}sbw-CX_Super.csv")
     
     for t in nifty:
+        print(f"runnging2 {t} {sl} {ml} {bw} {sbw}")
         df = niftydf[t]
         df = signals.bollinger_band_cx(df,sl,ml,bw,sbw)
         tearsheet,tearsheetdf = perf.tearsheet(df)
@@ -72,14 +76,13 @@ def backtest(sl,ml,bw,sbw):
         tearsheetdf.insert(0, 'sbw', sbw)
         tearsheetdf.insert(0, 'ticker', t)
         tearsheetdf.insert(0, 'type', 2)
-        print(f"runnging2 {t} {sl} {ml} {bw} {sbw}")
 
         performance = pd.concat([performance, tearsheetdf])
 
     results = pd.concat([results,performance.mean().to_frame().T])
     performance.to_csv("Data/backtest/NS{sl}sl-{ml}ml-{bw}bw-{sbw}sbw-CX.csv")
     
-def combinator():
+def combinator_variables():
     for sl in [100,200,300]:
         print(sl)
         for ml in [10,20,30,50]:
@@ -89,7 +92,12 @@ def combinator():
                 for sbw in [2,2.5,3,3,5,4]:
                     print(sbw)
                     backtest(sl,ml,bw,sbw)
-
+                    
+def combinator_interval():
+    for i in ['minute','5minute','15minute','30minute','60minute']:
+        zget(i)
+        backtest()
+        
 def groupByDay(df):
     # Split the DataFrame by day using the 'groupby' function and list comprehension
     dfs_by_day = [group[1] for group in df.groupby(pd.Grouper(freq='D'))]
@@ -100,8 +108,10 @@ def groupByDay(df):
         print(df_by_day)
 
 #combinator()
+#combinator_interval()
+zget()
 backtest(200,20,2,2.5)
-#results.to_csv("Data/backtest/NIFTY-TUNING-BACKTEST.csv")
+results.to_csv("Data/backtest/NIFTY-TUNING-BACKTEST.csv")
 # sl = 100
 # ml = 10
 # bw = 3

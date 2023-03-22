@@ -44,8 +44,8 @@ def zget(from_date, to_date, symbol,interval='minute',continuous=False):
         records = kite.historical_data(token, from_date=from_date, to_date=to_date, 
                                        continuous=continuous, interval=interval)
     except Exception as e:
-        print(f'Get Historical Data Failed T: {token} from: {from_date} to: {to_date} continueous:{continuous} interval:{interval} FAILED.')
-        print(e.args[0])
+        logging.error(f'Get Historical Data Failed T: {token} from: {from_date} to: {to_date} continueous:{continuous} interval:{interval} FAILED.')
+        logging.error(e.args[0])
         return pd.DataFrame()
 
     df = pd.DataFrame(records)

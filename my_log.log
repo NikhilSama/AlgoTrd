@@ -1,0 +1,11 @@
+2023-03-22 07:59:31 +0530::INFO::root::log_setup.py::73::This log message will be in the IST timezone.
+2023-03-22 08:01:39 +0530::INFO::root::log_setup.py::72::This log message will be in the IST timezone.
+2023-03-22 08:01:39 +0530::INFO::root::log_setup.py::72::This log message will be in the IST timezone.
+2023-03-22 08:03:35 +0530::INFO::my_logger::log_setup.py::71::This log message will be in the IST timezone.
+2023-03-22 08:03:35 +0530::INFO::my_logger::log_setup.py::71::This log message will be in the IST timezone.
+2023-03-22 08:03:44 +0530::INFO::my_logger::log_setup.py::71::This log message will be in the IST timezone.
+2023-03-22 08:03:44 +0530::INFO::my_logger::log_setup.py::71::This log message will be in the IST timezone.
+2023-03-22 08:24:56 +0530::DEBUG::root::log_setup.py::31::LOG SETUP
+2023-03-22 08:24:56 +0530::INFO::root::log_setup.py::32::This is an informational message
+2023-03-22 05:08:19 +0530::DEBUG::spyder_kernels.customize.spyderpdb::spyderpdb.py::581::Could not get breakpoints from the frontend.
+2023-03-22 05:08:19 +0530::DEBUG::spyder_kernels.customize.spyderpdb::spyderpdb.py::581::Could not get breakpoints from the frontend.

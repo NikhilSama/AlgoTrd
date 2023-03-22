@@ -73,6 +73,7 @@ def initKiteTicker():
     return kite,kws
 
 def logtrade(s):
+    s = f'{datetime.now(ist).strftime("%I:%M:%P %p")} ->' + {datetime.now(ist).strftime("%I:%M:%P %p")}
     with open(tradelog, "a") as f:
         f.write(s)
         f.write('\n')
@@ -87,21 +88,32 @@ def getQ (lot_size,ltp,betsize):
 def getP (ltp,tick_size,delta):
     p = ltp * delta #Almost market order go market or at max 10% above market
     p = round(p/tick_size)*tick_size
+    logging.debug(f"getP returning p: {p} for ltp {ltp} and tick: {tick_size} and delta:{delta}")
     return p
 
 def startOfTick():
-    logtrade(f"*********************WAKE -- {datetime.now(ist)}N***********************************")
+    logtrade('WAKE***********************************')
 
 def endOfTick():
-    logtrade(f"*********************SLEEP -- {datetime.now(ist)}N***********************************")
+    logtrade('SLEEP***********************************')
 
 def is_not_tradable(t):
     if (t == 'NIFTY 50'):
         return True
     else:
         return False 
+def getExchange(kite,exchange):
+    if (exchange == 'NSE'):
+        exch = kite.EXCHANGE_NSE
+    elif (exchange == 'BSE'):
+        exch = kite.EXCHANGE_BSE
+    else:
+        logging.error(f"Unknown exchange {exchange}")
+        print(f"Unknown exchange {exchange}")
+        exch = -1
+    return exch
 
-def nse_buy (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0):
+def nse_buy (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,exchange='NSE'):
     if is_not_tradable(t):
         logging.info(f"{t} is not a tradable instrument.  NSE Buy not executed")
         return
@@ -112,15 +124,18 @@ def nse_buy (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0):
 
     if q==0:
         q = getQ(1,ltp,bet_size)
+        
 
     p = getP(ltp,tick_size,1.001)
 
-    logtrade(f"{datetime.now(ist)}NSE BUY {t} Q:{q} P:{p} LTP:{ltp} Tick:{tick_size}")
+    exch = getExchange(kite,exchange)
+    
+    logtrade(f'BUY {t} Q:{q} P:{p} LTP:{ltp} Tick:{tick_size}')
 
     #1 Min TTL LIMIT ORDER priced really as a market order (10% above market)
     try:
         order_id = kite.place_order(variety=kite.VARIETY_REGULAR,tradingsymbol=t,
-                     exchange=kite.EXCHANGE_NSE,
+                     exchange=exch,
                      transaction_type=kite.TRANSACTION_TYPE_BUY,
                      quantity=q,
                      order_type=kite.ORDER_TYPE_LIMIT,
@@ -129,7 +144,7 @@ def nse_buy (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0):
         #SL to accompany
         if (sl):
             order_id = kite.place_order(variety=kite.VARIETY_REGULAR,tradingsymbol=t,
-                                        exchange=kite.EXCHANGE_NFO,
+                                        exchange=exch,
                                         transaction_type=kite.TRANSACTION_TYPE_SELL,
                                         quantity=q,
                                         order_type=kite.ORDER_TYPE_SL,
@@ -143,7 +158,7 @@ def nse_buy (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0):
     return order_id
 
 
-def nse_sell (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0):
+def nse_sell (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,exchange='NSE'):
     if is_not_tradable(t):
         logging.info(f"{t} is not a tradable instrument.  NSE Sell not executed")
         return
@@ -157,12 +172,13 @@ def nse_sell (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0):
 
     p = getP(ltp,tick_size,0.999)
 
-    logtrade(f"{datetime.now(ist)}NSE SELL {t} Q:{q} P:{p} LTP:{ltp} Tick:{tick_size}")
+    exch = getExchange(kite,exchange)
+    logtrade(f'{exchange} SELL {t} Q:{q} P:{p} LTP:{ltp} Tick:{tick_size}')
 
     #1 Min TTL LIMIT ORDER priced really as a market order (10% above market)
     try:
         order_id = kite.place_order(variety=kite.VARIETY_REGULAR,tradingsymbol=t,
-                     exchange=kite.EXCHANGE_NSE,
+                     exchange=exch,
                      transaction_type=kite.TRANSACTION_TYPE_SELL,
                      quantity=q,
                      order_type=kite.ORDER_TYPE_LIMIT,
@@ -192,7 +208,7 @@ def nse_sell (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0):
 #     for position in positions:
 #         #print(position)
 #         symb = position['tradingsymbol']
-#         if t == gettFromOpt(symb):
+#         if t == gettFromOption(symb):
 #             #print ("has it")
 #             q = position['quantity']
 #             ltp = position['last_price']
@@ -205,7 +221,7 @@ def nse_sell (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0):
                 
             
 
-def nfo_buy (kite,t,lot_size,tick_size, q=1,ltp=0,sl=1):
+def nfo_buy (kite,t,lot_size=1,tick_size=0.5, q=1,ltp=0,sl=1):
     if (ltp ==0):
         #Get ltp if not provided
         ltp = kite.ltp([f"NFO:{t}"])[f"NFO:{t}"]['last_price']
@@ -243,7 +259,7 @@ def nfo_buy (kite,t,lot_size,tick_size, q=1,ltp=0,sl=1):
     return order_id
 
     
-def nfo_sell (kite, t, lot_size, tick_size, q=0,ltp=0,sl=1):
+def nfo_sell (kite, t, lot_size=1, tick_size=0.5, q=0,ltp=0,sl=1):
     
     if (ltp ==0):
         #Get ltp if not provided
@@ -282,7 +298,7 @@ def nfo_sell (kite, t, lot_size, tick_size, q=0,ltp=0,sl=1):
         return -1
     return order_id
 
-def gettFromOpt (string):
+def gettFromOption (string):
     # Define regex pattern to match all leading alphabets
     pattern = r'^[a-zA-Z]+'
     
@@ -296,6 +312,34 @@ def gettFromOpt (string):
         # Return an empty string if no match found
         return ''
 
+def isPutOption (t):
+    underlying_ticker = gettFromOption(t)
+    # Define regex pattern to match all leading alphabets
+    pattern = re.compile(underlying_ticker + r"\d+[a-zA-Z]+(\w{2})")
+    
+    # Search for the pattern in the string
+    match = pattern.search(t)
+    
+    if match:
+        last_two_chars = match.group(1)
+        print(last_two_chars)
+        if (last_two_chars == 'PE'):
+            return True
+    return False
+      
+def long_or_short(position):
+    t = gettFromOption(position['tradingsymbol'])
+    if isPutOption(t):
+        if (position['quantity'] > 0):
+            return -1
+        else:
+            return -1        
+    else: #Equity, or Call Option
+        if (position['quantity'] > 0):
+            return 1
+        else:
+            return -1        
+    
 def exit_positions (kite,t='day',lot_size=1,tick_size=0.5):
     try:
         positions = kite.positions()
@@ -304,7 +348,7 @@ def exit_positions (kite,t='day',lot_size=1,tick_size=0.5):
          print(e.args[0])
          return -1
        
-    logtrade(f"{datetime.now(ist)}NFO EXIT {t} lot_size: {lot_size} tick_size{tick_size}")
+    logtrade(f'{datetime.now(ist).strftime("%I:%M %p")}->NFO EXIT {t} lot_size: {lot_size} tick_size{tick_size}')
 
     for position in positions['day']:
         #print(position)
@@ -312,15 +356,15 @@ def exit_positions (kite,t='day',lot_size=1,tick_size=0.5):
         q = position['quantity']
         prod = position['product']
         
-        if q != 0 and prod == 'MIS' and(t == 'day' or t == gettFromOpt(symb)) :
+        if q != 0 and prod == 'MIS' and(t == 'day' or t == gettFromOption(symb)) :
             #print ("has it")
             ltp = position['last_price']
             if (q>0):
                 #Long position, need to sell to exit
                 if (position['exchange'] == 'NFO'):
                     nfo_sell(kite,symb,lot_size,tick_size, q,ltp)
-                elif (position['exchange'] == 'NSE'):
-                    nse_sell(kite,symb,lot_size,tick_size, q,ltp)
+                elif (position['exchange'] == 'NSE' or position['exchange'] == 'BSE'):
+                    nse_sell(kite,symb,lot_size,tick_size, q,ltp,position['exchange'])
                 else:
                     logging.error("Unhandled Exchange type in positions")
                     print("Unhandled Exchange type in positions")
@@ -328,34 +372,72 @@ def exit_positions (kite,t='day',lot_size=1,tick_size=0.5):
                 #Short position, need to buy to exit
                 if (position['exchange'] == 'NFO'):
                     nfo_buy(kite,symb,lot_size,tick_size, -1*q,ltp)
-                elif (position['exchange'] == 'NSE'):
-                    nse_buy(kite,symb,lot_size,tick_size, -1*q,ltp)
+                elif (position['exchange'] == 'NSE'or position['exchange'] == 'BSE'):
+                    nse_buy(kite,symb,lot_size,tick_size, -1*q,ltp, ltp,position['exchange'])
                 else:
                     logging.error("Unhandled Exchange type in positions")
                     print("Unhandled Exchange type in positions")
 
+def exit_given_position(kite,p):
+    logging.info(f"EXIT: {p['tradingsymbol']}")
+    if p['exchange'] == 'NFO':
+        if p['quantity'] > 0:
+            nfo_sell(kite,p['tradingsymbol'], q=p['quantity'],ltp=p['last_price'])
+        else:
+            nfo_buy(kite,p['tradingsymbol'], q=-1*p['quantity'],ltp=p['last_price'])
+    elif p['exchange'] == 'NSE' or p['exchange'] == 'BSE':
+        if p['quantity'] > 0:
+            nse_sell(kite,p['tradingsymbol'], q=p['quantity'],ltp=p['last_price'],
+                     exchange=p['exchange'])
+        else:
+            nse_buy(kite,p['tradingsymbol'], q=-1*p['quantity'],ltp=p['last_price'],
+                    exchange = p['exchange'])
+    else:
+        logging.error(f"Unhandled Exchange type ({p['exchange']}) in positions")
+        print(f"Unhandled Exchange type ({p['exchange']})in positions")
 
-def get_positions (kite,t):
-    q = 0
-    ltp = 0
+def exit_given_positions(kite,positions):
+    for position in positions:
+        exit_given_position(kite, position)
+
+def get_positions (kite):
+    p = {}
     try:
         positions = kite.positions()
     except Exception as e:
-         print(f'Exit Positions T: {t} FAILED.  Unable to Exit')
+         print(f'Get Positions FAILED.')
          print(e.args[0])
-         return 0,0
+         return p
        
     for position in positions['day']:
-        #print(position)
-        symb = position['tradingsymbol']
-        q = position['quantity']
-        prod = position['product']
         
-        if q != 0 and prod == 'MIS' and(t == 'day' or t == gettFromOpt(symb)) :
-            #print ("has it")
-            ltp = position['last_price']
-            return q,ltp
-    return 0,0
+        if position['quantity'] != 0 and position['product'] == 'MIS' :
+            pos = {}
+            pos['tradingsymbol'] = position['tradingsymbol']
+            pos['quantity'] = position['quantity']
+            pos['last_price'] = position['last_price']
+            pos['exchange'] = position['exchange']
+            pos['long_or_short'] = long_or_short(position)
+            t = gettFromOption(position['tradingsymbol'])
+            if not t in p:
+                p[t] = {}
+                p[t]['net_position'] = pos['long_or_short']
+                p[t]['positions'] = []
+            else:
+                #check to ensure old positions are consistant
+                for other_positions in p[t]['positions']:
+                    if other_positions['long_or_short'] != p[t]['net_position']:
+                        p[t]['net_position'] = 'inconsistant'
+                        logging.error(f"Positions for {t} inconsistant")
+                        logging.error(position)
+            p[t]['positions'].append(pos)
+            
+    return p
+
+# kite = initKite()
+# x = get_positions(kite)
+# for y in x.values():
+#      exit_given_positions(kite, y['positions'])
 
 # import signal
 # import sys

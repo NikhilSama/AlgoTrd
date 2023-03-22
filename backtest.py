@@ -41,7 +41,9 @@ def getTotalChange(df):
 
 def backtest(t):
 
+    print (f"StART {datetime.now(ist)}")
     df = zgetNDays(t,1)
+    print (f"ZGET Complete {datetime.now(ist)}")
     #df = td.get_ticker_data("NIFTY 50", start,end, incl_options=False)
     #ce_ticker = td.get_option_ticker("RELIANCE", df['Adj Close'][-1], 'CE')
     #ddf = td.get_ticker_data(ce_ticker, start,end)
@@ -54,7 +56,8 @@ def backtest(t):
     #df = signals.bollinger_band_cx(df)
     
     df = signals.bollinger_band_cx(df)
-    
+    print (f"SIGNALS Complete {datetime.now(ist)}")
+
     #df['Open'] = ddf['Open']
     #df['High'] = ddf['High']
     #df['Low'] = ddf['Low']
@@ -64,7 +67,8 @@ def backtest(t):
     #signals.ema_cx(df)
     #signals.mystrat(df)
     tearsheet,tearsheetdf = perf.tearsheet(df)
-    
+    print (f"Tearsheet Complete {datetime.now(ist)}")
+
     #df[['ma_superTrend', 'ma_slow', 'ma_fast']].plot(grid=True, figsize=(12, 8))
     fig, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(5, 1, figsize=(8, 8))
     
@@ -93,9 +97,10 @@ def backtest(t):
     
     # display the plots
     plt.show()
-    pprint.pprint(tearsheet)
+    #pprint.pprint(tearsheet)
     
     df.to_csv("export.csv")
+    print (f"END Complete {datetime.now(ist)}")
 
 def plot(tickers,day=30):
     df={}

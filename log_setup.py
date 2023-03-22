@@ -9,8 +9,10 @@ import logging
 from datetime import datetime
 
 ## LOG SETUP 
-log_format = "%(asctime)s::%(levelname)s::%(name)s::"\
-             "%(filename)s::%(lineno)d::%(message)s"
+# log_format = "%(asctime)s::%(levelname)s::%(name)s::"\
+#              "%(filename)s::%(lineno)d::%(message)s"
+
+log_format = "%(asctime)s::%(message)s"
 
 fname = datetime.now().strftime('%d-%m-%y')
 
@@ -25,7 +27,8 @@ if root.handlers:
 #####
 
  
-logging.basicConfig(filename=f'Data/logs/{fname}.log', level='INFO', format=log_format)
+logging.basicConfig(filename=f'Data/logs/{fname}.log', level='INFO', 
+                    format=log_format, datefmt='%I:%M:%S %p')
 
 print(f"Logging to Data/logs/{fname}.log")
 logging.debug("LOG SETUP")
