@@ -202,7 +202,7 @@ def tearsheet (df):
         tearsheet["return"] = trades.iloc[-1]["cum_return"]
         tearsheet["return per day in trade"] =     tearsheet["return"] / tearsheet["days_in_trade"]
         tearsheet["annualized return"] = tearsheet["return per day in trade"] * 250
-        tearsheet["return_fixed_bet"] = trades["return"].sum()
+        #tearsheet["return_fixed_bet"] = df["cum_bnh_returns"][-1]
         tearsheet["average_return"] = trades['return'].mean()
         tearsheet["std_dev_return"] = trades['return'].std()
         tearsheet["wins"] = get_trade_stats(trades.loc[trades['return'] > 0, 'return'])

@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 import pprint
 import DownloadHistorical as downloader
 import pytz
+import strategies15m as strat15m
 
 tickers = td.get_sp500_tickers()
 nifty = td.get_nifty_tickers()
@@ -24,25 +25,25 @@ index_tickers = td.get_index_tickers()
 # set timezone to IST
 ist = pytz.timezone('Asia/Kolkata')
 
-def zget(t,s,e):
+def zget(t,s,e,i):
     #Get latest minute tick from zerodha
-    df = downloader.zget(s,e,t) 
+    df = downloader.zget(s,e,t,i) 
     df = downloader.zColsToDbCols(df)
     return df
 
-def zgetNDays(t,n,e=datetime.now(ist)):
+def zgetNDays(t,n,e=datetime.now(ist),i="minute"):
     s = e - timedelta(days=n)
-    return zget(t, s, e)
+    return zget(t, s, e, i)
 
 def getTotalChange(df):
     return round(100*(df['Open'][0] - df['Adj Close'][-1])/df['Open'][0],2)
 
 
 
-def backtest(t):
+def backtest(t,i):
 
-    print (f"StART {datetime.now(ist)}")
-    df = zgetNDays(t,1)
+    print (f'Start {datetime.now(ist)}')
+    df = zgetNDays(t,40,i=i)
     print (f"ZGET Complete {datetime.now(ist)}")
     #df = td.get_ticker_data("NIFTY 50", start,end, incl_options=False)
     #ce_ticker = td.get_option_ticker("RELIANCE", df['Adj Close'][-1], 'CE')
@@ -55,7 +56,9 @@ def backtest(t):
     #signals.sma50_bullish(df)
     #df = signals.bollinger_band_cx(df)
     
-    df = signals.bollinger_band_cx(df)
+    #df = signals.bollinger_band_cx(df)
+    df = strat15m.meanReversionStrategy(df)
+    
     print (f"SIGNALS Complete {datetime.now(ist)}")
 
     #df['Open'] = ddf['Open']
@@ -68,9 +71,10 @@ def backtest(t):
     #signals.mystrat(df)
     tearsheet,tearsheetdf = perf.tearsheet(df)
     print (f"Tearsheet Complete {datetime.now(ist)}")
-
+    print(f'{tearsheet["average_return"]*100}%')
+    print(tearsheet['std_dev_return'])
     #df[['ma_superTrend', 'ma_slow', 'ma_fast']].plot(grid=True, figsize=(12, 8))
-    fig, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(5, 1, figsize=(8, 8))
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(8, 8))
     
     # plot the first series in the first subplot
     #ax1.plot(df['i'], df['ma_superTrend'], color='green', linewidth=2)
@@ -81,15 +85,15 @@ def backtest(t):
     ax1.plot(df['i'], df['ma_superTrend'], color='orange', linewidth=4)
     
     # plot the second series in the second subplot
-    ax2.plot(df['i'], df['ma_superTrend_pct_change'], color='red', linewidth=2)
+    #ax2.plot(df['i'], df['ma_superTrend_pct_change'], color='red', linewidth=2)
     #ax2.plot(df.index, df['superTrend'], color='red', linewidth=2)
     #ax2.plot(df['i'], df['Adj Close-P'], color='blue', linewidth=2)
     #ax2.plot(df['i'], df['Adj Close-C'], color='red', linewidth=2)
     
-    ax3.plot(df['i'], df['ma20_pct_change_ma'], color='green', linewidth=2)
+    #ax3.plot(df['i'], df['ma20_pct_change_ma'], color='green', linewidth=2)
     #ax3.plot(df['i'], df['ma20_pct_change_ma'], color='red', linewidth=2)
-    ax4.plot(df['i'], df['cum_strategy_returns'], color='blue', linewidth=2)
-    ax5.plot(df['i'], df['position'], color='green', linewidth=2)
+    ax2.plot(df['i'], df['cum_strategy_returns'], color='blue', linewidth=2)
+    ax3.plot(df['i'], df['position'], color='green', linewidth=2)
     
     #ax3.plot(df.index, df['Volume'], color='red', linewidth=2)
     #ax3.plot(df.index, df['obv'], color='green', linewidth=2)
@@ -102,13 +106,16 @@ def backtest(t):
     df.to_csv("export.csv")
     print (f"END Complete {datetime.now(ist)}")
 
-def plot(tickers,day=30):
+# Plot the graph of closing prices for the array of tickers provided
+# and the interval provided and the number of days provided
+def plot(tickers,i='minute', days=30):
     df={}
     i=0
     color=['blue','green','red']
     fig, (ax1) = plt.subplots(1, 1, figsize=(8, 8))
+
     for t in tickers:
-        df[t] = zgetNDays(t,10)
+        df[t] = zgetNDays(t,days,i=i)
         df[t]['pct_change'] = df[t]['Adj Close'].pct_change()
         df[t]['cum_pct_change']=(1 + df[t]['pct_change']).cumprod() - 1
         df[t].insert(0, 'i', range(1, 1 + len(df[t])))
@@ -120,7 +127,7 @@ def compareDayByDayPerformance(t,days=90):
     while i<days:
         i=i+1
         s = datetime.now(ist)-timedelta(days=i)
-        df = zgetNDays(t,1,s)
+        df = zgetNDays(t,days,s)
         if(len(df)):
             df = signals.bollinger_band_cx(df)
             tearsheet,tearsheetdf = perf.tearsheet(df)
@@ -128,8 +135,11 @@ def compareDayByDayPerformance(t,days=90):
             ret = round(tearsheet['return'] *100,2)
             print(f"{t} Day:{s} Return:{ret}% Change; {change}%")
 
-backtest('COALINDIA')
+plot(['ASIANPAINT'],10,'minute')
+#backtest('ASIANPAINT','60minute')
 #compareDayByDayPerformance('ONGC')
  
 #plot(['NIFTY23MAR17300PE','NIFTY23MAR16850CE'])       
-    
+
+    # print hello
+# print hello

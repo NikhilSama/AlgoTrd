@@ -36,7 +36,32 @@ def addATR(df,n=14):
     dfc['ATR'] = df['TR'].ewm(com=n,min_periods=n).mean()
     return dfc['ATR']
 
+def ADX(DF, n=20):
+    "function to calculate ADX"
+    df = DF.copy()
+    df["ATR"] = addATR(DF, n)
+    df["upmove"] = df["High"] - df["High"].shift(1)
+    df["downmove"] = df["Low"].shift(1) - df["Low"]
+    df["+dm"] = np.where((df["upmove"]>df["downmove"]) & (df["upmove"] >0), df["upmove"], 0)
+    df["-dm"] = np.where((df["downmove"]>df["upmove"]) & (df["downmove"] >0), df["downmove"], 0)
+    df["+di"] = 100 * (df["+dm"]/df["ATR"]).ewm(alpha=1/n, min_periods=n).mean()
+    df["-di"] = 100 * (df["-dm"]/df["ATR"]).ewm(alpha=1/n, min_periods=n).mean()
+    df["ADX"] = 100* abs((df["+di"] - df["-di"])/(df["+di"] + df["-di"])).ewm(alpha=1/n, min_periods=n).mean()
+    return df["ADX"]
 
+
+
+def RSI(DF, n=14):
+    "function to calculate RSI"
+    df = DF.copy()
+    df["change"] = df["Adj Close"] - df["Adj Close"].shift(1)
+    df["gain"] = np.where(df["change"]>=0, df["change"], 0)
+    df["loss"] = np.where(df["change"]<0, -1*df["change"], 0)
+    df["avgGain"] = df["gain"].ewm(alpha=1/n, min_periods=n).mean()
+    df["avgLoss"] = df["loss"].ewm(alpha=1/n, min_periods=n).mean()
+    df["rs"] = df["avgGain"]/df["avgLoss"]
+    df["rsi"] = 100 - (100/ (1 + df["rs"]))
+    return df["rsi"]
 
 def addSMA(df,fast=8,slow=26,superTrend=200):
     
@@ -68,6 +93,7 @@ def addBBStats(df,superLen=200,maLen=20,bandWidth=2,superBandWidth=2.5):
     df['super_lower_band'] = df['ma20'] - (superBandWidth * df['std'])
     #df.drop(['Open','High','Low'],axis=1,inplace=True,errors='ignore')
     #df.tail(5)
+    return df
     
 
 def eom_effect(df):
@@ -201,7 +227,7 @@ def bollinger_band_cx(df,superLen=200,maLen=20,bandWidth=2,superBandWidth=2.5,
         
     addBBStats(df,superLen,maLen,bandWidth,superBandWidth)
     
-    #EXIT CONDITIONS
+    #EXIT CONDITIONS -- Spefically put nan in the signal column 
     setInitialExitSignalonBBandBreach(df)
     
     # BUY condition
@@ -225,6 +251,49 @@ def bollinger_band_cx(df,superLen=200,maLen=20,bandWidth=2,superBandWidth=2.5,
 #                            (df['Adj Close'].shift(1) <= df['upper_band'])
                             ,-1,df['signal'])
     
+    closePositionsEODandSOD(df)
+    
+    return df
+def bollinger_band_cx2(df,superLen=200,maLen=20,bandWidth=2,superBandWidth=2.5,
+                      startTime = 0):
+    if startTime == 0:
+        startTime = datetime.datetime(2000,1,1,10,0,0) #Long ago :-)
+        startTime = ist.localize(startTime)
+        
+    addBBStats(df,superLen,maLen,bandWidth,superBandWidth)
+    
+    #EXIT CONDITIONS
+    setInitialExitSignalonBBandBreach(df)
+    
+    # BUY condition
+    # 1) Trading Hours, 2) Price crossing under lower band
+    # 3) Super trend below super lower band, or if it is higher then at least it is 
+    # trending downs
+    df['signal'] = np.where((df.index >= startTime) &
+                            (df.index.hour <15) &  
+                            (df['Adj Close'] < df['lower_band']) #&
+                            #(df['Adj Close'].shift(1) >= df['lower_band'])
+                            ,1,df['signal'])
+    
+    # SELL condition
+    # 1) Trading Hours, 2) Price crossing over upper band
+    # 3) Super trend below super upper band, or if it is higher then at least it is 
+    # trending down
+
+    df['signal'] = np.where((df.index >= startTime) &
+                            (df.index.hour <15) & 
+                            (df['Adj Close'] > df['upper_band']) #&
+#                            (df['Adj Close'].shift(1) <= df['upper_band'])
+                            ,-1,df['signal'])
+    # EXIT condition
+    df['signal'] = np.where((df.index >= startTime) &
+                            (df.index.hour <15) &  
+                            (((df['Adj Close'] < df['ma20']) &
+                            (df['Adj Close'].shift(1) >= df['ma20'])) |
+                             ((df['Adj Close'] > df['ma20']) &
+                             (df['Adj Close'].shift(1) <= df['ma20'])))
+                            ,0,df['signal'])
+
     closePositionsEODandSOD(df)
     
     return df
@@ -261,10 +330,9 @@ def bollinger_band_cx_w_basis_breakout (df,superLen=200,maLen=20,bandWidth=2,sup
                             -1,df['signal'])
     
     
-    ## IMPORTANT CALL THIS FUNCTIN IN THE BEGINNING, so that other
-    ## MEAN REVERSION SIGNALS OVERRIDE THIS ONE
-
-    ## EXIT MA 20 extreme slope conditions override BB signals.  Heavy slope up, 
+    ## IMPORTANT CALL THIS FUNCTIN IN THE END, so that it overrides other
+    ## MEAN REVERSION SIGNALS
+    ## MA 20 extreme slope conditions override BB signals.  Heavy slope up, 
     # just buy, and heavy slope down, just sell.
     enterExtremeTrendPositions(df)
     
@@ -272,7 +340,13 @@ def bollinger_band_cx_w_basis_breakout (df,superLen=200,maLen=20,bandWidth=2,sup
     
     return df
 
-def bollinger_band_cx_w_flat_superTrend (df,superLen=200,maLen=20,bandWidth=2,superBandWidth=2.5):
+def bollinger_band_cx_w_flat_superTrend (df,superLen=200,maLen=20,
+                                         bandWidth=2,superBandWidth=2.5,
+                                         startTime = 0, exitAtMA=False):
+    if startTime == 0:
+        startTime = datetime.datetime(2000,1,1,10,0,0) #Long ago :-)
+        startTime = ist.localize(startTime)
+
     addBBStats(df,superLen,maLen,bandWidth,superBandWidth)
     
     #EXIT CONDITIONS
@@ -285,7 +359,7 @@ def bollinger_band_cx_w_flat_superTrend (df,superLen=200,maLen=20,bandWidth=2,su
     # trending down
     df['signal'] = np.where((df.index.hour <15) &  
                             (df['Adj Close'] < df['lower_band']) &
-                            (df['Adj Close'].shift(1) >= df['lower_band']) &
+                            #(df['Adj Close'].shift(1) >= df['lower_band']) &
                             ((df['ma_superTrend'] < df['super_upper_band'])),
                             1,df['signal'])
     
@@ -296,14 +370,32 @@ def bollinger_band_cx_w_flat_superTrend (df,superLen=200,maLen=20,bandWidth=2,su
 
     df['signal'] = np.where((df.index.hour <15) & 
                             (df['Adj Close'] > df['upper_band']) &
-                            (df['Adj Close'].shift(1) <= df['upper_band']) &
+                            #(df['Adj Close'].shift(1) <= df['upper_band']) &
                             ((df['ma_superTrend'] > df['super_lower_band'])),
                             -1,df['signal'])
+    
+    if (exitAtMA):
+        # EXIT condition
+        df['signal'] = np.where((df.index >= startTime) &
+                                (df.index.hour <15) &  
+                                (((df['Adj Close'] < df['ma20']) &
+                                (df['Adj Close'].shift(1) >= df['ma20'])) |
+                                 ((df['Adj Close'] > df['ma20']) &
+                                 (df['Adj Close'].shift(1) <= df['ma20'])))
+                                ,0,df['signal'])
+
     
     closePositionsEODandSOD(df)
     return df
 
 def bollinger_band_cx_w_flat_superTrend2 (df,superLen=200,maLen=20,
+                                         bandWidth=2,superBandWidth=2.5,
+                                         startTime=0, exitAtMA=True):
+    return bollinger_band_cx_w_flat_superTrend (df,superLen,maLen,bandWidth,
+                                                superBandWidth,exitAtMA)
+
+
+def bollinger_band_cx_w_flat_superTrend_wHurdle (df,superLen=200,maLen=20,
                                           bandWidth=2,superBandWidth=2.5,
                                           stSlopeHurdle=0.001):
     addBBStats(df,superLen,maLen,bandWidth,superBandWidth)

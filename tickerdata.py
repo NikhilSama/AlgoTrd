@@ -93,6 +93,7 @@ def get_nifty_tickers():
  #          'NIFTY 50']
 #'ITC','BPCL','HINDALCO','WIPRO','JSWSTEEL','NTPC','TATAMOTORS',
     # return['NTPC','SBILIFE']
+    #return['COALINDIA']
     file_name = "Data/niftytickers.pickle"
     tickers = []
 

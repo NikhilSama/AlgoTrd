@@ -15,7 +15,8 @@ import time
 import logging
 import pytz
 import re
-
+import pandas as pd
+import numpy as np
 
 # set timezone to IST
 ist = pytz.timezone('Asia/Kolkata')
@@ -24,7 +25,9 @@ api_key = "ctyl079egk5jwfai"
 apisecret = "skrapb33nfgsrnivz9ms20w0x6odhr3t"
 zacceccess_file = "Data/zerodha_kite_accesstoken.txt"
 tradelog = f"Data/trades/{datetime.now().strftime('%d-%m-%y')}.trades"
+tradelogcsv = f"Data/trades/{datetime.now().strftime('%d-%m-%y')}-trades.csv"
 bet_size = 1000
+
     
 def getNewAccessToken(kite): 
     
@@ -72,12 +75,23 @@ def initKiteTicker():
     kws = KiteTicker(api_key, getAccessToken(kite))
     return kite,kws
 
-def logtrade(s):
-    s = f'{datetime.now(ist).strftime("%I:%M:%P %p")} ->' + {datetime.now(ist).strftime("%I:%M:%P %p")}
+def logtrade(s='',ticker=0,position=0,q=0,p=0,e='NSE'):
+    time = datetime.now(ist).strftime("%I:%M:%S %p")
+    p = round(p,2)
+        
+    if s == '':
+        s = f'{time} -> {position} {q} {e}:{ticker} @ {p}'
+    else:
+        s = f'{time} -> {s}' 
     with open(tradelog, "a") as f:
         f.write(s)
         f.write('\n')
 
+    if(ticker):
+        trade = pd.DataFrame(np.array([time,ticker,position,q,p,e]).reshape(1,6), 
+            columns=['time', 'ticker', 'position', 'quantity', 'price','exchange'])
+        trade.to_csv(tradelogcsv, mode='a', header=not os.path.exists(tradelogcsv))
+    
 def getQ (lot_size,ltp,betsize):
     if (lot_size > 1):
         return lot_size
@@ -107,41 +121,75 @@ def getExchange(kite,exchange):
         exch = kite.EXCHANGE_NSE
     elif (exchange == 'BSE'):
         exch = kite.EXCHANGE_BSE
+    elif (exchange == 'NFO'):
+        exch = kite.EXCHANGE_NFO
     else:
         logging.error(f"Unknown exchange {exchange}")
         print(f"Unknown exchange {exchange}")
         exch = -1
     return exch
 
-def nse_buy (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,exchange='NSE'):
+def getDelta(exchange,tx_type):
+    if exchange == 'NFO':
+        if tx_type == 'BUY':
+            return 1.05
+        elif tx_type == 'SELL':
+            return 0.99
+        else:
+            logging.error(f"Unknown tx_type {tx_type}")
+  
+    elif exchange == 'BSE' or exchange == 'NSE':
+        if tx_type == 'BUY':
+            return 1.001
+        elif tx_type == 'SELL':
+            return 0.999
+        else:
+            logging.error(f"Unknown tx_type {tx_type}")
+    else:
+        logging.error(f"Unknown exchange {exchange}")
+
+
+def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0):
     if is_not_tradable(t):
-        logging.info(f"{t} is not a tradable instrument.  NSE Buy not executed")
+        logging.info(f"{t} is not a tradable instrument.  {exchange} {tx_type} not executed")
         return
 
     if (ltp ==0):
         #Get ltp if not provided
-        ltp = kite.ltp([f"NSE:{t}"])[f"NSE:{t}"]['last_price']
+        ltp = kite.ltp([f"{exchange}:{t}"])[f"{exchange}:{t}"]['last_price']
 
     if q==0:
-        q = getQ(1,ltp,bet_size)
+        q = getQ(lot_size,ltp,bet_size)
         
-
-    p = getP(ltp,tick_size,1.001)
+    delta = getDelta(exchange,tx_type)
+    
+    p = getP(ltp,tick_size,delta)
 
     exch = getExchange(kite,exchange)
-    
-    logtrade(f'BUY {t} Q:{q} P:{p} LTP:{ltp} Tick:{tick_size}')
+
+    if tx_type == 'BUY':
+        kite_tx_type = kite.TRANSACTION_TYPE_BUY
+    elif tx_type == 'SELL':
+        kite_tx_type = kite.TRANSACTION_TYPE_SELL
+    else:
+        logging.error("Unknown Transaction Type given to Kite Exec")
+
+    logtrade('',t,tx_type,q,p,exchange)
+        
+    # logtrade(f'{tx_type} {t} Q:{q} P:{p} LTP:{ltp} Tick:{tick_size}',
+    #          t,tx_type,q,p)
 
     #1 Min TTL LIMIT ORDER priced really as a market order (10% above market)
     try:
         order_id = kite.place_order(variety=kite.VARIETY_REGULAR,tradingsymbol=t,
                      exchange=exch,
-                     transaction_type=kite.TRANSACTION_TYPE_BUY,
+                     transaction_type=kite_tx_type,
                      quantity=q,
                      order_type=kite.ORDER_TYPE_LIMIT,
                      product=kite.PRODUCT_MIS,
                      validity=kite.VALIDITY_TTL, price = p, validity_ttl = 1)
-        #SL to accompany
+        #SL to accompany 
+        ### UNTESTED CODE -- need to get teh right tx type etc in there 
         if (sl):
             order_id = kite.place_order(variety=kite.VARIETY_REGULAR,tradingsymbol=t,
                                         exchange=exch,
@@ -152,53 +200,105 @@ def nse_buy (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,exchange='NSE'):
                                         trigger_price=getP(ltp,tick_size,0.9), 
                                         price = getP(ltp,tick_size,.85))
     except Exception as e:
-        print(f'NSE Buy Failed for {t}')
+        print(f'{exchange} {tx_type} Failed for {t}')
         print(e.args[0])
         return -1
     return order_id
+
+def nse_buy (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,exchange='NSE'):
+    return exec(kite,t,exchange,'BUY',lot_size,tick_size,q,ltp,sl)
+    
+    # if is_not_tradable(t):
+    #     logging.info(f"{t} is not a tradable instrument.  NSE Buy not executed")
+    #     return
+
+    # if (ltp ==0):
+    #     #Get ltp if not provided
+    #     ltp = kite.ltp([f"NSE:{t}"])[f"NSE:{t}"]['last_price']
+
+    # if q==0:
+    #     q = getQ(1,ltp,bet_size)
+        
+
+    # p = getP(ltp,tick_size,1.001)
+
+    # exch = getExchange(kite,exchange)
+    
+    # logtrade('',t,'BUY',q,p,exchange)
+
+    # # logtrade(f'BUY {t} Q:{q} P:{p} LTP:{ltp} Tick:{tick_size}',
+    # #          t,'BUY',q,p)
+
+    # #1 Min TTL LIMIT ORDER priced really as a market order (10% above market)
+    # try:
+    #     order_id = kite.place_order(variety=kite.VARIETY_REGULAR,tradingsymbol=t,
+    #                  exchange=exch,
+    #                  transaction_type=kite.TRANSACTION_TYPE_BUY,
+    #                  quantity=q,
+    #                  order_type=kite.ORDER_TYPE_LIMIT,
+    #                  product=kite.PRODUCT_MIS,
+    #                  validity=kite.VALIDITY_TTL, price = p, validity_ttl = 1)
+    #     #SL to accompany
+    #     if (sl):
+    #         order_id = kite.place_order(variety=kite.VARIETY_REGULAR,tradingsymbol=t,
+    #                                     exchange=exch,
+    #                                     transaction_type=kite.TRANSACTION_TYPE_SELL,
+    #                                     quantity=q,
+    #                                     order_type=kite.ORDER_TYPE_SL,
+    #                                     product=kite.PRODUCT_MIS,
+    #                                     trigger_price=getP(ltp,tick_size,0.9), 
+    #                                     price = getP(ltp,tick_size,.85))
+    # except Exception as e:
+    #     print(f'NSE Buy Failed for {t}')
+    #     print(e.args[0])
+    #     return -1
+    # return order_id
 
 
 def nse_sell (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,exchange='NSE'):
-    if is_not_tradable(t):
-        logging.info(f"{t} is not a tradable instrument.  NSE Sell not executed")
-        return
+    return exec(kite,t,exchange,'SELL',lot_size,tick_size,q,ltp,sl)
+    # if is_not_tradable(t):
+    #     logging.info(f"{t} is not a tradable instrument.  NSE Sell not executed")
+    #     return
 
-    if (ltp ==0):
-        #Get ltp if not provided
-        ltp = kite.ltp([f"NSE:{t}"])[f"NSE:{t}"]['last_price']
+    # if (ltp ==0):
+    #     #Get ltp if not provided
+    #     ltp = kite.ltp([f"NSE:{t}"])[f"NSE:{t}"]['last_price']
 
-    if q==0:
-        q = getQ(1,ltp,bet_size)
+    # if q==0:
+    #     q = getQ(1,ltp,bet_size)
 
-    p = getP(ltp,tick_size,0.999)
+    # p = getP(ltp,tick_size,0.999)
 
-    exch = getExchange(kite,exchange)
-    logtrade(f'{exchange} SELL {t} Q:{q} P:{p} LTP:{ltp} Tick:{tick_size}')
+    # exch = getExchange(kite,exchange)
+    # logtrade('',t,'SELL',q,p,exchange)
+    # # logtrade(f'{exchange} SELL {t} Q:{q} P:{p} LTP:{ltp} Tick:{tick_size}',
+    # #          t,'SELL',q,p)
 
-    #1 Min TTL LIMIT ORDER priced really as a market order (10% above market)
-    try:
-        order_id = kite.place_order(variety=kite.VARIETY_REGULAR,tradingsymbol=t,
-                     exchange=exch,
-                     transaction_type=kite.TRANSACTION_TYPE_SELL,
-                     quantity=q,
-                     order_type=kite.ORDER_TYPE_LIMIT,
-                     product=kite.PRODUCT_MIS,
-                     validity=kite.VALIDITY_TTL, price = p, validity_ttl = 1)
-        #SL to accompany
-        if (sl):
-            order_id = kite.place_order(variety=kite.VARIETY_REGULAR,tradingsymbol=t,
-                                        exchange=kite.EXCHANGE_NFO,
-                                        transaction_type=kite.TRANSACTION_TYPE_BUY,
-                                        quantity=q,
-                                        order_type=kite.ORDER_TYPE_SL,
-                                        product=kite.PRODUCT_MIS,
-                                        trigger_price=getP(ltp,tick_size,0.9), 
-                                        price = getP(ltp,tick_size,.85))
-    except Exception as e:
-        print(f'NSE Buy Failed for {t}')
-        print(e.args[0])
-        return -1
-    return order_id
+    # #1 Min TTL LIMIT ORDER priced really as a market order (10% above market)
+    # try:
+    #     order_id = kite.place_order(variety=kite.VARIETY_REGULAR,tradingsymbol=t,
+    #                  exchange=exch,
+    #                  transaction_type=kite.TRANSACTION_TYPE_SELL,
+    #                  quantity=q,
+    #                  order_type=kite.ORDER_TYPE_LIMIT,
+    #                  product=kite.PRODUCT_MIS,
+    #                  validity=kite.VALIDITY_TTL, price = p, validity_ttl = 1)
+    #     #SL to accompany
+    #     if (sl):
+    #         order_id = kite.place_order(variety=kite.VARIETY_REGULAR,tradingsymbol=t,
+    #                                     exchange=kite.EXCHANGE_NFO,
+    #                                     transaction_type=kite.TRANSACTION_TYPE_BUY,
+    #                                     quantity=q,
+    #                                     order_type=kite.ORDER_TYPE_SL,
+    #                                     product=kite.PRODUCT_MIS,
+    #                                     trigger_price=getP(ltp,tick_size,0.9), 
+    #                                     price = getP(ltp,tick_size,.85))
+    # except Exception as e:
+    #     print(f'NSE Buy Failed for {t}')
+    #     print(e.args[0])
+    #     return -1
+    # return order_id
 
 # def nse_exit (kite,t,lot_size=1,tick_size=0.05):
 #     positions = kite.holdings()
@@ -312,10 +412,12 @@ def gettFromOption (string):
         # Return an empty string if no match found
         return ''
 
-def isPutOption (t):
-    underlying_ticker = gettFromOption(t)
+def isPutOption (t,exch):
+    if(exch != 'NFO'):
+        return False
+    
     # Define regex pattern to match all leading alphabets
-    pattern = re.compile(underlying_ticker + r"\d+[a-zA-Z]+(\w{2})")
+    pattern = re.compile(t + r"\d+[a-zA-Z]+(\w{2})")
     
     # Search for the pattern in the string
     match = pattern.search(t)
@@ -326,14 +428,19 @@ def isPutOption (t):
         if (last_two_chars == 'PE'):
             return True
     return False
-      
+
+def isFutureOrOption(exch):
+    if (exch == 'NFO'):
+        return True
+    else:
+        return False    
+    
 def long_or_short(position):
-    t = gettFromOption(position['tradingsymbol'])
-    if isPutOption(t):
+    if isPutOption(position['tradingsymbol'],position['exchange']):
         if (position['quantity'] > 0):
             return -1
         else:
-            return -1        
+            return 1        
     else: #Equity, or Call Option
         if (position['quantity'] > 0):
             return 1
@@ -348,7 +455,7 @@ def exit_positions (kite,t='day',lot_size=1,tick_size=0.5):
          print(e.args[0])
          return -1
        
-    logtrade(f'{datetime.now(ist).strftime("%I:%M %p")}->NFO EXIT {t} lot_size: {lot_size} tick_size{tick_size}')
+    logtrade(f'{datetime.now(ist).strftime("%I:%M %p")}-> EXIT {t} lot_size: {lot_size} tick_size{tick_size}')
 
     for position in positions['day']:
         #print(position)
@@ -418,7 +525,11 @@ def get_positions (kite):
             pos['last_price'] = position['last_price']
             pos['exchange'] = position['exchange']
             pos['long_or_short'] = long_or_short(position)
-            t = gettFromOption(position['tradingsymbol'])
+            if (isFutureOrOption(position['exchange'])):
+                t = gettFromOption(position['tradingsymbol'])
+            else:
+                t = position['tradingsymbol']
+                
             if not t in p:
                 p[t] = {}
                 p[t]['net_position'] = pos['long_or_short']

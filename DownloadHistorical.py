@@ -22,6 +22,7 @@ import kite_init as ki
 import tickerdata as td
 import logging
 import pytz
+import os
 
 # set timezone to IST
 ist = pytz.timezone('Asia/Kolkata')
@@ -29,9 +30,30 @@ ist = pytz.timezone('Asia/Kolkata')
 db = DBBasic() 
 kite = ki.initKite()
 
+def cache_df(df,t,frm,to):
+    #create directory if none exists
+    path = "Data/td_cache/"+to.strftime('%d-%m-%y')
+    if not os.path.exists(path):
+        try: 
+            os.mkdir(path)
+        except OSError as error:
+            print(error)
+
+    path = path+'/'+t
+    if not os.path.exists(path):
+        try: 
+            os.mkdir(path)
+        except OSError as error:
+            print(error)
+
+    #check if file exists
+    file_name=path+"/ohlv-"+to.strftime("%I:%M%p")+".csv"
+    df.to_csv(file_name)
+
 def zget(from_date, to_date, symbol,interval='minute',continuous=False):
     if from_date > to_date:
         return
+    
     #Kite API doesnt like TZ info in dates
     from_date = from_date.replace(tzinfo=None)
     to_date = to_date.replace(tzinfo=None)
@@ -52,6 +74,16 @@ def zget(from_date, to_date, symbol,interval='minute',continuous=False):
     if len(df) == 0:
         logging.info('No data returned')
         return df
+    #Kite Historical timestamp for a candle contails ohlcv data for the 
+    #minute that "STARTED" at the timestamp.
+    #
+    #Last row of the dataframe contains a "live" incomplete candle for the minute
+    # that STARTED now
+    #We dont want to make any signal decisions based on this live / incomplete
+    #view, since as the candle complete, ohlcv data cahnges, that signal may
+    #change.  Therefore we remove this last row of data
+    df.drop(df.tail(1).index,inplace=True) # drop last row
+
     #df.drop('volume', inplace=True, axis=1)   
     df['symbol'] = symbol
     df.set_index('date',inplace=True)
