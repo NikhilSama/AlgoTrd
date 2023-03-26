@@ -27,7 +27,7 @@ if root.handlers:
 #####
 
  
-logging.basicConfig(filename=f'Data/logs/{fname}.log', level='INFO', 
+logging.basicConfig(filename=f'Data/logs/{fname}.log', level='DEBUG', 
                     format=log_format, datefmt='%I:%M:%S %p')
 
 print(f"Logging to Data/logs/{fname}.log")

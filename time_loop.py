@@ -81,8 +81,60 @@ db = DBBasic()
 nifty = td.get_nifty_tickers()
 kite, kws = ki.initKiteTicker()
 
+# BUY CONDITION
+# Buy if current signal is 1 and position is not 1, 
+# or if position is 1 and net position is not 1 as long as signal is not -1
+# Logic for the second one is a missed candle or a missed trade(order not executed) 
+# can lead to position being 1, and net_postion not 1; we shoudl fix this
+# UNLESS the signal is -1 or 0 (nan or 1 is ok), in which case we should not, since we are going short this tick anyway
 
-def Tick():
+def buyCondition(df,net_position):
+    
+    return (df['signal'][-1] == 1 and df['position'][-1] != 1) or \
+            (df['position'][-1] == 1 and net_position != 1 and df['signal'][-1] != -1 and df['signal'][-1] != 0)
+
+# SELL CONDITION
+# Sell if current signal is -1 and position is not -1,
+# or if position is -1 and net position is not -1 as long as signal is not 1
+# Logic for the second one is a missed candle or a missed trade(order not executed)
+# can lead to position being -1, and net_postion not -1; we shoudl fix this
+# UNLESS the signal is 1 or 0 (nan or -1 is ok), in which case we should not, since we are going long this tick anyway
+
+def sellCondition(df,net_position):
+    return (df['signal'][-1] == -1 and df['position'][-1] != -1) or \
+            (df['position'][-1] == -1 and net_position != -1 and df['signal'][-1] != 1 and df['signal'][-1] != 0)
+
+# EXIT CONDITION
+# Exit if there is a current position (net_position != 0) 
+# and current signal is 0 or current signal is nan and position is 0 (missed candle or missed trade)
+def exitCondition(df,net_position):
+    return (net_position != 0) and \
+        ((df['signal'][-1] == 0 and df['position'][-1] != 0) or \
+        (df['position'][-1] == 0 and math.isnan(df['signal'][-1])))
+
+def exitCurrentPosition(t,positions,net_position,nextPosition):
+    doubleQtoExit = False
+    if t in positions: 
+        #if multiple position exists, exit all
+        if (len(positions[t]['positions']) > 1):
+            logging.error("More than one position exists for {t}. Exiting all")
+            ki.exit_given_positions(kite,positions[t]['positions'])
+        else:
+
+            if (net_position == -1 and nextPosition == 1) or \
+                (net_position == 1 and nextPosition == -1):
+                #Exit Options positions, because we always engage in options by selling
+                #ie: if we are short a stock, we sold a call option; we dont reverse
+                #positions by buying 2 calls; instead we sell the call and then sell
+                #a put;  So we need to exit any options positions here if the 
+                #net position is not consistant with nextPosition
+                ki.exitNFOPositionsONLY(kite,positions[t]['positions'])
+                #For Equity positions we can reverse simply by doubling the buy when 
+                # we change direction; so we dont need to exit equity positions here
+                doubleQtoExit = True# We have a short position, so we need to exit both
+    return doubleQtoExit
+
+def Tick(stock,options):
 
     logging.info("\n\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n")
     logging.info(f'Tick @ {now.strftime("%I:%M:%S %p")}')
@@ -129,6 +181,8 @@ def Tick():
         net_position = 0
         if t in positions:
             net_position = positions[t]['net_position']
+            # net_position can be 1,-1 or 'inconsistent'
+            # if inconsistent, then we need to exit all positions
             if (df['position'][-1] != net_position):
                 if (df['signal'][-1] != net_position):
                     logging.info(f"{t}: Exiting all Positions.  Live Kite positions({positions[t]['net_position']} inconsistant with DF pos:{df['position'][-1]} signal: {df['signal'][-1]} ")
@@ -139,37 +193,40 @@ def Tick():
                 logging.info(f"{t}: No Live Kite positions inconsistant with DF ({df['position'][-1]})")
             
         # Get Put / CALL option tickerS
-        tput,tput_lot_size,tput_tick_size = db.get_option_ticker(t, ltp, 'PE')
-        tcall,tcall_lot_size,tcall_tick_size = db.get_option_ticker(t, ltp, 'CE')
+        if options:
+            tput,tput_lot_size,tput_tick_size = db.get_option_ticker(t, ltp, 'PE')
+            tcall,tcall_lot_size,tcall_tick_size = db.get_option_ticker(t, ltp, 'CE')
         
         if ('signal' not in df.columns or 'position' not in df.columns):
             logging.error('signal or position does not exist in dataframe')
             logging.error(df)
             continue
-        # if (math.isnan(df['signal'][-1])):
-        #     continue
-        
-        #place orders
-        if (df['signal'][-1] == 1 and df['position'][-1] != 1) or (df['position'][-1] == 1 and net_position != 1): 
+                
+        if (buyCondition(df,net_position)): 
             #Go Long --  Sell Put AND buy back any pre-sold Calls
-            logging.info(f"GO LONG {t} LastCandleClose:{ltp}")
-            if t in positions: 
-                ki.exit_given_positions(kite,positions[t]['positions'])
-#            ki.exit_positions(kite,t,tput_lot_size,tput_tick_size)            
-            ki.nse_buy(kite,t)
-            #ki.nfo_sell(kite,tput,tput_lot_size,tput_tick_size)
-
-        if (df['signal'][-1] == -1 and df['position'][-1] != -1) or (df['position'][-1] == -1 and net_position != -1): 
-            #Go Short --  Sell Call AND buy back any pre-sold Puts
-            logging.info(f"GO SHORT {t} LastCandleClose:{ltp}" )
-            if t in positions: 
-                ki.exit_given_positions(kite,positions[t]['positions'])
-#           ki.exit_positions(kite,t,tput_lot_size,tput_tick_size)            
-            ki.nse_sell(kite,t)
-            #ki.nfo_sell(kite,tcall,tcall_lot_size,tcall_tick_size)
+            logging.info(f"GO LONG {t} LastCandleClose:{ltp}  Signal:{df['signal'][-1]} Position:{df['position'][-1]} NetPosition:{net_position}")
+            doubleQtoExit = \
+                exitCurrentPosition(t,positions,net_position,1)           
+            if stock:
+                ki.nse_buy(kite,t,doubleQtoExit=doubleQtoExit) 
+            if options:
+                ki.nfo_sell(kite,tput,tput_lot_size,tput_tick_size,doubleQtoExit=False) 
         
-        if(df['signal'][-1] == 0 and df['position'][-1] != 0):
-            ki.exit_positions(kite,t,tput_lot_size,tput_tick_size)            
+        
+        if (sellCondition(df,net_position)): 
+            #Go Short --  Sell Call AND buy back any pre-sold Puts
+            logging.info(f"GO SHORT {t} LastCandleClose:{ltp} Signal:{df['signal'][-1]} Position:{df['position'][-1]} NetPosition:{net_position}" )
+            doubleQtoExit = \
+                exitCurrentPosition(t,positions,net_position,-1)           
+            if stock:
+                ki.nse_sell(kite,t,doubleQtoExit=doubleQtoExit)
+            if options:
+                ki.nfo_sell(kite,tcall,tcall_lot_size,tcall_tick_size,doubleQtoExit=False)
+        
+        if(exitCondition(df,net_position)):
+            ki.exit_given_positions(kite,positions[t]['positions'])
+
+            # ki.exit_positions(kite,t,tput_lot_size,tput_tick_size)            
         
 ### MAIN LOOP RUNS 9:15 AM to 3:00 @ 3 PM MIS orders will be auto closed anyway (bad pricing)###
 
@@ -177,7 +234,7 @@ while (now.hour >= 9 and now.hour < 15):
     nxt_tick = now + timedelta(minutes=1) - timedelta(seconds=now.second)
     
     #Tick during market hours only
-    Tick()
+    Tick(stock=False, options=True)
         
     now = datetime.datetime.now(ist)
     #Sleep for seconds until the next minute

@@ -92,12 +92,11 @@ def logtrade(s='',ticker=0,position=0,q=0,p=0,e='NSE'):
             columns=['time', 'ticker', 'position', 'quantity', 'price','exchange'])
         trade.to_csv(tradelogcsv, mode='a', header=not os.path.exists(tradelogcsv))
     
-def getQ (lot_size,ltp,betsize):
+def getQ (lot_size,ltp,betsize, doubleQtoExit=False):
     if (lot_size > 1):
-        return lot_size
+        return lot_size*2 if doubleQtoExit else lot_size
     else:
-        return max(1,round(betsize/ltp))
-    #    return max(lot_size,round(betsize/ltp))
+        return max(1,round(betsize/ltp))*2 if doubleQtoExit else max(1,round(betsize/ltp))
 
 def getP (ltp,tick_size,delta):
     p = ltp * delta #Almost market order go market or at max 10% above market
@@ -132,7 +131,7 @@ def getExchange(kite,exchange):
 def getDelta(exchange,tx_type):
     if exchange == 'NFO':
         if tx_type == 'BUY':
-            return 1.05
+            return 1.03
         elif tx_type == 'SELL':
             return 0.99
         else:
@@ -148,8 +147,16 @@ def getDelta(exchange,tx_type):
     else:
         logging.error(f"Unknown exchange {exchange}")
 
+def getTxType(kite,tx_type):
+    if tx_type == 'BUY':
+        kite_tx_type = kite.TRANSACTION_TYPE_BUY
+    elif tx_type == 'SELL':
+        kite_tx_type = kite.TRANSACTION_TYPE_SELL
+    else:
+        logging.error(f"Unknown tx_type {tx_type}")
+    return kite_tx_type
 
-def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0):
+def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,doubleQtoExit=False):
     if is_not_tradable(t):
         logging.info(f"{t} is not a tradable instrument.  {exchange} {tx_type} not executed")
         return
@@ -159,20 +166,15 @@ def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0):
         ltp = kite.ltp([f"{exchange}:{t}"])[f"{exchange}:{t}"]['last_price']
 
     if q==0:
-        q = getQ(lot_size,ltp,bet_size)
-        
+        q = getQ(lot_size,ltp,bet_size, doubleQtoExit)
+            
     delta = getDelta(exchange,tx_type)
     
     p = getP(ltp,tick_size,delta)
 
     exch = getExchange(kite,exchange)
 
-    if tx_type == 'BUY':
-        kite_tx_type = kite.TRANSACTION_TYPE_BUY
-    elif tx_type == 'SELL':
-        kite_tx_type = kite.TRANSACTION_TYPE_SELL
-    else:
-        logging.error("Unknown Transaction Type given to Kite Exec")
+    kite_tx_type = getTxType(kite,tx_type)
 
     logtrade('',t,tx_type,q,p,exchange)
         
@@ -205,8 +207,8 @@ def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0):
         return -1
     return order_id
 
-def nse_buy (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,exchange='NSE'):
-    return exec(kite,t,exchange,'BUY',lot_size,tick_size,q,ltp,sl)
+def nse_buy (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,exchange='NSE',doubleQtoExit=False):
+    return exec(kite,t,exchange,'BUY',lot_size,tick_size,q,ltp,sl,doubleQtoExit)
     
     # if is_not_tradable(t):
     #     logging.info(f"{t} is not a tradable instrument.  NSE Buy not executed")
@@ -255,8 +257,8 @@ def nse_buy (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,exchange='NSE'):
     # return order_id
 
 
-def nse_sell (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,exchange='NSE'):
-    return exec(kite,t,exchange,'SELL',lot_size,tick_size,q,ltp,sl)
+def nse_sell (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,exchange='NSE',doubleQtoExit=False):
+    return exec(kite,t,exchange,'SELL',lot_size,tick_size,q,ltp,sl,doubleQtoExit)
     # if is_not_tradable(t):
     #     logging.info(f"{t} is not a tradable instrument.  NSE Sell not executed")
     #     return
@@ -321,7 +323,9 @@ def nse_sell (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,exchange='NSE'):
                 
             
 
-def nfo_buy (kite,t,lot_size=1,tick_size=0.5, q=1,ltp=0,sl=1):
+def nfo_buy (kite,t,lot_size=1,tick_size=0.5, q=1,ltp=0,sl=1,doubleQtoExit=False):
+    return exec(kite,t,'NFO', 'BUY', lot_size,tick_size,q,ltp,sl,doubleQtoExit)
+
     if (ltp ==0):
         #Get ltp if not provided
         ltp = kite.ltp([f"NFO:{t}"])[f"NFO:{t}"]['last_price']
@@ -359,8 +363,8 @@ def nfo_buy (kite,t,lot_size=1,tick_size=0.5, q=1,ltp=0,sl=1):
     return order_id
 
     
-def nfo_sell (kite, t, lot_size=1, tick_size=0.5, q=0,ltp=0,sl=1):
-    
+def nfo_sell (kite, t, lot_size=1, tick_size=0.5, q=0,ltp=0,sl=1, doubleQtoExit=False):
+    return exec(kite,t,'NFO', 'SELL', lot_size,tick_size,q,ltp,sl,doubleQtoExit)
     if (ltp ==0):
         #Get ltp if not provided
         ltp = kite.ltp([f"NFO:{t}"])[f"NFO:{t}"]['last_price']
@@ -436,6 +440,9 @@ def isFutureOrOption(exch):
         return False    
     
 def long_or_short(position):
+    if position['quantity'] == 0:
+        return 0
+    
     if isPutOption(position['tradingsymbol'],position['exchange']):
         if (position['quantity'] > 0):
             return -1
@@ -507,6 +514,11 @@ def exit_given_positions(kite,positions):
     for position in positions:
         exit_given_position(kite, position)
 
+def exitNFOPositionsONLY(kite,positions):
+    for position in positions:
+        if position['exchange'] == 'NFO':
+            exit_given_position(kite, position)
+
 def get_positions (kite):
     p = {}
     try:
@@ -537,10 +549,13 @@ def get_positions (kite):
             else:
                 #check to ensure old positions are consistant
                 for other_positions in p[t]['positions']:
-                    if other_positions['long_or_short'] != p[t]['net_position']:
+                    if other_positions['long_or_short'] != p[t]['net_position'] or \
+                    other_positions['long_or_short'] != pos['long_or_short']:
                         p[t]['net_position'] = 'inconsistant'
                         logging.error(f"Positions for {t} inconsistant")
                         logging.error(position)
+                        logging.error(other_positions)
+                        logging.error(pos)
             p[t]['positions'].append(pos)
             
     return p

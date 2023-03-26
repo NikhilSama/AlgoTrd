@@ -88,6 +88,9 @@ def get_sp500_tickers():
 
     return tickers
 
+def get_fo_active_nifty_tickers():
+    return ['RELIANCE','ADANIENT','INFY','BAJFINANCE','SBIN', 'TCS', 'KOTAKBANK', 'ICICIBANK', 'HDFCBANK', 'MARUTI' ]
+
 def get_nifty_tickers():
 #    return ['HDFC','HDFCBANK','HDFCLIFE','TATASTEEL','POWERGRID','ONGC','COALINDIA',
  #          'NIFTY 50']

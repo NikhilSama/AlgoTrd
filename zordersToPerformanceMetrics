@@ -1,0 +1,42 @@
+import pandas as pd
+import numpy as np
+
+def calculate_percentage_profit(trades_csv):
+    df = pd.read_csv(trades_csv)
+
+    # Extract the quantity and price from the 'Qty.' and 'Avg. price' columns
+    df[['Quantity', 'Fraction']] = df['Qty.'].str.split('/', expand=True).astype(float)
+    df['Price'] = df['Avg. price']
+
+    stocks = df['Instrument'].unique()
+    profits = []
+
+    for stock in stocks:
+        stock_data = df[df['Instrument'] == stock]
+        buy_data = stock_data[stock_data['Type'] == 'BUY']
+        sell_data = stock_data[stock_data['Type'] == 'SELL']
+
+        buy_sum = (buy_data['Quantity'] * buy_data['Price']).sum()
+        sell_sum = (sell_data['Quantity'] * sell_data['Price']).sum()
+        avg_buy_quantity = buy_data['Quantity'].mean()
+        avg_buy_price = buy_data['Price'].mean()
+
+        profit = (sell_sum - buy_sum) / (avg_buy_price * avg_buy_quantity) * 100
+        profits.append((stock, profit))
+        print(f"{stock}: {profit:.2f}%")
+    
+    # Calculate statistics
+    max_profit = max(profits, key=lambda x: x[1])
+    min_profit = min(profits, key=lambda x: x[1])
+    median_profit = np.median([profit for _, profit in profits])
+    mean_profit = np.mean([profit for _, profit in profits])
+    std_dev_profit = np.std([profit for _, profit in profits])
+
+    # Print statistics
+    print(f"\nMax profit: {max_profit[0]} : {max_profit[1]:.2f}%")
+    print(f"Min profit: {min_profit[0]} : {min_profit[1]:.2f}%")
+    print(f"Median profit: {median_profit:.2f}%")
+    print(f"Mean profit: {mean_profit:.2f}%")
+    print(f"Standard deviation of profit: {std_dev_profit:.2f}%")
+
+calculate_percentage_profit("trades.csv")

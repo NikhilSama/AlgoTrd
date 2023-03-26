@@ -1,0 +1,31 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.widgets import Slider, Button, RadioButtons
+
+# generate some sample data
+t = np.arange(0.0, 100.0, 0.1)
+s = np.sin(2*np.pi*t)
+
+# set up the plot
+fig, ax = plt.subplots()
+plt.subplots_adjust(left=0.25, bottom=0.25)
+
+# plot the initial data
+l, = ax.plot(t, s, lw=2)
+ax.set_xlabel('Time')
+ax.set_ylabel('Amplitude')
+ax.set_title('Scrollable plot')
+
+# create the slider widget
+axpos = plt.axes([0.25, 0.10, 0.65, 0.03])
+slider = Slider(axpos, 'Time', t[0], t[-1])
+
+# define the function to update the plot when the slider is changed
+def update(val):
+    pos = slider.val
+    ax.axis([pos, pos+10, -1, 1])
+    fig.canvas.draw_idle()
+
+slider.on_changed(update)
+
+plt.show()

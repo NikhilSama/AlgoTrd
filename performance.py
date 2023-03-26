@@ -22,6 +22,7 @@ Created on Sun Feb  5 12:43:21 2023
 import pandas as pd
 import numpy as np
 import csv
+
 pd.options.mode.chained_assignment = None  # default='warn'
 
 ### Global Data frame prep functions that calculate positions and returns
@@ -35,7 +36,6 @@ def calculate_bnh_returns (df):
 
     ## IF Call and Put option data exists
     if "Adj Close-C" in df.columns:
-        print('Call data exists')
         df['bnh_returns-C'] = df["Adj Close-C"].pct_change()
     if "Adj Close-P" in df.columns:
         df['bnh_returns-P'] = df["Adj Close-P"].pct_change()
