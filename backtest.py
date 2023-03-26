@@ -52,7 +52,7 @@ def test(t='ADANIENT',i='minute',days=1,adxThreh=30,includeOptions=False):
     signals.applyIntraDayStrategy(df1,dataPopulators,signalGenerators)
     
 
-def backtest(t='ADANIENT',i='minute',days=1,adxThresh=30,maThresh=1,obvOscThresh=.25,includeOptions=False):
+def backtest(t='ADANIENT',i='minute',days=1,adxThresh=30,maThresh=1,obvOscThresh=.25,includeOptions=False, plot=False):
 
     print (f'Start {datetime.now(ist)}')
     df = zgetNDays(t,days,i=i,includeOptions=includeOptions)
@@ -76,6 +76,11 @@ def backtest(t='ADANIENT',i='minute',days=1,adxThresh=30,maThresh=1,obvOscThresh
 
     tearsheet,tearsheetdf = perf.tearsheet(df)
     print(f'Total Return: {tearsheet["return"]*100}%')
+    df.to_csv("export.csv")
+
+    if (plot == False):
+        return
+    ## PLOTTING CODE FOLLOWS 
     #pprint.pprint(tearsheet, indent=4)
     #df[['ma_superTrend', 'ma_slow', 'ma_fast']].plot(grid=True, figsize=(12, 8))
 #    fig, (ax1, ax2, ax3, ax4, ax5, ax7) = plt.subplots(6, 1, figsize=(8, 8))
@@ -136,9 +141,14 @@ def backtest(t='ADANIENT',i='minute',days=1,adxThresh=30,maThresh=1,obvOscThresh
         end_index=df['i'][end_time]
         # Add a shaded rectangle for the time period between start_time and end_time
         ax1.axvspan(start_index, end_index, alpha=0.2, color='gray')
-    
+        ax2.axvspan(start_index, end_index, alpha=0.2, color='gray')
+        ax3.axvspan(start_index, end_index, alpha=0.2, color='gray')
+        ax4.axvspan(start_index, end_index, alpha=0.2, color='gray')
+        ax5.axvspan(start_index, end_index, alpha=0.2, color='gray')
+        ax7.axvspan(start_index, end_index, alpha=0.2, color='gray')
+
         start_time = pd.Timestamp(year=day.year, month=day.month, day=day.day, hour=14, minute=0)
-        end_time = pd.Timestamp(year=day.year, month=day.month, day=day.day, hour=15, minute=0)
+        end_time = pd.Timestamp(year=day.year, month=day.month, day=day.day, hour=15, minute=29)
         start_time = ist.localize(start_time)
         end_time = ist.localize(end_time)
         try:
@@ -147,8 +157,34 @@ def backtest(t='ADANIENT',i='minute',days=1,adxThresh=30,maThresh=1,obvOscThresh
             end_index=df['i'][end_time]
             # Add a shaded rectangle for the time period between start_time and end_time
             ax1.axvspan(start_index, end_index, alpha=0.2, color='yellow')
+            ax2.axvspan(start_index, end_index, alpha=0.2, color='yellow')
+            ax3.axvspan(start_index, end_index, alpha=0.2, color='yellow')
+            ax4.axvspan(start_index, end_index, alpha=0.2, color='yellow')
+            ax5.axvspan(start_index, end_index, alpha=0.2, color='yellow')
+            ax7.axvspan(start_index, end_index, alpha=0.2, color='yellow')
         except KeyError:
             print(f"Label '{start_time}' not found in DataFrame index.")
+        # Create a boolean mask where 'a' is greater than 'b'
+        mask = (df['position'].shift(-2) == 0) & \
+            (df.index.hour >=10) & \
+            (df.index.hour <= 13) & \
+            ((df['Adj Close'] > df['upper_band']) | \
+            (df['Adj Close'] < df['lower_band']))
+        # Use the shift method to get the start and end times of each region where the mask is True
+        start_times = df.index[(mask & ~mask.shift(1, fill_value=False))].tolist()
+        end_times = df.index[(mask & ~mask.shift(-1, fill_value=False))].tolist()
+        # Loop over each start and end time and add a shaded rectangle
+        for start_time, end_time in zip(start_times, end_times):
+            start_index=df['i'][start_time]
+            end_index=df['i'][end_time]
+            
+            # Add a shaded rectangle for the time period between start_time and end_time
+            ax1.axvspan(start_index, end_index, alpha=0.2, color='red')
+            ax2.axvspan(start_index, end_index, alpha=0.2, color='red')
+            ax3.axvspan(start_index, end_index, alpha=0.2, color='red')
+            ax4.axvspan(start_index, end_index, alpha=0.2, color='red')
+            ax5.axvspan(start_index, end_index, alpha=0.2, color='red')
+            ax7.axvspan(start_index, end_index, alpha=0.2, color='red')
 
     # create the slider widget
     axpos = plt.axes([0.1, 0.1, 0.65, 0.03])
@@ -158,7 +194,7 @@ def backtest(t='ADANIENT',i='minute',days=1,adxThresh=30,maThresh=1,obvOscThresh
     # define the function to update the plot when the slider is changed
     def update(val):
         pos = slider.val
-        sliderLen = 500
+        sliderLen = 300
         # Get the current y-value at pos
         yval1 = np.interp(pos, df['i'], df['Adj Close'])
         # Set the y-axis limits to ±5% of the current y-value at pos
@@ -205,8 +241,7 @@ def backtest(t='ADANIENT',i='minute',days=1,adxThresh=30,maThresh=1,obvOscThresh
     # display the plots
     plt.show()
     #pprint.pprint(tearsheet)
-    
-    df.to_csv("export.csv")
+    #### END OF PLOTTING CODE
     # print (f"END Complete {datetime.now(ist)}")
 
 # Plot the graph of closing prices for the array of tickers provided
@@ -252,7 +287,7 @@ def compareDayByDayPerformance(t,days=90):
 
 #plot(['ASIANPAINT'],10,'minute')
 #backtest('HDFCLIFE','minute',adxThreh=30)
-backtest('RELIANCE','minute',days=30, adxThresh=30,obvOscThresh=0.25,includeOptions=False)
+backtest('RELIANCE','minute',days=10, adxThresh=30,obvOscThresh=0.25,includeOptions=False, plot=True)
 #backtest('HDFCLIFE','minute',adxThreh=25)
 #backtest('ASIANPAINT','minute',adxThreh=25)
 #backtest('HDFCLIFE','minute',adxThreh=30)

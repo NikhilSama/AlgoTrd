@@ -5,6 +5,7 @@ Created on Sun Feb  5 14:26:36 2023
 
 @author: nikhilsama
 """
+import log_setup
 import numpy as np
 import pandas as pd
 import math 
@@ -206,9 +207,16 @@ def getSig_ADX_FILTER (type,row,superLen=200,maLen=20,bandWidth=2,superBandWidth
     # Since this is a FILTER, we only negate long and short signals
     # on extreme ADX.
     # for nan or 0, we just return the signal
-    if signal == 1 or signal == -1:
-        if row['ADX'] >= adxThresh:
-            signal = 0            
+    if row['ADX'] >= adxThresh:
+        if signal == 1:
+            if row['ma20_pct_change_ma'] < 0:
+                logging.debug(f"ADX FILTERERD SIGNL TO 0: {row.symbol}@{row.name}")
+                signal = 0
+        elif signal == -1:
+            if row['ma20_pct_change_ma'] > 0:
+                logging.debug(f"ADX FILTERERD SIGNL TO 0: {row.symbol}@{row.name}")
+                signal = 0
+
     return signal
 
 def getSig_MASLOPE_FILTER (type,row,superLen=200,maLen=20,bandWidth=2,superBandWidth=2.5,
@@ -219,9 +227,13 @@ def getSig_MASLOPE_FILTER (type,row,superLen=200,maLen=20,bandWidth=2,superBandW
     # Since this is a FILTER, we only negate long and short signals
     # on extreme MSSLOPE.
     # for nan or 0, we just return the signal
-    if signal == 1 or signal == -1:
-        if abs(row['ma20_pct_change_ma']) >= maThresh:
-            signal = 0
+    if signal == 1 and row['ma20_pct_change_ma'] >= maThresh:
+        logging.debug(f"MASLOPE FILTERERD SIGNL TO 0: {row.symbol}@{row.name}")
+        signal = 0
+    elif signal == -1 and row['ma20_pct_change_ma'] <= -maThresh:
+        logging.debug(f"MASLOPE FILTERERD SIGNL TO 0: {row.symbol}@{row.name}")
+        signal = 0
+        
     return signal
 
 
@@ -233,9 +245,12 @@ def getSig_OBV_FILTER (type,row,superLen=200,maLen=20,bandWidth=2,superBandWidth
     # Since this is a FILTER, we only negate long and short signals
     # on extreme OBV.
     # for nan or 0, we just return the signal
-    if signal == 1 or signal == -1:
-        if abs(row['OBV-OSC']) >= obvOscThresh:
-            signal = 0
+    if signal == 1 and row['OBV-OSC'] <= -obvOscThresh:
+        logging.debug(f"OBV FILTERERD SIGNL TO 0: {row.symbol}@index:{row.i} obv is:{row['OBV-OSC']} threshod is:{obvOscThresh} ")
+        signal = 0
+    elif signal == -1 and row['OBV-OSC'] >= obvOscThresh:
+        logging.debug(f"OBV FILTERERD SIGNL TO 0: {row.symbol}@index:{row.i} obv is:{row['OBV-OSC']} threshod is:{obvOscThresh}")
+        signal = 0
     return signal
 
 ### OVERRIDE SIGNAL GENERATORS
