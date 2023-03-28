@@ -23,9 +23,9 @@ def plot_backtest(df):
     #pprint.pprint(tearsheet, indent=4)
     #df[['ma_superTrend', 'ma_slow', 'ma_fast']].plot(grid=True, figsize=(12, 8))
 #    fig, (ax1, ax2, ax3, ax4, ax5, ax7) = plt.subplots(6, 1, figsize=(8, 8))
-    fig, (ax1, ax2, ax3, ax4, ax5, ax6, ax7,ax8) = \
-        plt.subplots(8, 1, figsize=(8, 8), sharex=True, 
-                     gridspec_kw={'height_ratios': [4, 1, 1, 1, 1, 1,1,1]})
+    fig, (ax1, ax2, ax3, ax4, ax5, ax6, ax7,ax8,ax9) = \
+        plt.subplots(9, 1, figsize=(8, 8), sharex=True, 
+                     gridspec_kw={'height_ratios': [4, 1, 1, 1, 1, 1,1,1,1]})
     plt.subplots_adjust(left=0.1, bottom=0.1)
     df['ma20_pct_change_ma'].fillna(0, inplace=True)
     df['ADX-PCT-CHNG'].fillna(0, inplace=True)
@@ -66,21 +66,25 @@ def plot_backtest(df):
 
     ax6.plot(df['i'], df['ma20_pct_change_ma'], color='green', linewidth=2)
     ax6.set_title('ma20_pct_change_ma - MA↓', loc='right')
-    ax6.axhline(y=maThresh, color='red', linestyle='--')
-    ax6.axhline(y=-maThresh, color='red', linestyle='--')
+    ax6.axhline(y=maSlopeThresh, color='red', linestyle='--')
+    ax6.axhline(y=-maSlopeThresh, color='red', linestyle='--')
 
+    ax7.plot(df['i'], df['ma20_pct_change_ma_sq'], color='green', linewidth=2)
+    ax7.set_title('MA slope slope sq ↓', loc='right')
+    ax7.axhline(y=maSlopeSlopeThresh, color='red', linestyle='--')
+    ax7.axhline(y=-maSlopeSlopeThresh, color='red', linestyle='--')
 
-    ax7.plot(df['i'], df['OBV-OSC'], color='green', linewidth=2)
-    ax7.set_title('OBV OSC↓', loc='right')
-    ax7.axhline(y=obvOscThresh, color='red', linestyle='--')
-    ax7.axhline(y=-obvOscThresh, color='red', linestyle='--')
-    ax7.axhline(y=obvOscThresh*obvOscThreshYellowMultiplier, color='blue', linestyle='--')
-    ax7.axhline(y=-obvOscThresh*obvOscThreshYellowMultiplier, color='blue', linestyle='--')
+    ax8.plot(df['i'], df['OBV-OSC'], color='green', linewidth=2)
+    ax8.set_title('OBV OSC↓', loc='right')
+    ax8.axhline(y=obvOscThresh, color='red', linestyle='--')
+    ax8.axhline(y=-obvOscThresh, color='red', linestyle='--')
+    ax8.axhline(y=obvOscThresh*obvOscThreshYellowMultiplier, color='blue', linestyle='--')
+    ax8.axhline(y=-obvOscThresh*obvOscThreshYellowMultiplier, color='blue', linestyle='--')
 
-    ax8.plot(df['i'], df['OBV-OSC-PCT-CHNG'], color='green', linewidth=2)
-    ax8.set_title('OBV-OSC-PCT-CHNG OSC↓', loc='right')
-    ax8.axhline(y=obvOscSlopeThresh, color='red', linestyle='--')
-    ax8.axhline(y=-obvOscSlopeThresh, color='red', linestyle='--')
+    ax9.plot(df['i'], df['OBV-OSC-PCT-CHNG'], color='green', linewidth=2)
+    ax9.set_title('OBV-OSC-PCT-CHNG OSC↓', loc='right')
+    ax9.axhline(y=obvOscSlopeThresh, color='red', linestyle='--')
+    ax9.axhline(y=-obvOscSlopeThresh, color='red', linestyle='--')
     
     
     # Loop over each day in the DataFrame
@@ -101,6 +105,7 @@ def plot_backtest(df):
         ax6.axvspan(start_index, end_index, alpha=0.2, color='gray')
         ax7.axvspan(start_index, end_index, alpha=0.2, color='gray')
         ax8.axvspan(start_index, end_index, alpha=0.2, color='gray')
+        ax9.axvspan(start_index, end_index, alpha=0.2, color='gray')
 
         start_time = pd.Timestamp(year=day.year, month=day.month, day=day.day, hour=14, minute=0)
         end_time = pd.Timestamp(year=day.year, month=day.month, day=day.day, hour=15, minute=29)
@@ -119,6 +124,7 @@ def plot_backtest(df):
             ax6.axvspan(start_index, end_index, alpha=0.2, color='yellow')
             ax7.axvspan(start_index, end_index, alpha=0.2, color='yellow')
             ax8.axvspan(start_index, end_index, alpha=0.2, color='yellow')
+            ax9.axvspan(start_index, end_index, alpha=0.2, color='yellow')
         except KeyError:
             print(f"Label '{start_time}' not found in DataFrame index.")
         # Create a boolean mask where 'a' is greater than 'b'
@@ -144,6 +150,7 @@ def plot_backtest(df):
             ax6.axvspan(start_index, end_index, alpha=0.2, color='red')
             ax7.axvspan(start_index, end_index, alpha=0.2, color='red')
             ax8.axvspan(start_index, end_index, alpha=0.2, color='red')
+            ax9.axvspan(start_index, end_index, alpha=0.2, color='red')
 
         mask = (df['position'].shift(-1) != 0) & \
             (df.index.hour >=10) & \
@@ -167,6 +174,7 @@ def plot_backtest(df):
             ax6.axvspan(start_index, end_index, alpha=0.2, color='green')
             ax7.axvspan(start_index, end_index, alpha=0.2, color='green')
             ax8.axvspan(start_index, end_index, alpha=0.2, color='green')
+            ax9.axvspan(start_index, end_index, alpha=0.2, color='green')
     # create the slider widget
     axpos = plt.axes([0.25, 0.05, 0.65, 0.03])
     slider = Slider(axpos, 'Time', df['i'][0], df['i'].iloc[-1], 
@@ -208,6 +216,9 @@ def plot_backtest(df):
         # ma 20 pct change
         ax6.set_ylim(-3.5,3.5)
         ax6.set_xlim(pos, pos+sliderLen)  # update the x-axis limits
+        # OBV - OSC
+        ax7.set_ylim(-1,1)
+        ax7.set_xlim(pos, pos+sliderLen)  # update the x-axis limits
         
         # # Get the current y-value at pos
         # yval6 = np.interp(pos, df['i'], df['OBV'])
@@ -218,13 +229,13 @@ def plot_backtest(df):
         # OBV - OSC
         
         # OBV - OSC
-        ax7.set_ylim(-1,1)
-        ax7.set_xlim(pos, pos+sliderLen)  # update the x-axis limits
+        ax8.set_ylim(-1,1)
+        ax8.set_xlim(pos, pos+sliderLen)  # update the x-axis limits
         # OBV - OSC
         
         #OBV SLOPE
-        ax8.set_ylim(-1,1)
-        ax8.set_xlim(pos, pos+sliderLen)  # update the x-axis limits
+        ax9.set_ylim(-1,1)
+        ax9.set_xlim(pos, pos+sliderLen)  # update the x-axis limits
         
         fig.canvas.draw_idle()
 

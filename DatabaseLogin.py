@@ -18,13 +18,18 @@ import sys
 
 # set timezone to IST
 ist = pytz.timezone('Asia/Kolkata')
+#cfg has all the config parameters make them all globals here
+import cfg
+globals().update(vars(cfg))
 
+#dbhost = "localhost"
 class DBBasic:
     
-    con = sqlConnector.connect(host="localhost", user="trading", passwd="trading", database="trading", port="3306", auth_plugin='mysql_native_password')
-    conTick = sqlConnector.connect(host="localhost", user="trading", passwd="trading", database="trading", port="3306", auth_plugin='mysql_native_password')
-    engine = create_engine("mysql+pymysql://{user}:{pw}@localhost:3306/{db}"
-                        .format(user="trading", pw="trading", db="trading"))
+    con = sqlConnector.connect(host=dbhost, user=dbuser, passwd=dbpass, database="trading", port="3306", auth_plugin='mysql_native_password')
+    conTick = sqlConnector.connect(host=dbhost, user=dbuser, passwd=dbpass, database="trading", port="3306", auth_plugin='mysql_native_password')
+    engine = create_engine("mysql+pymysql://{user}:{pw}@{host}:3306/{db}"
+                        .format(user=dbuser, pw=dbpass, host=dbhost, 
+                                db="trading"))
 
     def __init__(self):
         pass

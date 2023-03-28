@@ -16,7 +16,7 @@ Created on Sat Feb  4 20:18:29 2023
 
 from datetime import date,timedelta,datetime
 import tickerdata as td
-import performance as perf
+import performance as perf  
 import numpy as np
 import signals as signals
 import pandas as pd

@@ -33,8 +33,6 @@ index_tickers = td.get_index_tickers()
 # set timezone to IST
 ist = pytz.timezone('Asia/Kolkata')
 
-
-
 def zget(t,s,e,i):
     #Get latest minute tick from zerodha
     df = downloader.zget(s,e,t,i,includeOptions=includeOptions)

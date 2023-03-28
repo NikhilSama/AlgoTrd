@@ -17,6 +17,9 @@ import pytz
 import re
 import pandas as pd
 import numpy as np
+#cfg has all the config parameters make them all globals here
+import cfg
+globals().update(vars(cfg))
 
 # set timezone to IST
 ist = pytz.timezone('Asia/Kolkata')
@@ -44,6 +47,9 @@ def getNewAccessToken(kite):
 
 
 def getAccessToken(kite):
+    if 'zerodha_access_token' in cfg:
+        return zerodha_access_token
+    
     if os.path.isfile(zacceccess_file):
         #logging.debug('Access Token File exists')
         # file modification

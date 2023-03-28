@@ -10,24 +10,34 @@ cfg = {
     'startHour': 10,
     'endHour': 14,
     'exitHour': 15,
-    'days': 2,
+    'days': 5,
+    'superLen': 200,
+    'maLen': 20,
+    'bandWidth': 2,
+    'superBandWidth': 2.5,
+    'fastMALen': 7,
     'atrLen': 14,
     'adxLen': 14,
     'adxThresh': 30,
     'adxThreshYellowMultiplier': 0.7,
     'numCandlesForSlopeProjection':2,
     'adxSlopeThres': 0.06,
-    'maThresh': 1,
+    'maSlopeThresh': 1,
+    'maSlopeThreshYellowMultiplier': 0.7,
+    'maSlopeSlopeThresh': 0.01,
     'obvOscThresh': 0.25,
     'obvOscThreshYellowMultiplier': 0.7,
     'obvOscSlopeThresh': 0.3,
     'includeOptions': False,
     'plot': True,
-    'superLen': 200,
-    'maLen': 20,
-    'bandWidth': 2,
-    'superBandWidth': 2.5,
-    'overrideMultiplier': 1.2
+    'overrideMultiplier': 1.2,
+# google cloud specific stuff 
+    'dbhost' : 'localhost',
+#   'zerodha_access_token': 'Evr9jmY6dG4T1n7fQGtwRN4lzNAERgJy',
+#    'dbhost' : '34.131.115.155',
+    'dbuser' : 'trading',
+    'dbpass' : 'trading'
+
 }
 
 # Create variables with names as dict keys and values as dict values
