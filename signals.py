@@ -14,6 +14,9 @@ import datetime
 import pytz
 import performance as perf
 import logging
+#cfg has all the config parameters make them all globals here
+import cfg
+globals().update(vars(cfg))
 
 # set timezone to IST
 ist = pytz.timezone('Asia/Kolkata')
@@ -27,7 +30,7 @@ def MACD(DF,f=20,s=50):
     df['macd_his'] = df['macd'] = df['macd_signal']
     return(df['macd_signal'],df['macd_his'])
 
-def OBV(df,obvOscThresh=.1):
+def OBV(df):
     df = df.copy()
     # calculate the OBV column
     df['change'] = df['Adj Close'] - df['Open']
@@ -37,9 +40,11 @@ def OBV(df,obvOscThresh=.1):
     df['ma_obv'] = df['obv'].ewm(com=30, min_periods=5).mean()
     df['ma_obv_diff'] = df['ma_obv'].diff(5)
     df['obv_osc'] = df['ma_obv_diff'] / (df['ma_obv_diff'].max() - df['ma_obv_diff'].min())
+    df['obv_osc_pct_change'] = df['obv_osc'].pct_change(periods=3)
+    df['obv_osc_pct_change'] = df['obv_osc_pct_change'].clip(lower=-1, upper=1)
     df['obv_trend'] = np.where(df['obv_osc'] > obvOscThresh,1,0)
     df['obv_trend'] = np.where(df['obv_osc'] < -obvOscThresh,-1,df['obv_trend'])
-    return (df['ma_obv'],df['obv_osc'],df['obv_trend'])
+    return (df['ma_obv'],df['obv_osc'],df['obv_trend'],df['obv_osc_pct_change'])
 
 def tenAMToday (now=0):
     if (now == 0):
@@ -52,7 +57,7 @@ def tenAMToday (now=0):
     tenAMToday = datetime.datetime.combine(now.date(), tenAM)
     return tenAMToday
 
-def ATR(DF,n=14):
+def ATR(DF,n=atrLen):
     df = DF.copy()
     df['H-L'] = df['High'] - df['Low']
     df['H-PC'] = df['High'] - df['Adj Close'].shift(1)
@@ -62,7 +67,7 @@ def ATR(DF,n=14):
     df['ATR'] = df['TR'].ewm(com=n,min_periods=n).mean()
     return df['ATR']
 
-def ADX(DF, n=20):
+def ADX(DF, n=adxLen):
     "function to calculate ADX"
     df = DF.copy()
     df["ATR"] = ATR(DF, n)
@@ -73,7 +78,10 @@ def ADX(DF, n=20):
     df["+di"] = 100 * (df["+dm"]/df["ATR"]).ewm(alpha=1/n, min_periods=n).mean()
     df["-di"] = 100 * (df["-dm"]/df["ATR"]).ewm(alpha=1/n, min_periods=n).mean()
     df["ADX"] = 100* abs((df["+di"] - df["-di"])/(df["+di"] + df["-di"])).ewm(alpha=1/n, min_periods=n).mean()
-    return df["ADX"]
+    df['ADX-PCT-CHNG'] = df['ADX'].pct_change(periods=3)
+    df['ADX-PCT-CHNG'] = df['ADX-PCT-CHNG'].clip(lower=-1, upper=1)
+
+    return (df["ADX"],df['ADX-PCT-CHNG'])
 
 
 def RSI(DF, n=14):
@@ -103,7 +111,7 @@ def addSMA(df,fast=8,slow=26,superTrend=200):
     df['ma_slow'] = df['Adj Close'].ewm(com=slow, min_periods=slow).mean()
     df['ma_fast'] = df['Adj Close'].ewm(com=fast, min_periods=fast).mean()
 
-def addBBStats(df,superLen=200,maLen=20,bandWidth=2,superBandWidth=2.5):
+def addBBStats(df):
     # creating bollinger band indicators
     df['ma_superTrend'] = df['Adj Close'].ewm(com=superLen, min_periods=superLen).mean()
     df['ma_superTrend_pct_change'] = 10000*df['ma_superTrend'].pct_change(periods=1)
@@ -158,174 +166,429 @@ def enterExtremeTrendPositions(df):
                             (df['ma20_pct_change'] < -1),
                             -1,df['signal'])
 
+def valueBreachedThreshold (value,threshold,multiplier,slope,
+                            slopeThreshold,type='H'):
+    superHigh = value >= threshold/multiplier
+    High = (not superHigh) and value >= threshold
+    almostHigh = (not (High or superHigh)) and \
+        (value >= threshold*multiplier)
+
+    superLow = value <= -threshold/multiplier
+    Low = (not superLow) and value <= -threshold
+    almostLow = (not (Low or superLow)) and \
+        (value <= -threshold*multiplier)
+
+
+    gettingHigher = slope >= slopeThreshold
+    gettingLower = slope <= -slopeThreshold
+    notchanging = not (gettingHigher or gettingLower)
+    
+    highBreached = superHigh or \
+            (High and (not gettingLower)) or \
+            (almostHigh and gettingHigher)  
+            
+    lowBreached = superLow or \
+            (Low and (not gettingHigher)) or \
+            (almostLow and gettingLower)
+
+    if type == 'H':
+        return highBreached
+    elif type == 'L':
+        return lowBreached
+    elif type == 'H_OR_L':
+        if highBreached:
+            return 'H'
+        elif lowBreached:
+            return 'L'
+        else:
+            return False
+    else:
+        logging.error(f"unknown type {type}")
+        return False
+
+def projectedValueBreachedThreshold(value,threshold,slope,
+                                    slopeThreshold,multiplier,type):
+    #Calc projectedValue is where the value will be after {candlesToProject}
+    #if it starts at value and continues at current slope levels
+    for counter in range(numCandlesForSlopeProjection):
+        value *= (1 + slope) # calculate new value of x after one candle
+    return valueBreachedThreshold(value,threshold,multiplier,0,0.1,type)
+
+def valueOrProjectedValueBreachedThreshold(value,threshold,slope,
+                                    slopeThreshold,multiplier,type):
+    p = projectedValueBreachedThreshold(value,threshold,slope,
+                                    slopeThreshold,multiplier,type) 
+    if p == False:
+        return valueBreachedThreshold(value,threshold,multiplier,slope,
+                                    slopeThreshold,type)
+    else:
+        return p
+    
+def getLastSignal(signal):
+    last_signal_index = signal.last_valid_index()
+    if(last_signal_index):
+        last_signal = signal.loc[last_signal_index]
+    else:
+        last_signal = 0
+    return last_signal
 
 #####END OF UTILTIY FUNCTIONS#########
 
 ####### POPULATE FUNCTIONS #######
 # Functions that populate the dataframe with the indicators
-def populateBB (df,superLen=200,maLen=20,bandWidth=2,superBandWidth=2.5,
-                      adxThresh = 30,maThresh = 1,obvOscThresh=.1):
-    addBBStats(df,superLen,maLen,bandWidth,superBandWidth)
+def populateBB (df):
+    addBBStats(df)
 
-def populateADX (df,superLen=200,maLen=20,bandWidth=2,superBandWidth=2.5,
-                      adxThresh = 30,maThresh = 1,obvOscThresh=.1):
-    df['ADX'] = ADX(df,maLen)
+def populateADX (df):
+    (df['ADX'],df['ADX-PCT-CHNG']) = ADX(df,maLen)
 
-def populateOBV (df,superLen=200,maLen=20,bandWidth=2,superBandWidth=2.5,
-                      adxThresh = 30,maThresh = 1,obvOscThresh=.1):
-    (df['OBV'],df['OBV-OSC'],df['OBV-TREND']) = OBV(df,obvOscThresh)
+def populateOBV (df):
+    (df['OBV'],df['OBV-OSC'],df['OBV-TREND'],df['OBV-OSC-PCT-CHNG']) = OBV(df)
 ########### END OF POPULATE FUNCTIONS ###########
 
 ## SIGNAL GENERATION functions
 # Functions that generate the signals based on the indicators
 # type is 1 for entry or exit, 0 for exit only time frame close
 # to end of trading day
-def getSig_BB_CX(type,row,superLen=200,maLen=20,bandWidth=2,superBandWidth=2.5,
-                      adxThresh = 30,maThresh = 1,obvOscThresh=.1):
+def getSig_BB_CX(type,signal, isLastRow, row, df):
     # First get the original signal
     signal = row['signal']
+    signalChanged = False
     # BUY condition
     # 1) Trading Hours, 2) Price crossing under lower band
     # 3) Super trend below super lower band, or if it is higher then at least it is 
     # trending downs
     if row['Adj Close'] <= row['lower_band']:
         signal = 1*type
+        signalChanged = True
     # SELL condition
     # 1) Trading Hours, 2) Price crossing over upper band
     # 3) Super trend below super upper band, or if it is higher then at least it is 
     # trending down
     if row['Adj Close'] >= row['upper_band']:
         signal = -1*type
+        signalChanged = True
 
+    if isLastRow and signalChanged:
+        logging.info(f'BB-CX{row.symbol}@{row.name} signal={signal} type={type}')
     return signal
 
-def getSig_ADX_FILTER (type,row,superLen=200,maLen=20,bandWidth=2,superBandWidth=2.5,
-                      adxThresh = 30, maThresh = 1,obvOscThresh=.1):
-    # First get the original signal
-    signal = row['signal']
+# START OF BB FILTERS
+# Filters only negate BB signals to 0 under certain trending conditions
+# Never give buy or sell signals if BB is not already signalling it 
 
+# ADX is best for strength of trend, catches even
+# gentle sloping ma, with low OBV, as long as it is long lived
+def getSig_ADX_FILTER (type,signal, isLastRow,row,df):
     # Since this is a FILTER, we only negate long and short signals
-    # on extreme ADX.
+    # on extreme ADX, with MA SLOPE pointing the opposite direction of signal
     # for nan or 0, we just return the signal
-    if row['ADX'] >= adxThresh:
-        if signal == 1:
-            if row['ma20_pct_change_ma'] < 0:
-                logging.debug(f"ADX FILTERERD SIGNL TO 0: {row.symbol}@{row.name}")
-                signal = 0
-        elif signal == -1:
-            if row['ma20_pct_change_ma'] > 0:
-                logging.debug(f"ADX FILTERERD SIGNL TO 0: {row.symbol}@{row.name}")
-                signal = 0
+    signalChanged = False
 
+    if valueOrProjectedValueBreachedThreshold(row['ADX'],adxThresh,adxThreshYellowMultiplier,
+                              row['ADX-PCT-CHNG'],adxSlopeThres,"H"):
+        
+        i = df.index.get_loc(row.name) # get index of current row
+        rollbackCandles = round(adxLen*.6) # how many candles to look back
+        # Since ADX is based on last 14 candles, we should look
+        # at slope in the median of that period to understand 
+        # the direction of slope that created this ADX trend
+        # if the trend reverses, ADX may stay high, but slope may
+        # reverse.  Therefore we need to rollback and look at 
+        # old slops to relate it to ADX value
+        oldSlope = df.iloc[i - rollbackCandles,
+                          df.columns.get_loc('ma20_pct_change_ma')]  
+        if signal == 1 and oldSlope < 0:
+            signal = 0
+            signalChanged = True
+        elif signal == -1 and oldSlope > 0:
+            signal = 0
+            signalChanged = True
+        
+    if isLastRow and signalChanged:
+        logging.info(f"ADX FILTER {row.symbol}@{row.name} ADX:{row['ADX']} > Thresh:{adxThresh} MASLOPE:{row['ma20_pct_change_ma']} signal={signal} type={type}")
+    elif signalChanged:
+        logging.debug(f"ADX FILTER {row.symbol}@{row.name} ADX:{row['ADX']} > Thresh:{adxThresh} MASLOPE:{row['ma20_pct_change_ma']} signal={signal} type={type}")
+        
     return signal
 
-def getSig_MASLOPE_FILTER (type,row,superLen=200,maLen=20,bandWidth=2,superBandWidth=2.5,
-                      adxThresh = 30, maThresh = 1,obvOscThresh=.1):
-    # First get the original signal
-    signal = row['signal']
+# MA SLOPE FILTER is to catch spikes, get out dont get caught in them
+def getSig_MASLOPE_FILTER (type,signal, isLastRow,row,df):
+    signalChanged = False
+
+    breached = valueOrProjectedValueBreachedThreshold(row['ma20_pct_change_ma'],
+                                      maThresh,1,row['ma20_pct_change_ma_sq'],
+                                    .0001, "H_OR_L")
 
     # Since this is a FILTER, we only negate long and short signals
     # on extreme MSSLOPE.
     # for nan or 0, we just return the signal
-    if signal == 1 and row['ma20_pct_change_ma'] >= maThresh:
-        logging.debug(f"MASLOPE FILTERERD SIGNL TO 0: {row.symbol}@{row.name}")
-        signal = 0
-    elif signal == -1 and row['ma20_pct_change_ma'] <= -maThresh:
-        logging.debug(f"MASLOPE FILTERERD SIGNL TO 0: {row.symbol}@{row.name}")
-        signal = 0
+    
+    if breached == False:
+        return signal
+    else:
+        if signal == 1 and breached == 'L':
+            # We want to go long, but the ticker is diving down, ma pct change is too low
+            # so we filter this signal out
+            signal = 0
+            signalChanged = True
+        elif signal == -1 and breached == 'H':
+            signal = 0
+            signalChanged = True
+    if isLastRow and signalChanged:
+        logging.info(f"MASLOPE FILTER {row.symbol}@{row.name} Slope:{row['ma20_pct_change_ma']} >= Threshold {maThresh} signal={signal} type={type}")
+    elif signalChanged:
+        logging.debug(f"MASLOPE FILTER {row.symbol}@{row.name} Slope:{row['ma20_pct_change_ma']} >= Threshold {maThresh} signal={signal} type={type}")
         
     return signal
 
+#OBV is best as a leading indicator, flashes and spikes before 
+#the price moves dramatically and it beomes and trend that shows up
+#in MA or ADX etc 
+def getSig_OBV_FILTER (type,signal, isLastRow,row, df):
+    signalChanged = False
 
-def getSig_OBV_FILTER (type,row,superLen=200,maLen=20,bandWidth=2,superBandWidth=2.5,
-                      adxThresh = 30, maThresh = 1,obvOscThresh=.1):
-    # First get the original signal
-    signal = row['signal']
-    
     # Since this is a FILTER, we only negate long and short signals
     # on extreme OBV.
     # for nan or 0, we just return the signal
-    if signal == 1 and row['OBV-OSC'] <= -obvOscThresh:
-        logging.debug(f"OBV FILTERERD SIGNL TO 0: {row.symbol}@index:{row.i} obv is:{row['OBV-OSC']} threshod is:{obvOscThresh} ")
-        signal = 0
-    elif signal == -1 and row['OBV-OSC'] >= obvOscThresh:
-        logging.debug(f"OBV FILTERERD SIGNL TO 0: {row.symbol}@index:{row.i} obv is:{row['OBV-OSC']} threshod is:{obvOscThresh}")
-        signal = 0
+    
+    breached = valueOrProjectedValueBreachedThreshold(row['OBV-OSC'],obvOscThresh,
+                    obvOscThreshYellowMultiplier,row['OBV-OSC-PCT-CHNG'],
+                    obvOscSlopeThresh, "H_OR_L")
+
+    if breached == False:
+        return signal
+    else:
+        if signal == 1 and breached == 'L':
+            signal = 0
+            signalChanged = True
+        elif signal == -1 and breached == 'H':
+            signal = 0
+            signalChanged = True
+        if isLastRow and signalChanged:
+            logging.info(f"OBV FILTERERD SIGNL TO 0: {row.symbol}@index:{row.name} obv is:{row['OBV-OSC']} >= threshod is:{obvOscThresh} signal={signal} type={type}")
+        elif signalChanged:
+            logging.debug(f"OBV FILTERERD SIGNL TO 0: {row.symbol}@index:{row.name} obv is:{row['OBV-OSC']} >= threshod is:{obvOscThresh} signal={signal} type={type}")
+
     return signal
+
+## END OF FILTERS
 
 ### OVERRIDE SIGNAL GENERATORS
 # These are the signal generators that override the other signals
 # They are caleld with other signal generators have already come up
 # with a signal.  These can override in extreme cases such as 
-# sharpe declines or rises in prices or extreme ADX
-def getSig_Extreme_ADX_OBV_MA20_OVERRIDE (row,last_signal,
-        superLen=200,maLen=20,bandWidth=2,superBandWidth=2.5,
-        adxThresh = 30, maThresh = 1,obvOscThresh=.1,overridMultiplier=1.2):
-    # First get the original signal
-    if abs(row['OBV-OSC']) >= obvOscThresh*overridMultiplier or \
-        abs(row['ma20_pct_change_ma']) >= maThresh*overridMultiplier or \
-        row['ADX'] >= adxThresh*overridMultiplier:
-            print(f"Extreme ADX/OBV/MA20 OVERRIDE: {row.symbol}@{row.name}")
-            logging.debug(f"Extreme ADX/OBV/MA20 OVERRIDE: {row.symbol}@{row.name}")
-            return 0
-    return last_signal
+# sharpe declines or rises in prices or extreme ADX, and can 
+# provide buy/sell signals that override BB for breakout trends
+def getSig_exitAnyExtremeADX_OBV_MA20_OVERRIDE (type, signal, isLastRow, row, df, 
+                                                last_signal=float('nan')):    
+    
+    # Three potential strategies here -- all work
+    # 1) Set signal to 0 on extreme conditions regardless of last signal or current signal
+    # no need to even look at signal or last signal
+    # in this case we will exit even when inside BB band if conditions are extreme 
+    # df will have repeated exit signal 0 every time this is the case
+    #
+    # 2) Set signal to 0 only if current signal is 1 or -1 and last signal is 1 or -1
+    # in this case we will exit even when inside BB band if conditions are extreme 
+    # contrary to intuition, we will still have repeated exit signal 0 every time this is the case, 
+    # because last_signal will not be updated for the signals created by overrideSignals, 
+    #
+    # 3) Set signal to 0 only if current signal is 1 or -1, overriding BB signals
+    # in this case we *WILL NOT* explicitly exit on extreme conditions before BB is hit
+    # but this may be ok since bb will usually be hit when conditions are extreme
+    #
+    # NOTE: Current strategy is 3, achieved by calling this function from signal generator, 
+    # and not from overrideSignals, therefore last_signal will be nan
+    
+    if signal == 0:
+        return signal # nothing to override, we exiting already
+    
+    if last_signal in [1,-1]:
+        if signal in [1,-1]:
+            positionToAnalyse = signal
+        else:
+            positionToAnalyse = last_signal #signal is nan
+    elif signal in [1,-1]:
+        positionToAnalyse = signal
+    else:
+        return signal # signal is nan (not -1,0,1) and last signal is nan or 0
+                    #we have not current or planned position
+
+            
+    obvBreached = valueBreachedThreshold(row['OBV-OSC'],obvOscThresh,
+                                obvOscThreshYellowMultiplier,
+                                row['OBV-OSC-PCT-CHNG'],obvOscSlopeThresh,"H_OR_L")
+
+    adxBreached = valueBreachedThreshold(row['ADX'],adxThresh,adxThreshYellowMultiplier,
+                              row['ADX-PCT-CHNG'],adxSlopeThres,"H")   
+
+    slopebreached = valueBreachedThreshold(row['ma20_pct_change_ma'],
+                                      maThresh,1,row['ma20_pct_change_ma_sq'],
+                                    .0001, "H_OR_L")
+    
+    if obvBreached == False and adxBreached == False and slopebreached == False:
+        return signal    
+    
+    s = signal 
+    
+    if obvBreached:
+        breach = obvBreached
+    elif slopebreached:
+        breach = slopebreached
+    elif adxBreached:
+        i = df.index.get_loc(row.name) # get index of current row
+        rollbackCandles = round(adxLen*.6) # how many candles to look back
+        # Since ADX is based on last 14 candles, we should look
+        # at slope in the median of that period to understand 
+        # the direction of slope that created this ADX trend
+        # if the trend reverses, ADX may stay high, but slope may
+        # reverse.  Therefore we need to rollback and look at 
+        # old slops to relate it to ADX value
+        oldSlope = df.iloc[i - rollbackCandles,
+                          df.columns.get_loc('ma20_pct_change_ma')]  
+        if oldSlope < 0:
+            breach = 'L'
+        else:
+            breach = 'H'
+            
+    if positionToAnalyse == 1 and breach == 'L':
+        s = 0
+    elif positionToAnalyse == -1 and breach == 'H':
+        s = 0
+                    
+    if isLastRow and s!=signal:
+        logging.info(f"{row.symbol} => EXIT => Extreme ADX/OBV/MA20 OVERRIDE SIGNAL({signal}) / LAST SIGNAL({last_signal}). ADX:{row['ADX']} > {adxThresh*overrideMultiplier} OR OBV:{row['OBV-OSC']} > {obvOscThresh*overrideMultiplier} OR MA20:{row['ma20_pct_change_ma']} > {maThresh*overrideMultiplier}")                
+    elif s!=signal:
+        logging.debug(f"{row.symbol} => EXIT => Extreme ADX/OBV/MA20 OVERRIDE SIGNAL({signal}) / LAST SIGNAL({last_signal}). ADX:{row['ADX']} > {adxThresh*overrideMultiplier} OR OBV:{row['OBV-OSC']} > {obvOscThresh*overrideMultiplier} OR MA20:{row['ma20_pct_change_ma']} > {maThresh*overrideMultiplier}")                
+                
+    return s
+
+def getSig_followAllExtremeADX_OBV_MA20_OVERRIDE (type, signal, isLastRow, row, df, 
+                                                  last_signal=float('nan')):
+    if type == 0:# Dont take new positions when its time to exit only
+        return signal
+    s = signal 
+    
+    if abs(row['OBV-OSC']) >= obvOscThresh and \
+        abs(row['ma20_pct_change_ma']) >= maThresh and \
+        row['ADX'] >= adxThresh:
+        #We are breaking out Ride the trend
+        #print(f"Extreme ADX/OBV/MA20 OVERRIDE FOLLOW TREND: {row.symbol}@{row.name}")
+        if row['OBV-OSC'] > 0 and row['ma20_pct_change_ma'] > 0 and signal != 1:
+            if (last_signal != 1 and signal != 1):
+                s = 1
+                signalChanged = True
+        elif row['OBV-OSC'] < 0 and row['ma20_pct_change_ma'] < 0 and signal != -1:
+            if (last_signal != -1 and signal != -1):
+                s = -1
+                signalChanged = True
+            
+        if isLastRow and s!=signal:
+            logging.info(f"{row.symbol} => FOLLOW TREND => Extreme ADX/OBV/MA20 OVERRIDE signal ({signal}) / last_signal ({last_signal}) TO FOLLOW TREND.ADX:{row['ADX']} > {adxThresh} AND OBV:{row['OBV-OSC']} > {obvOscThresh} AND MA20:{row['ma20_pct_change_ma']} > {maThresh}")
+        elif s!=signal:
+            logging.debug(f"{row.symbol} => FOLLOW TREND => Extreme ADX/OBV/MA20 OVERRIDE signal ({signal}) / last_signal ({last_signal}) TO FOLLOW TREND.ADX:{row['ADX']} > {adxThresh} AND OBV:{row['OBV-OSC']} > {obvOscThresh} AND MA20:{row['ma20_pct_change_ma']} > {maThresh}")
+   
+    return s
 
 ######### END OF SIGNAL GENERATION FUNCTIONS #########
-def getSignal(row,sigGen, superLen,maLen,bandWidth,
-            superBandWidth,startTime,startHour,endHour,exitHour,
-            adxThresh,maThresh,obvOscThresh):
-    s = float("nan")
-
+def getOverrideSignal(row,ovSignalGenerators, df):
+    
+    s = row['signal'] #the signal that non-override sig generators generated
+    #Could be nan, diff rom getLastSignal, which returns last valid, non-nan,
+    #signal in df
+    
     #Return nan if its not within trading hours
     if(row.name >= startTime) & \
-        (row.name.hour > startHour):
-        if row.name.hour < endHour:
-            #Generate entry and exit signals
-            return sigGen(1,row,superLen,maLen,bandWidth,
-                        superBandWidth,adxThresh,maThresh,
-                        obvOscThresh)
-                          
-        elif row.name.hour < exitHour:
-            #Generate exit signals only
-            return sigGen(0,row,superLen,maLen,bandWidth,
-                        superBandWidth,adxThresh,maThresh,
-                        obvOscThresh)
-        else:
-            return s  
+        (row.name.hour >= startHour):
+            
+            if row.name.hour < endHour:
+                type = 1 # Entry or Exit
+            elif row.name.hour < exitHour:
+                # Last time period before intraday exit; only exit positions
+                # No new psitions will be entered
+                type = 0 
+            else:
+                return s # Outside of trading hours
+            isLastRow = row.name == df.index[-1]
+            last_signal = getLastSignal(df['signal'])
+            for sigGen in ovSignalGenerators:
+                    #Note signal last_signal is a snapshot from the last traversal of entire DF
+                    #s is initialized to last_signal, but is updated by each signal generator
+                    #and passed in.  So two signals are passed into sigGen, 
+                    # signal  (updated by sigGen) is the signal for *THIS* row, 
+                    # and last_signal is the last non nan signal from prev rows
+                    # calculated from last traversal of entire DF by signalGenerators
+                    s = sigGen(type,s, isLastRow, row, df, last_signal)                          
     else:
-        return s
+        return s#Should Never happen
+          
+    return s    
+    
+def getSignal(row,signalGenerators, df):
+    s = float("nan")
+    isLastRow = row.name == df.index[-1]
+        
+    #Return nan if its not within trading hours
+    if(row.name >= startTime) & \
+        (row.name.hour >= startHour):
+            
+            if row.name.hour < endHour:
+                type = 1 # Entry or Exit
+            elif row.name.hour < exitHour:
+                # Last time period before intraday exit; only exit positions
+                # No new psitions will be entered
+                type = 0 
+            else:
+                return s # Outside of trading hours
+            
+            for sigGen in signalGenerators:
+                        # these functions can get the signal for *THIS* row, based on the
+                        # what signal Generators previous to this have done
+                        # they cannot get or act on signals generated in previous rows
+                        # signal s from previous signal generations is passed in as an 
+                        # argument
+
+                    s = sigGen(type,s, isLastRow, row, df)                          
+    else:
+        return s#Should Never happen
           
     return s
 ## MAIN APPLY STRATEGY FUNCTION
 def applyIntraDayStrategy(df,analyticsGenerators=[populateBB], signalGenerators=[getSig_BB_CX],
-                        overrideSignalGenerators=[], superLen=200,maLen=20,bandWidth=2,superBandWidth=2.5,
-                        startTime = 0, startHour = 10, endHour = 14, exitHour= 15, 
-                        adxThresh = 30, maThresh = 1,obvOscThresh=.1):
+                        overrideSignalGenerators=[]):
+    global startTime
     if startTime == 0:
         startTime = datetime.datetime(2000,1,1,10,0,0) #Long ago :-)
         startTime = ist.localize(startTime)
     df['signal'] = float("nan")
     
     for analGen in analyticsGenerators:
-        analGen(df,superLen=superLen,maLen=maLen,bandWidth=bandWidth,
-                    superBandWidth=superBandWidth, 
-                    adxThresh=adxThresh,maThresh=maThresh,obvOscThresh=obvOscThresh)
+        analGen(df)
             
-    for sigGen in signalGenerators:
-        # apply the condition function to each row of the DataFrame
-        df['signal'] = df.apply(getSignal, 
-            args=(sigGen, superLen,maLen,bandWidth,
-                  superBandWidth,startTime,startHour,endHour,exitHour,
-                  adxThresh,maThresh,obvOscThresh), axis=1)
+    # apply the condition function to each row of the DataFrame
+    # these functions can get the signal for *THIS* row, based on the
+    # what signal Generators previous to this have done
+    # they cannot get or act on signals generated in previous rows
+    df['signal'] = df.apply(getSignal, 
+        args=(signalGenerators, df), axis=1)
     
-    # If we have exitSignalGenerators and have a non 0 net position
-    # at the end, then run them
-    last_signal = df['signal'].loc[df['signal'].last_valid_index()]
-    if len(overrideSignalGenerators) and \
-        (last_signal == 1 or last_signal == -1):
-        for ovSigGen in overrideSignalGenerators:
-            df['signal'] = df.apply(ovSigGen, 
-                args=(last_signal, superLen,maLen,bandWidth,
-                      superBandWidth,startTime,startHour,endHour,exitHour,
-                      adxThresh,maThresh,obvOscThresh), axis=1)
+    #Override signals if any:
+    #Override signal generators are similar to other signal Generators
+    #The only difference is that they are run on a second traversal of the dataframe
+    #therefore the df passed to them is updated from previous traversal signals.
+    #Unlike signalGenerators that only get signals generated in *THIS* row,
+    #overrideSignalGenerators can get signals from previous rows as well 
+    #
+    # NOTE: the last_signal we get from previous rows, will only include 
+    # the signals generated by sigGenerators, and WILL NOT include signals
+    # generated by overrideSignalGenerators.  There is no way to get the
+    # signals generated by overrideSignalGenerators in previous rows
+    #
+    #Avoid using these, unless you really need the last signal from previous rows
+    #in the current row, as second traversal will slow the entire app down
+    if len(overrideSignalGenerators):
+        df['signal'] = df.apply(getOverrideSignal, 
+            args=(overrideSignalGenerators, df), axis=1)
+    startTime = startTime
 

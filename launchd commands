@@ -1,0 +1,4 @@
+sudo launchctl load /Library/LaunchDaemons/com.example.autologin.plist
+sudo launchctl unload /Library/LaunchDaemons/com.example.autologin.plist
+log show --predicate 'subsystem == "com.apple.launchd"'
+log show --predicate 'subsystem == "com.apple.launchd" AND jobLabel == "com.example.autologin"'

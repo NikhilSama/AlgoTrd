@@ -102,6 +102,9 @@ def zget(from_date, to_date, symbol,interval='minute',
     
     df = zget_basic(from_date, to_date, symbol,interval,continuous)
     
+    if df.empty:
+        return df
+    
     if (includeOptions):
         df = zAddOptionsData(df,symbol,from_date,to_date,interval,continuous)
         

@@ -92,11 +92,12 @@ def get_fo_active_nifty_tickers():
     return ['RELIANCE','ADANIENT','INFY','BAJFINANCE','SBIN', 'TCS', 'KOTAKBANK', 'ICICIBANK', 'HDFCBANK', 'MARUTI' ]
 
 def get_nifty_tickers():
+    
 #    return ['HDFC','HDFCBANK','HDFCLIFE','TATASTEEL','POWERGRID','ONGC','COALINDIA',
  #          'NIFTY 50']
 #'ITC','BPCL','HINDALCO','WIPRO','JSWSTEEL','NTPC','TATAMOTORS',
     # return['NTPC','SBILIFE']
-    #return['COALINDIA']
+    #return['UPL']
     file_name = "Data/niftytickers.pickle"
     tickers = []
 

@@ -24,6 +24,9 @@ import matplotlib.pyplot as plt
 import pprint
 import pytz
 import random
+import cfg
+globals().update(vars(cfg))
+
 
 # set timezone to IST
 ist = pytz.timezone('Asia/Kolkata')
@@ -60,9 +63,7 @@ def zget(interval='minute',days=1,includeOptions=False):
         niftydf[t]= downloader.zget(start,end,t,interval,includeOptions=includeOptions) 
         niftydf[t]=downloader.zColsToDbCols(niftydf[t])
 
-def backtest(dataPopulators, signalGenerators,type=1, name='test',
-             sl=200,ml=20,bw=2,sbw=2.5,adxThresh=30,maThresh=1,
-             obvOscThresh=.2, plot=False):
+def backtest(type=1, name='test'):
     performance = pd.DataFrame()
     global results 
     x = 0
@@ -70,16 +71,29 @@ def backtest(dataPopulators, signalGenerators,type=1, name='test',
         #print(f"{datetime.now()}runngin {t} {sl} {ml} {bw} {sbw}")
         df = niftydf[t].copy()
         
+        if df.empty:
+            print(f"{t} is empty. Skipping.")
+            continue
+        
+        dataPopulators = [signals.populateBB, signals.populateADX, signals.populateOBV]
+        signalGenerators = [signals.getSig_BB_CX
+                      ,signals.getSig_ADX_FILTER
+                       ,signals.getSig_MASLOPE_FILTER
+                       ,signals.getSig_OBV_FILTER
+                       ,signals.getSig_exitAnyExtremeADX_OBV_MA20_OVERRIDE
+                       ,signals.getSig_followAllExtremeADX_OBV_MA20_OVERRIDE
+                        ]
+        overrideSignalGenerators = []
         signals.applyIntraDayStrategy(df,dataPopulators,signalGenerators,
-            adxThresh=adxThresh, maThresh=maThresh,
-            obvOscThresh=obvOscThresh)
+                                  overrideSignalGenerators)
+
 
         tearsheet,tearsheetdf = perf.tearsheet(df)
-        tearsheetdf.insert(0, 'sl', sl)
-        tearsheetdf.insert(0, 'ml', ml)
-        tearsheetdf.insert(0, 'bw', bw)
-        tearsheetdf.insert(0, 'sbw', sbw)
-        tearsheetdf.insert(0, 'ticker', t)
+        # tearsheetdf.insert(0, 'sl', sl)
+        # tearsheetdf.insert(0, 'ml', ml)
+        # tearsheetdf.insert(0, 'bw', bw)
+        # tearsheetdf.insert(0, 'sbw', sbw)
+        # tearsheetdf.insert(0, 'ticker', t)
         tearsheetdf.insert(0, 'type', type)
 
         df = df[df['cum_strategy_returns']!=0]
@@ -93,7 +107,7 @@ def backtest(dataPopulators, signalGenerators,type=1, name='test',
 
     results = pd.concat([results,performance.mean().to_frame().T])
     results.to_csv("Data/backtest/NIFTY-TUNING-BACKTEST.csv")
-    performance.to_csv(f"Data/backtest/NS{sl}sl-{ml}ml-{bw}bw-{sbw}sbw-{name}.csv")
+    performance.to_csv(f"Data/backtest/{name}.csv")
     
     if plot:
         plt.legend(legend,loc='upper right')
@@ -170,7 +184,7 @@ def groupByDay(df):
 
 #combinator()
 #combinator_interval()
-zget(days=90,includeOptions=False)
+zget(days=60,includeOptions=False)
 # combinator_variables()
 dataPopulators = [signals.populateBB, signals.populateADX, signals.populateOBV]
 signalGenerators = [signals.getSig_BB_CX
@@ -180,10 +194,7 @@ signalGenerators = [signals.getSig_BB_CX
                     ]
            
 #backtest(200,20,2,2.5,signals.bollinger_band_cx,"bb-cx",1)
-backtest(dataPopulators, signalGenerators, 
-         2, 'BB-CX-ADX30-MASLOPE1-OBV.25',
-         200,20,2,2.5,
-         adxThresh=30,maThresh=1,obvOscThresh=.25)
+backtest(2, 'BB-CX-ADX30-MASLOPE1-OBV.25')
 # backtest(200,20,2,2.5,signals.bollinger_band_cx2,"bb-cx-basis",2)
 # backtest(200,20,2,2.5,signals.bollinger_band_cx_w_flat_superTrend,"bb-cx-super",3)
 print(results)

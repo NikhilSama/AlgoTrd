@@ -61,7 +61,6 @@ def getAccessToken(kite):
         print("AccessToken File does not exist")
 
         AccessToken = getNewAccessToken(kite)
-        
     return AccessToken
 
 def initKite():
@@ -524,9 +523,9 @@ def get_positions (kite):
     try:
         positions = kite.positions()
     except Exception as e:
-         print(f'Get Positions FAILED.')
-         print(e.args[0])
-         return p
+        print(f'Get Positions FAILED.')
+        print(e.args[0])
+        return p
        
     for position in positions['day']:
         

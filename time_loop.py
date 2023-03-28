@@ -20,12 +20,16 @@ import kite_init as ki
 from DatabaseLogin import DBBasic
 import performance as perf
 
-from freezegun import freeze_time
+from freezegun import freeze_time   
 import pytz
 import logging
 import signal
 import sys
 import math
+
+#cfg has all the config parameters make them all globals here
+import cfg
+globals().update(vars(cfg))
 
 
 def sigterm_handler(_signo, _stack_frame):
@@ -37,11 +41,12 @@ signal.signal(signal.SIGTERM, sigterm_handler)
 
 ## TEST FREEZESR START
 
-from freezegun import freeze_time
-freezer = freeze_time("Mar 24nd, 2023 11:00:00+0530", tick=True)
-freezer.start()
-
-## END 
+if 'freezeGun' in sys.argv:
+    from freezegun import freeze_time
+    freezer = freeze_time("Mar 28nd, 2023 10:00:00+0530", tick=True)
+    freezer.start()
+    print ("Freeze gun is on")
+    ## END 
 
 # set timezone to IST
 ist = pytz.timezone('Asia/Kolkata')
@@ -69,7 +74,7 @@ now = startTime
 sleep_till_10am()
 
 #sleep a few seconds to ensure we kick off on a rounded minute
-time.sleep(60-now.second)
+#time.sleep(60-now.second)
 now = datetime.datetime.now(ist)
 
 print(f'Tick @ {now.strftime("%I:%M %p")}')
@@ -78,7 +83,7 @@ logging.debug(f">>>>>>>>DEBUG IS ON>>>>>>>")
 
 db = DBBasic() 
 
-nifty = td.get_nifty_tickers()
+nifty = td.get_fo_active_nifty_tickers()
 kite, kws = ki.initKiteTicker()
 
 # BUY CONDITION
@@ -155,7 +160,7 @@ def Tick(stock,options):
 
         #Get latest minute tick from zerodha
         df = downloader.zget(frm,now,t) 
-        if (len(df) == 0):
+        if (df.empty):
             continue
         df = downloader.zColsToDbCols(df)
         
@@ -163,7 +168,18 @@ def Tick(stock,options):
         #df = td.get_ticker_data(t, frm_ma, now, incl_options=False)
         
         #update moving averages and get signals
-        df = signals.bollinger_band_cx(df,startTime=startTime)
+        dataPopulators = [signals.populateBB, signals.populateADX, signals.populateOBV]
+        signalGenerators = [signals.getSig_BB_CX
+                         ,signals.getSig_ADX_FILTER
+                         ,signals.getSig_MASLOPE_FILTER
+                         ,signals.getSig_OBV_FILTER
+                         ,signals.getSig_exitAnyExtremeADX_OBV_MA20_OVERRIDE
+                         ,signals.getSig_followAllExtremeADX_OBV_MA20_OVERRIDE
+                                    
+                         ]
+        overrideSignalGenerators = []   
+        signals.applyIntraDayStrategy(df,dataPopulators,signalGenerators,
+                                  overrideSignalGenerators)
         df = perf.calculate_positions(df,close_at_end=False)
         
         downloader.cache_df(df, t, frm, now)
@@ -183,11 +199,12 @@ def Tick(stock,options):
             net_position = positions[t]['net_position']
             # net_position can be 1,-1 or 'inconsistent'
             # if inconsistent, then we need to exit all positions
-            if (df['position'][-1] != net_position):
-                if (df['signal'][-1] != net_position):
-                    logging.info(f"{t}: Exiting all Positions.  Live Kite positions({positions[t]['net_position']} inconsistant with DF pos:{df['position'][-1]} signal: {df['signal'][-1]} ")
-                    ki.exit_given_positions(kite,positions[t]['positions'])
-                    del positions[t]
+            if (np.isnan(df['signal'][-1]) and df['position'][-1] != net_position):
+#                if (df['signal'][-1] != net_position):
+                logging.info(f"{t}: Exiting all Positions.  Live Kite positions({positions[t]['net_position']} inconsistant with DF pos:{df['position'][-1]} signal: {df['signal'][-1]} ")
+                ki.exit_given_positions(kite,positions[t]['positions'])
+                net_position =0
+                del positions[t]
 #        elif (not math.isnan(df['signal'][-1])) and df['position'][-1] != 0:
         elif df['position'][-1] != 0:
                 logging.info(f"{t}: No Live Kite positions inconsistant with DF ({df['position'][-1]})")
@@ -224,24 +241,32 @@ def Tick(stock,options):
                 ki.nfo_sell(kite,tcall,tcall_lot_size,tcall_tick_size,doubleQtoExit=False)
         
         if(exitCondition(df,net_position)):
+            logging.info(f"EXITING {t} LastCandleClose:{ltp} Signal:{df['signal'][-1]} Position:{df['position'][-1]} NetPosition:{net_position}" )
             ki.exit_given_positions(kite,positions[t]['positions'])
 
             # ki.exit_positions(kite,t,tput_lot_size,tput_tick_size)            
-        
+    return positions
+    
 ### MAIN LOOP RUNS 9:15 AM to 3:00 @ 3 PM MIS orders will be auto closed anyway (bad pricing)###
 
-while (now.hour >= 9 and now.hour < 15):
+while (now.hour >= startHour and now.hour < exitHour):
     nxt_tick = now + timedelta(minutes=1) - timedelta(seconds=now.second)
     
     #Tick during market hours only
-    Tick(stock=False, options=True)
+    positions = Tick(stock=True, options=False)
         
     now = datetime.datetime.now(ist)
     #Sleep for seconds until the next minute
     slp_time = (nxt_tick - now).total_seconds()
     
-    logging.info(f'Done >>> It is {now.strftime("%I:%M:%S %p")} Sleeping for {slp_time}')
-    
+    if (now.hour == endHour):
+        if len(positions) == 0:
+            logging.info('In exit window and no more positions to exit. Quitting')
+            break
+        logging.info(f'Done >>> It is {now.strftime("%I:%M:%S %p")} -- NO MORE NEW POSITION ENTRY; EXITS ONLY -- Sleeping for {slp_time}')
+    else:
+        logging.info(f'Done >>> It is {now.strftime("%I:%M:%S %p")} Sleeping for {slp_time}')
+        
     ki.endOfTick()
 
     time.sleep(max(slp_time , 0))
@@ -249,7 +274,9 @@ while (now.hour >= 9 and now.hour < 15):
 
     #update now
     now = datetime.datetime.now(ist)
-    
+
+logging.info(f"*** TRADING HOURS OVER ***" )
+
 #Exit all positions at end of trading
 ki.exit_positions(kite)            
 
