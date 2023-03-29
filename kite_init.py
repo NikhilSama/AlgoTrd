@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+exit#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Created on Thu Mar  2 11:28:46 2023
@@ -97,11 +97,11 @@ def logtrade(s='',ticker=0,position=0,q=0,p=0,e='NSE'):
             columns=['time', 'ticker', 'position', 'quantity', 'price','exchange'])
         trade.to_csv(tradelogcsv, mode='a', header=not os.path.exists(tradelogcsv))
     
-def getQ (lot_size,ltp,betsize, doubleQtoExit=False):
+def getQ (lot_size,ltp,betsize, qToExit=0):
     if (lot_size > 1):
-        return lot_size*2 if doubleQtoExit else lot_size
+        return lot_size+qToExit if qToExit else lot_size
     else:
-        return max(1,round(betsize/ltp))*2 if doubleQtoExit else max(1,round(betsize/ltp))
+        return max(1,round(betsize/ltp))+qToExit if qToExit else max(1,round(betsize/ltp))
 
 def getP (ltp,tick_size,delta):
     p = ltp * delta #Almost market order go market or at max 10% above market
@@ -161,7 +161,7 @@ def getTxType(kite,tx_type):
         logging.error(f"Unknown tx_type {tx_type}")
     return kite_tx_type
 
-def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,doubleQtoExit=False):
+def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,qToExit=0):
     if is_not_tradable(t):
         logging.info(f"{t} is not a tradable instrument.  {exchange} {tx_type} not executed")
         return
@@ -171,7 +171,7 @@ def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,double
         ltp = kite.ltp([f"{exchange}:{t}"])[f"{exchange}:{t}"]['last_price']
 
     if q==0:
-        q = getQ(lot_size,ltp,bet_size, doubleQtoExit)
+        q = getQ(lot_size,ltp,bet_size, qToExit)
             
     delta = getDelta(exchange,tx_type)
     
@@ -212,8 +212,8 @@ def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,double
         return -1
     return order_id
 
-def nse_buy (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,exchange='NSE',doubleQtoExit=False):
-    return exec(kite,t,exchange,'BUY',lot_size,tick_size,q,ltp,sl,doubleQtoExit)
+def nse_buy (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,exchange='NSE',qToExit=0):
+    return exec(kite,t,exchange,'BUY',lot_size,tick_size,q,ltp,sl,qToExit)
     
     # if is_not_tradable(t):
     #     logging.info(f"{t} is not a tradable instrument.  NSE Buy not executed")
@@ -262,8 +262,8 @@ def nse_buy (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,exchange='NSE',doub
     # return order_id
 
 
-def nse_sell (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,exchange='NSE',doubleQtoExit=False):
-    return exec(kite,t,exchange,'SELL',lot_size,tick_size,q,ltp,sl,doubleQtoExit)
+def nse_sell (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,exchange='NSE',qToExit=0):
+    return exec(kite,t,exchange,'SELL',lot_size,tick_size,q,ltp,sl,qToExit)
     # if is_not_tradable(t):
     #     logging.info(f"{t} is not a tradable instrument.  NSE Sell not executed")
     #     return
@@ -328,8 +328,8 @@ def nse_sell (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,exchange='NSE',dou
                 
             
 
-def nfo_buy (kite,t,lot_size=1,tick_size=0.5, q=1,ltp=0,sl=1,doubleQtoExit=False):
-    return exec(kite,t,'NFO', 'BUY', lot_size,tick_size,q,ltp,sl,doubleQtoExit)
+def nfo_buy (kite,t,lot_size=1,tick_size=0.5, q=1,ltp=0,sl=1,qToExit=0):
+    return exec(kite,t,'NFO', 'BUY', lot_size,tick_size,q,ltp,sl,qToExit)
 
     if (ltp ==0):
         #Get ltp if not provided
@@ -368,8 +368,8 @@ def nfo_buy (kite,t,lot_size=1,tick_size=0.5, q=1,ltp=0,sl=1,doubleQtoExit=False
     return order_id
 
     
-def nfo_sell (kite, t, lot_size=1, tick_size=0.5, q=0,ltp=0,sl=1, doubleQtoExit=False):
-    return exec(kite,t,'NFO', 'SELL', lot_size,tick_size,q,ltp,sl,doubleQtoExit)
+def nfo_sell (kite, t, lot_size=1, tick_size=0.5, q=0,ltp=0,sl=1, qToExit=0):
+    return exec(kite,t,'NFO', 'SELL', lot_size,tick_size,q,ltp,sl,qToExit)
     if (ltp ==0):
         #Get ltp if not provided
         ltp = kite.ltp([f"NFO:{t}"])[f"NFO:{t}"]['last_price']

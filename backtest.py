@@ -21,6 +21,7 @@ import pytz
 import strategies15m as strat15m
 import ppprint
 from plotting import plot_backtest
+import backtest_log_setup
 
 #cfg has all the config parameters make them all globals here
 import cfg
@@ -61,10 +62,7 @@ def backtest(t='ADANIENT',i='minute'):
     print (f'Start {datetime.now(ist)}')
     df = zgetNDays(t,days,i=i)
     print (f"ZGET Complete {datetime.now(ist)}")
-    
-    # Adding new column
-    df.insert(0, 'i', range(1, 1 + len(df)))
-    
+        
     dataPopulators = [signals.populateBB, signals.populateADX, signals.populateOBV]
     signalGenerators = [signals.getSig_BB_CX
                         ,signals.getSig_ADX_FILTER
@@ -132,7 +130,7 @@ def compareDayByDayPerformance(t,days=90):
 
 #plot_options(['ASIANPAINT'],10,'minute')
 #backtest('HDFCLIFE','minute',adxThreh=30)
-backtest('ADANIENT','minute')
+backtest('BAJFINANCE','minute')
 #backtest('HDFCLIFE','minute',adxThreh=25)
 #backtest('ASIANPAINT','minute',adxThreh=25)
 #backtest('HDFCLIFE','minute',adxThreh=30)

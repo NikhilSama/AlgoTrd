@@ -127,7 +127,7 @@ def exitCondition(df,net_position):
         (df['position'][-1] == 0 and math.isnan(df['signal'][-1])))
 
 def exitCurrentPosition(t,positions,net_position,nextPosition):
-    doubleQtoExit = False
+    qToExit = 0
     if t in positions: 
         #if multiple position exists, exit all
         if (len(positions[t]['positions']) > 1):
@@ -145,8 +145,8 @@ def exitCurrentPosition(t,positions,net_position,nextPosition):
                 ki.exitNFOPositionsONLY(kite,positions[t]['positions'])
                 #For Equity positions we can reverse simply by doubling the buy when 
                 # we change direction; so we dont need to exit equity positions here
-                doubleQtoExit = True# We have a short position, so we need to exit both
-    return doubleQtoExit
+                qToExit = positions[t]['positions'][0]['quantity']# We have a short position, so we need to exit both
+    return qToExit
 
 
 def tradeNotification(type, t,ltp,signal,position,net_position):
@@ -245,10 +245,10 @@ def Tick(stock,options):
                 
         if (buyCondition(df,net_position)): 
             #Go Long --  Sell Put AND buy back any pre-sold Calls
-            doubleQtoExit = \
+            qToExit = \
                 exitCurrentPosition(t,positions,net_position,1)           
             if stock:
-                ki.nse_buy(kite,t,doubleQtoExit=doubleQtoExit) 
+                ki.nse_buy(kite,t,qToExit=qToExit) 
             if options:
                 ki.nfo_sell(kite,tput,tput_lot_size,tput_tick_size,doubleQtoExit=False) 
             tradeNotification("LONG", t,ltp,df['signal'][-1],df['position'][-1],net_position)
@@ -256,10 +256,10 @@ def Tick(stock,options):
         
         if (sellCondition(df,net_position)): 
             #Go Short --  Sell Call AND buy back any pre-sold Puts
-            doubleQtoExit = \
+            qToExit = \
                 exitCurrentPosition(t,positions,net_position,-1)           
             if stock:
-                ki.nse_sell(kite,t,doubleQtoExit=doubleQtoExit)
+                ki.nse_sell(kite,t,qToExit=qToExit)
             if options:
                 ki.nfo_sell(kite,tcall,tcall_lot_size,tcall_tick_size,doubleQtoExit=False)
             

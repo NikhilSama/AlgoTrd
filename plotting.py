@@ -38,6 +38,7 @@ def plot_backtest(df):
     ax1.plot(df['i'], df['lower_band'], color='grey', linewidth=2)
     ax1.plot(df['i'], df['upper_band'], color='grey', linewidth=2)
     ax1.plot(df['i'], df['ma20'], color='orange', linewidth=1)
+    ax1.plot(df['i'], df['MA-FAST'], color='green', linewidth=1)
     
     # plot the second series in the second subplot
     #ax2.plot(df['i'], df['ma_superTrend_pct_change'], color='red', linewidth=2)
@@ -157,11 +158,7 @@ def plot_backtest(df):
             ax8.axvspan(start_index, end_index, alpha=0.2, color='red')
             ax9.axvspan(start_index, end_index, alpha=0.2, color='red')
 
-        mask = (df['position'].shift(-1) != 0) & \
-            (df.index.hour >=10) & \
-            (df.index.hour <= 13) & \
-            ((df['Adj Close'] >= df['upper_band']) | \
-            (df['Adj Close'] <= df['lower_band']))
+        mask = (df['position'].shift(-1) != 0)
         # Use the shift method to get the start and end times of each region where the mask is True
         start_times = df.index[(mask & ~mask.shift(1, fill_value=False))].tolist()
         end_times = df.index[(mask & ~mask.shift(-1, fill_value=False))].tolist()

@@ -72,6 +72,9 @@ def zget_basic(from_date, to_date, symbol,interval='minute',
         return pd.DataFrame()
 
     df = pd.DataFrame(records)
+    # Adding new index column
+    df.insert(0, 'i', range(1, 1 + len(df)))
+
     if df.empty:
         logging.info('No data returned')
     return zColsToDbCols(df)

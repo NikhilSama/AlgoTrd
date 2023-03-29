@@ -10,7 +10,7 @@ cfg = {
     'startHour': 10,
     'endHour': 14,
     'exitHour': 15,
-    'days': 0.8,
+    'days': 1,
     'superLen': 200,
     'maLen': 20,
     'bandWidth': 2,
@@ -37,7 +37,7 @@ cfg = {
 #    'dbhost' : '34.131.115.155',
     'dbuser' : 'trading',
     'dbpass' : 'trading',
-    'showTradingViewLive' : True
+    'showTradingViewLive' : False
 
 }
 
