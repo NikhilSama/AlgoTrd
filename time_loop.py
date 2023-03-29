@@ -152,7 +152,7 @@ def exitCurrentPosition(t,positions,net_position,nextPosition):
 def tradeNotification(type, t,ltp,signal,position,net_position):
     subprocess.call(["afplay", '/System/Library/Sounds/Glass.aiff'])
     logging.info(f"GO {type} {t} LastCandleClose:{ltp} Signal:{signal} Position:{position} NetPosition:{net_position}" )
-    if True or showTradingViewLive and (signal == 1 or signal == -1):
+    if showTradingViewLive and (signal == 1 or signal == -1):
         print(f'START LIVE @ {datetime.datetime.now(ist).strftime("%I:%M:%S %p")}')
         global liveTVThread 
         if liveTVThread is not None: 
