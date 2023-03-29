@@ -5,6 +5,7 @@ Created on Sun Feb  5 14:26:36 2023
 
 @author: nikhilsama
 """
+import sys
 cfg = {
     'startTime': 0,
     'startHour': 10,
@@ -42,6 +43,23 @@ cfg = {
 
 }
 
+  
+args = sys.argv[1:]
+arg_dict = {}
+for arg in args:
+    key, value = arg.split(':')
+# Convert value to int or float if possible
+    try:
+        value = int(value)
+    except ValueError:
+        try:
+            value = float(value)
+        except ValueError:
+            pass 
+    cfg[key] = value
+               
 # Create variables with names as dict keys and values as dict values
 for key, value in cfg.items():
     locals()[key] = value
+
+print(f"threshold is {adxThresh}")
