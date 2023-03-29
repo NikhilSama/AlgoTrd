@@ -83,7 +83,6 @@ def calculate_strategy_returns (df):
                                           df['bnh_returns-P'] * -1,0)
         df['strategy_returns'] = np.where( (df['position'] < 0),
                                           df['bnh_returns-C'] * -1,df['strategy_returns'])
-
         # if position > 0 sell Put, returns will be negative put option returns'
         # if position < 0 sell Call, returns will be negative call options returns    
     else:

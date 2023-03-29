@@ -107,7 +107,6 @@ def zget(from_date, to_date, symbol,interval='minute',
     
     if (includeOptions):
         df = zAddOptionsData(df,symbol,from_date,to_date,interval,continuous)
-        
     #Kite Historical timestamp for a candle contails ohlcv data for the 
     #minute that "STARTED" at the timestamp.
     #

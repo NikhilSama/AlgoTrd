@@ -54,7 +54,7 @@ for i in range(50):
     colors.append((r, g, b))
 legend = []
 
-def zget(interval='minute',days=1,includeOptions=False):
+def zget(interval='minute'):
     global niftydf
     end =datetime.now()
     start =end - timedelta(days=days)
@@ -82,7 +82,8 @@ def backtest(type=1, name='test'):
                        ,signals.getSig_OBV_FILTER
                        ,signals.getSig_exitAnyExtremeADX_OBV_MA20_OVERRIDE
                        ,signals.getSig_followAllExtremeADX_OBV_MA20_OVERRIDE
-                        ]
+                       ,signals.exitTrendFollowing
+                       ]
         overrideSignalGenerators = []
         signals.applyIntraDayStrategy(df,dataPopulators,signalGenerators,
                                   overrideSignalGenerators)
@@ -104,8 +105,13 @@ def backtest(type=1, name='test'):
             x = x + 1
             legend.append(t)
         performance = pd.concat([performance, tearsheetdf])
-
-    results = pd.concat([results,performance.mean().to_frame().T])
+    
+    perfSummary = performance.mean()
+    perfSummary['num_trades'] = performance['num_trades'].sum()
+    perfSummary['num_winning_trades'] = performance['num_winning_trades'].sum()
+    perfSummary['num_losing_trades'] = performance['num_losing_trades'].sum()
+    
+    results = pd.concat([results,perfSummary.to_frame().T])
     results.to_csv("Data/backtest/NIFTY-TUNING-BACKTEST.csv")
     performance.to_csv(f"Data/backtest/{name}.csv")
     
@@ -184,7 +190,7 @@ def groupByDay(df):
 
 #combinator()
 #combinator_interval()
-zget(days=60,includeOptions=False)
+zget()
 # combinator_variables()
 dataPopulators = [signals.populateBB, signals.populateADX, signals.populateOBV]
 signalGenerators = [signals.getSig_BB_CX

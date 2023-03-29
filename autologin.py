@@ -2,15 +2,16 @@
 
 from kiteconnect import KiteConnect
 from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 import time
 import os
 from pyotp import TOTP
+import sys 
 
 chrome_driver_path = '/Users/nikhilsama/Dropbox/Coding/AlgoTrading/Data/chromedriver' # Replace with the path to your ChromeDriver executable
 
 file = open("/Users/nikhilsama/Dropbox/Coding/AlgoTrading/Data/cred.txt", "r")
 keys = file.read().split()  # Get a List of keys
-print(keys)
 
 api_key = keys[0]
 key_secret = keys[1]
@@ -19,7 +20,15 @@ pwd = keys[3]
 totp_key = keys[4]
 
 kite = KiteConnect(api_key=api_key)
-browser = webdriver.Chrome(executable_path=chrome_driver_path)
+
+# Create Chrome options and set them to run in headless mode
+chrome_options = Options()
+chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+
+if 'headless' in sys.argv:
+    chrome_options.add_argument('--headless')
+
+browser = webdriver.Chrome(executable_path=chrome_driver_path, options=chrome_options)
 browser.get(kite.login_url())
 browser.implicitly_wait(5)
 username = browser.find_element("xpath", '/html/body/div[1]/div/div[2]/div[1]/div/div/div[2]/form/div[1]/input')
@@ -52,3 +61,4 @@ print("got access_token", access_token)
 
 with open('/Users/nikhilsama/Dropbox/Coding/AlgoTrading/Data/zerodha_kite_accesstoken.txt', "w") as f:
     f.write(access_token)
+browser.quit()

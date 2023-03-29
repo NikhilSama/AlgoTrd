@@ -39,7 +39,7 @@ def zget(t,s,e,i):
     df = downloader.zColsToDbCols(df)
     return df
 
-def zgetNDays(t,n,e=datetime.now(ist),i="minute",includeOptions=False):
+def zgetNDays(t,n,e=datetime.now(ist),i="minute"):
     s = e - timedelta(days=n)
     return zget(t, s, e, i)
 
@@ -48,7 +48,7 @@ def getTotalChange(df):
 
 
 def test(t='ADANIENT',i='minute'):
-    df = zgetNDays(t,days,i=i,includeOptions=includeOptions)
+    df = zgetNDays(t,days,i=i)
     df.insert(0, 'i', range(1, 1 + len(df)))
   
     dataPopulators = [signals.populateBB, signals.populateADX]
@@ -59,7 +59,7 @@ def test(t='ADANIENT',i='minute'):
 def backtest(t='ADANIENT',i='minute'):
 
     print (f'Start {datetime.now(ist)}')
-    df = zgetNDays(t,days,i=i,includeOptions=includeOptions)
+    df = zgetNDays(t,days,i=i)
     print (f"ZGET Complete {datetime.now(ist)}")
     
     # Adding new column
@@ -70,10 +70,11 @@ def backtest(t='ADANIENT',i='minute'):
                         ,signals.getSig_ADX_FILTER
                         ,signals.getSig_MASLOPE_FILTER
                         ,signals.getSig_OBV_FILTER
+                        ,signals.getSig_exitAnyExtremeADX_OBV_MA20_OVERRIDE
+                        ,signals.getSig_followAllExtremeADX_OBV_MA20_OVERRIDE
+                        ,signals.exitTrendFollowing
                         ]
-    overrideSignalGenerators = [signals.getSig_exitAnyExtremeADX_OBV_MA20_OVERRIDE
-                                ,signals.getSig_followAllExtremeADX_OBV_MA20_OVERRIDE
-                                ]   
+    overrideSignalGenerators = []   
     signals.applyIntraDayStrategy(df,dataPopulators,signalGenerators,
                                   overrideSignalGenerators)
 
@@ -106,7 +107,7 @@ def plot_options(uticker, tickers,i='minute',
     for t in tickers:
         print(t)
         df[t] = zgetNDays(t,days,i=i,e=e)
-        df[t]['pct_change'] = df[t]['Adj Close'].pct_change()
+        df[t]['pct_change'] = ldf[t]['Adj Close'].pct_change()
         df[t]['cum_pct_change']=((1 + df[t]['pct_change']).cumprod() - 1)*100/20
         df[t].insert(0, 'i', range(1, 1 + len(df[t])))
         ax2.plot(df[t]['i'], df[t]['cum_pct_change'], color=color[j], linewidth=2)

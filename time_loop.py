@@ -6,7 +6,8 @@ Created on Wed Mar  1 19:42:07 2023
 
 @author: nikhilsama
 """
-
+import os
+import subprocess
 import log_setup
 import time
 import datetime
@@ -26,11 +27,18 @@ import logging
 import signal
 import sys
 import math
+import threading
 
 #cfg has all the config parameters make them all globals here
 import cfg
 globals().update(vars(cfg))
 
+
+if showTradingViewLive:
+    import live_charting as liveCharts
+    liveCharts.init()
+    global liveTVThread 
+    liveTVThread = None
 
 def sigterm_handler(_signo, _stack_frame):
     # Raises SystemExit(0):
@@ -43,9 +51,10 @@ signal.signal(signal.SIGTERM, sigterm_handler)
 
 if 'freezeGun' in sys.argv:
     from freezegun import freeze_time
-    freezer = freeze_time("Mar 28nd, 2023 10:00:00+0530", tick=True)
+    freezeTime = "Mar 28nd, 2023 10:05:00+0530"
+    freezer = freeze_time(freezeTime, tick=True)
     freezer.start()
-    print ("Freeze gun is on")
+    print ("Freeze gun is on. Time is frozen at: ", freezeTime)
     ## END 
 
 # set timezone to IST
@@ -139,6 +148,21 @@ def exitCurrentPosition(t,positions,net_position,nextPosition):
                 doubleQtoExit = True# We have a short position, so we need to exit both
     return doubleQtoExit
 
+
+def tradeNotification(type, t,ltp,signal,position,net_position):
+    subprocess.call(["afplay", '/System/Library/Sounds/Glass.aiff'])
+    logging.info(f"GO {type} {t} LastCandleClose:{ltp} Signal:{signal} Position:{position} NetPosition:{net_position}" )
+    if True or showTradingViewLive and (signal == 1 or signal == -1):
+        print(f'START LIVE @ {datetime.datetime.now(ist).strftime("%I:%M:%S %p")}')
+        global liveTVThread 
+        if liveTVThread is not None: 
+            liveTVThread.join()
+        liveTVThread = threading.Thread(target=liveCharts.loadChart, 
+                                                args=(t,)) # funky syntax needs (t,) if only one arg to signify its a tuple
+        liveTVThread.start()
+            #liveCharts.loadChart(t)
+        print(f'START LIVE @ {datetime.datetime.now(ist).strftime("%I:%M:%S %p")}')
+
 def Tick(stock,options):
 
     logging.info("\n\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n")
@@ -221,25 +245,27 @@ def Tick(stock,options):
                 
         if (buyCondition(df,net_position)): 
             #Go Long --  Sell Put AND buy back any pre-sold Calls
-            logging.info(f"GO LONG {t} LastCandleClose:{ltp}  Signal:{df['signal'][-1]} Position:{df['position'][-1]} NetPosition:{net_position}")
             doubleQtoExit = \
                 exitCurrentPosition(t,positions,net_position,1)           
             if stock:
                 ki.nse_buy(kite,t,doubleQtoExit=doubleQtoExit) 
             if options:
                 ki.nfo_sell(kite,tput,tput_lot_size,tput_tick_size,doubleQtoExit=False) 
-        
+            tradeNotification("LONG", t,ltp,df['signal'][-1],df['position'][-1],net_position)
+
         
         if (sellCondition(df,net_position)): 
             #Go Short --  Sell Call AND buy back any pre-sold Puts
-            logging.info(f"GO SHORT {t} LastCandleClose:{ltp} Signal:{df['signal'][-1]} Position:{df['position'][-1]} NetPosition:{net_position}" )
             doubleQtoExit = \
                 exitCurrentPosition(t,positions,net_position,-1)           
             if stock:
                 ki.nse_sell(kite,t,doubleQtoExit=doubleQtoExit)
             if options:
                 ki.nfo_sell(kite,tcall,tcall_lot_size,tcall_tick_size,doubleQtoExit=False)
-        
+            
+            tradeNotification("SHORT", t,ltp,df['signal'][-1],df['position'][-1],net_position)
+            
+
         if(exitCondition(df,net_position)):
             logging.info(f"EXITING {t} LastCandleClose:{ltp} Signal:{df['signal'][-1]} Position:{df['position'][-1]} NetPosition:{net_position}" )
             ki.exit_given_positions(kite,positions[t]['positions'])

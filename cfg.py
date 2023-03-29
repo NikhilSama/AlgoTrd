@@ -10,7 +10,7 @@ cfg = {
     'startHour': 10,
     'endHour': 14,
     'exitHour': 15,
-    'days': 5,
+    'days': 0.8,
     'superLen': 200,
     'maLen': 20,
     'bandWidth': 2,
@@ -21,11 +21,11 @@ cfg = {
     'adxThresh': 30,
     'adxThreshYellowMultiplier': 0.7,
     'numCandlesForSlopeProjection':2,
-    'adxSlopeThres': 0.06,
+    'adxSlopeThresh': 0.06,
     'maSlopeThresh': 1,
     'maSlopeThreshYellowMultiplier': 0.7,
     'maSlopeSlopeThresh': 0.01,
-    'obvOscThresh': 0.25,
+    'obvOscThresh': 0.2,
     'obvOscThreshYellowMultiplier': 0.7,
     'obvOscSlopeThresh': 0.3,
     'includeOptions': False,
@@ -36,7 +36,8 @@ cfg = {
 #   'zerodha_access_token': 'Evr9jmY6dG4T1n7fQGtwRN4lzNAERgJy',
 #    'dbhost' : '34.131.115.155',
     'dbuser' : 'trading',
-    'dbpass' : 'trading'
+    'dbpass' : 'trading',
+    'showTradingViewLive' : True
 
 }
 

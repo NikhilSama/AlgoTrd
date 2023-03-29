@@ -37,7 +37,7 @@ def plot_backtest(df):
     ax1.plot(df['i'], df['Adj Close'], color='red', linewidth=2)
     ax1.plot(df['i'], df['lower_band'], color='grey', linewidth=2)
     ax1.plot(df['i'], df['upper_band'], color='grey', linewidth=2)
-    #ax1.plot(df['i'], df['ma_superTrend'], color='orange', linewidth=4)
+    ax1.plot(df['i'], df['ma20'], color='orange', linewidth=1)
     
     # plot the second series in the second subplot
     #ax2.plot(df['i'], df['ma_superTrend_pct_change'], color='red', linewidth=2)
@@ -61,8 +61,8 @@ def plot_backtest(df):
 
     ax5.plot(df['i'], df['ADX-PCT-CHNG'], color='green', linewidth=2)
     ax5.set_title('ADX-PCT-CHNG↓', loc='right')
-    ax5.axhline(y=adxSlopeThres, color='red', linestyle='--')
-    ax5.axhline(y=-adxSlopeThres, color='red', linestyle='--')
+    ax5.axhline(y=adxSlopeThresh, color='red', linestyle='--')
+    ax5.axhline(y=-adxSlopeThresh, color='red', linestyle='--')
 
     ax6.plot(df['i'], df['ma20_pct_change_ma'], color='green', linewidth=2)
     ax6.set_title('ma20_pct_change_ma - MA↓', loc='right')
@@ -94,8 +94,13 @@ def plot_backtest(df):
         end_time = pd.Timestamp(year=day.year, month=day.month, day=day.day, hour=10, minute=0)
         start_time = ist.localize(start_time)
         end_time = ist.localize(end_time)
-        start_index=df['i'][start_time]
-        end_index=df['i'][end_time]
+        start_index = 0
+        end_index = 0
+        try:
+            start_index=df['i'][start_time]
+            end_index=df['i'][end_time]
+        except:
+            print("cant find start or end index(Likely cause data started or ended mid-day) for {start_time} or {end_time}")
         # Add a shaded rectangle for the time period between start_time and end_time
         ax1.axvspan(start_index, end_index, alpha=0.2, color='gray')
         ax2.axvspan(start_index, end_index, alpha=0.2, color='gray')
