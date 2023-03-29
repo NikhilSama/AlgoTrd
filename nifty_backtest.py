@@ -98,7 +98,6 @@ def backtest(type=1, name='test'):
         tearsheetdf.insert(0, 'type', type)
 
         df = df[df['cum_strategy_returns']!=0]
-        df.insert(0, 'i', range(1, 1 + len(df)))
         if plot:
             plt.plot(df['i'], df['cum_strategy_returns'], 
                      color=colors[x])

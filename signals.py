@@ -305,6 +305,9 @@ def isSignal(s):
 def isLongOrShortSignal(s):
     return isLongSignal(s) or isShortSignal(s)
 
+def signalChanged(s,lastS):
+    #Oddly s!=lastS is True if both are nan, because nan's cant compare
+    return s != lastS and (not math.isnan(s))
 
 #####END OF UTILTIY FUNCTIONS#########
 
@@ -344,7 +347,7 @@ def getSig_BB_CX(type,signal, isLastRow, row, df):
         (not tickerIsTrendingUp(row['symbol'])): #Up trending tickers dance around the upper band, dont use that as an exit signal
         s = -1*type
 
-    if isLastRow and s!=signal and (not math.isnan(s)):
+    if isLastRow and signalChanged(s,signal):
         logging.info(f'{row.symbol} => BB-CX => signal={signal} s={s} type={type}')
     
     return s
@@ -382,7 +385,7 @@ def getSig_ADX_FILTER (type,signal, isLastRow,row,df):
         elif s == -1 and oldSlope > 0:
             s = 0
         
-    if isLastRow and s!=signal:
+    if isLastRow and signalChanged(s,signal):
         logging.info(f"{row.symbol}:{row.i}  => ADX FILTER => ADX:{row['ADX']} > Thresh:{adxThresh} MASLOPE:{row['ma20_pct_change_ma']} signal={signal} type={type}")
     elif s!=signal:
         logging.debug(f"{row.symbol}:{row.i} => ADX FILTER => ADX:{row['ADX']} > Thresh:{adxThresh} MASLOPE:{row['ma20_pct_change_ma']} signal={signal} type={type}")
@@ -412,7 +415,7 @@ def getSig_MASLOPE_FILTER (type,signal, isLastRow,row,df):
             s = 0
         elif s == -1 and breached == 'H':
             s = 0
-    if isLastRow and s!=signal:
+    if isLastRow and signalChanged(s,signal):
         logging.info(f"{row.symbol}:{row.i}  => MASLOPE FILTER => Slope:{row['ma20_pct_change_ma']} >= Threshold {maSlopeThresh} signal={signal} type={type}")
     elif s!=signal:
         logging.debug(f"{row.symbol}:{row.i} => MASLOPE FILTER => Slope:{row['ma20_pct_change_ma']} >= Threshold {maSlopeThresh} signal={signal} type={type}")
@@ -443,7 +446,7 @@ def getSig_OBV_FILTER (type,signal, isLastRow,row, df):
             s = 0
         elif s == -1 and breached == 'H':
             s = 0
-        if isLastRow and s!=signal:
+        if isLastRow and signalChanged(s,signal):
             logging.info(f"{row.symbol}:{row.i}  => OBV FILTERER => obv is:{row['OBV-OSC']} >= threshod is:{obvOscThresh} signal={signal} type={type}")
         elif s!=signal:
             logging.debug(f"{row.symbol}:{row.i} => OBV FILTERER =>  obv is:{row['OBV-OSC']} >= threshod is:{obvOscThresh} signal={signal} type={type}")
@@ -535,7 +538,7 @@ def getSig_exitAnyExtremeADX_OBV_MA20_OVERRIDE (type, signal, isLastRow, row, df
     elif positionToAnalyse == -1 and breach == 'H':
         s = 0
                     
-    if isLastRow and s!=signal:
+    if isLastRow and signalChanged(s,signal):
         logging.info(f"{row.symbol}:{row.i}  => EXIT => Extreme ADX/OBV/MA20 OVERRIDE SIGNAL({signal}) / LAST SIGNAL({last_signal}). ADX:{row['ADX']} > {adxThresh*overrideMultiplier} OR OBV:{row['OBV-OSC']} > {obvOscThresh*overrideMultiplier} OR MA20:{row['ma20_pct_change_ma']} > {maSlopeThresh*overrideMultiplier}")                
     elif s!=signal:
         logging.debug(f"{row.symbol}:{row.i} => EXIT => Extreme ADX/OBV/MA20 OVERRIDE SIGNAL({signal}) / LAST SIGNAL({last_signal}). ADX:{row['ADX']} > {adxThresh*overrideMultiplier} OR OBV:{row['OBV-OSC']} > {obvOscThresh*overrideMultiplier} OR MA20:{row['ma20_pct_change_ma']} > {maSlopeThresh*overrideMultiplier}")                
@@ -560,7 +563,7 @@ def getSig_followAllExtremeADX_OBV_MA20_OVERRIDE (type, signal, isLastRow, row, 
             if (last_signal != -1 and signal != -1):
                 s = -1
         
-        if s!=signal:
+        if signalChanged(s,signal):
             #print("entering trend following", row.i)
             setTickerTrend(row.symbol, s)
             if isLastRow:
@@ -608,7 +611,7 @@ def exitTrendFollowing(type, signal, isLastRow, row, df,
     else:
         logging.error("Wierd ! trend should always be 1 or -1")
         return signal
-    if s!=signal:
+    if signalChanged(s,signal):
         setTickerTrend(row.symbol, 0)
         #print(f"we did it for {row.symbol}@ {row.i}") 
         if isLastRow:

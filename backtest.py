@@ -130,7 +130,7 @@ def compareDayByDayPerformance(t,days=90):
 
 #plot_options(['ASIANPAINT'],10,'minute')
 #backtest('HDFCLIFE','minute',adxThreh=30)
-backtest('BAJFINANCE','minute')
+backtest('HDFCBANK','minute')
 #backtest('HDFCLIFE','minute',adxThreh=25)
 #backtest('ASIANPAINT','minute',adxThreh=25)
 #backtest('HDFCLIFE','minute',adxThreh=30)

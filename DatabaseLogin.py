@@ -25,11 +25,11 @@ globals().update(vars(cfg))
 #dbhost = "localhost"
 class DBBasic:
     
-    con = sqlConnector.connect(host=dbhost, user=dbuser, passwd=dbpass, database="trading", port="3306", auth_plugin='mysql_native_password')
-    conTick = sqlConnector.connect(host=dbhost, user=dbuser, passwd=dbpass, database="trading", port="3306", auth_plugin='mysql_native_password')
+    con = sqlConnector.connect(host=dbhost, user=dbuser, passwd=dbpass, database=dbname, port="3306", auth_plugin='mysql_native_password')
+    conTick = sqlConnector.connect(host=dbhost, user=dbuser, passwd=dbpass, database=dbname, port="3306", auth_plugin='mysql_native_password')
     engine = create_engine("mysql+pymysql://{user}:{pw}@{host}:3306/{db}"
                         .format(user=dbuser, pw=dbpass, host=dbhost, 
-                                db="trading"))
+                                db=dbname))
 
     def __init__(self):
         pass
