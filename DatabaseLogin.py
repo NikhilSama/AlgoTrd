@@ -22,7 +22,6 @@ ist = pytz.timezone('Asia/Kolkata')
 import cfg
 globals().update(vars(cfg))
 
-#dbhost = "localhost"
 class DBBasic:
     
     con = sqlConnector.connect(host=dbhost, user=dbuser, passwd=dbpass, database=dbname, port="3306", auth_plugin='mysql_native_password')
@@ -148,11 +147,11 @@ class DBBasic:
         for row in cursor:
             return row
     def get_instrument_token(self, symbol):
-        from sqlalchemy import create_engine
+        #from sqlalchemy import create_engine
         #engine = create_engine("mysql+pymysql://{user}:{pw}@localhost:3306/{db}"
          #                   .format(user="trading", pw="trading", db="trading"))
 
-        query = f"SELECT instrument_token FROM trading.instruments_zerodha where tradingsymbol = '{symbol}'"
+        query = f"SELECT instrument_token FROM instruments_zerodha where tradingsymbol = '{symbol}'"
         df = pd.read_sql(query, con=self.engine)
 
 #        query = "SELECT instrument_token FROM trading.instruments_zerodha where tradingsymbol = '{symbol}'"

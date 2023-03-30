@@ -6,7 +6,7 @@ import sys
 
 cloud_args=''
 if 'cloud' in sys.argv:
-    cloud_args = 'zerodha_access_token:7Xzo3aGAQ06z2cvT8AyppbT2Uh6BD4Ru dbhost:NikhilSama.mysql.pythonanywhere-services.com dbuser:NikhilSama dbpass:trading123 dbname:NikhilSama$default'
+    cloud_args = 'cacheTickData:True zerodha_access_token:7Xzo3aGAQ06z2cvT8AyppbT2Uh6BD4Ru dbhost:NikhilSama.mysql.pythonanywhere-services.com dbuser:NikhilSama dbpass:trading123 dbname:NikhilSama\$default'
 def run_instance(args):
     try: 
         arg_dict = {}
@@ -16,8 +16,7 @@ def run_instance(args):
             arg_dict[key] = value
             arg_array.append(arg)
 
-        subprocess.call(['python', 'nifty_backtest.py', 
-                         arg_array[0], arg_array[1]])
+        subprocess.call(f'python3.8 nifty_backtest.py {args}', shell=True) 
     except Exception as e:
         print('Error in run_instance():', e)
 
@@ -34,9 +33,11 @@ def argGenerator():
     
 
 def argGeneratorTest():
-    for maLen in [10,20,30]:
-        for bandWidth in [2,2.5,3,3.5,4]:
-            yield f'maLen:{maLen} bandWidth:{bandWidth}'
+    for maLen in [20,30]:
+        for bandWidth in [2,4]:
+            print(f"{cloud_args} maLen:{maLen} bandWidth:{bandWidth}")
+            yield f'{cloud_args} maLen:{maLen} bandWidth:{bandWidth}'
+
     
 if __name__ == '__main__':
     # List of argument strings to pass to instances
@@ -46,7 +47,7 @@ if __name__ == '__main__':
     pool = Pool()
 
     # Execute instances in parallel using the Pool object
-    pool.map(run_instance, argGenerator())
+    pool.map(run_instance, argGeneratorTest())
 
     # Close the Pool object to free resources
     pool.close()
@@ -73,6 +74,6 @@ if __name__ == '__main__':
     # Concatenate DataFrames into single DataFrame
  #   df_combined = pd.concat(dfs, axis=0)
  #   df_combined = df_combined.T.reset_index().drop_duplicates(subset='index').set_index('index')
-    print (df_combined)
+    #print (df_combined)
     # Write combined DataFrame to CSV file
     df_combined.to_csv(directory+'combined.csv', index=False)
