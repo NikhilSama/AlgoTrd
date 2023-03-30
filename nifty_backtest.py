@@ -25,6 +25,8 @@ import pprint
 import pytz
 import random
 import cfg
+import sys
+import utils
 globals().update(vars(cfg))
 
 
@@ -65,6 +67,10 @@ def zget(interval='minute'):
         niftydf[t]=downloader.zColsToDbCols(niftydf[t])
 
 def backtest(type=1, name='test'):
+    perfSummaryfname = utils.fileNameFromArgs('niftyPerf-')
+    if utils.fileExists("Data/backtest/nifty/"+perfSummaryfname):
+        print(f"File {perfSummaryfname} exists. Skipping.")
+        sys.exit(0)
     zget()
     performance = pd.DataFrame()
     global results 
@@ -111,22 +117,22 @@ def backtest(type=1, name='test'):
     perfSummary['num_winning_trades'] = performance['num_winning_trades'].sum()
     perfSummary['num_losing_trades'] = performance['num_losing_trades'].sum()
     perfSummary['std_dev_across_stocks'] = performance['return'].std()
+    perfSummary['kurtosis_across_stocks'] = performance['return'].kurtosis()
+    perfSummary['skewness_across_stocks'] = performance['return'].skew()
     perfSummary.rename(
                 {'std_dev_pertrade_return':'average_of_per_ticker_std_dev_across_trades'}, inplace=True)
     perfSummary = perfSummary.to_frame().T
 
     # Get command-line arguments and add them to the Series
-    perfSummaryfname = 'niftyPerf-'
     args = sys.argv[1:]
     for arg in args:
         key, value = arg.split(':')
         if key in ['zerodha_access_token','dbuser','dbpass','cacheTickData', 'dbname', 'dbhost']:
             continue
         perfSummary[key] = value
-        perfSummaryfname = perfSummaryfname + '-' + key + '-' + value
     #results = pd.concat([results,perfSummary.to_frame().T])
     #results.to_csv("Data/backtest/NIFTY-TUNING-BACKTEST.csv")
-    perfSummary.to_csv(f"Data/backtest/nifty/{perfSummaryfname}.csv")
+    perfSummary.to_csv(f"Data/backtest/nifty/{perfSummaryfname}")
     
     if plot:
         plt.legend(legend,loc='upper right')
