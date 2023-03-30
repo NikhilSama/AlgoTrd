@@ -2,7 +2,11 @@ from multiprocessing import Pool
 import subprocess
 import os
 import pandas as pd
+import sys
 
+cloud_args=''
+if 'cloud' in sys.argv:
+    cloud_args = 'zerodha_access_token:7Xzo3aGAQ06z2cvT8AyppbT2Uh6BD4Ru dbhost:NikhilSama.mysql.pythonanywhere-services.com dbuser:NikhilSama dbpass:trading123 dbname:NikhilSama$default'
 def run_instance(args):
     try: 
         arg_dict = {}
@@ -25,8 +29,8 @@ def argGenerator():
                     for adxThresh in [20,25,30,35,40]:
                         for adxThreshYellowMultiplier in [0.5,0.6,0.7,0.8,0.9]:
                             for adxThreshYellowMultiplier in [0.5,0.6,0.7,0.8,0.9]:
-                                print(f'maLen:{maLen} bandWidth:{bandWidth} fastMALen:{fastMALen} adxLen:{adxLen} adxThresh:{adxThresh} adxThreshYellowMultiplier:{adxThreshYellowMultiplier} ')
-                                yield f'maLen:{maLen} bandWidth:{bandWidth} fastMALen:{fastMALen} adxLen:{adxLen} adxThresh:{adxThresh} adxThreshYellowMultiplier:{adxThreshYellowMultiplier} '
+                                print(f'{cloud_args} maLen:{maLen} bandWidth:{bandWidth} fastMALen:{fastMALen} adxLen:{adxLen} adxThresh:{adxThresh} adxThreshYellowMultiplier:{adxThreshYellowMultiplier} ')
+                                yield f'{cloud_args} maLen:{maLen} bandWidth:{bandWidth} fastMALen:{fastMALen} adxLen:{adxLen} adxThresh:{adxThresh} adxThreshYellowMultiplier:{adxThreshYellowMultiplier} '
     
 
 def argGeneratorTest():

@@ -120,6 +120,8 @@ def backtest(type=1, name='test'):
     args = sys.argv[1:]
     for arg in args:
         key, value = arg.split(':')
+        if key in ['zerodha_access_token','dbuser','dbpass','cacheTickData', 'dbname', 'dbhost']:
+            continue
         perfSummary[key] = value
         perfSummaryfname = perfSummaryfname + '-' + key + '-' + value
     #results = pd.concat([results,perfSummary.to_frame().T])
