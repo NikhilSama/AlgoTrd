@@ -8,7 +8,7 @@ def fileNameFromArgs(prefix=''):
         key, value = arg.split(':')
         if key in ['zerodha_access_token','dbuser','dbpass','cacheTickData', 'dbname', 'dbhost']:
             continue
-        fname = fname + '-' + key + '-' + value
+        fname = fname + '-' + value
     fname = fname + '.csv'
     return fname
 def fileExists(fname):

@@ -29,7 +29,7 @@ def argGenerator():
     adx_lens = [10, 14, 20]
     adx_thresholds = [20, 25, 30, 35, 40]
     adx_thresh_yellow_multipliers = [0.5, 0.6, 0.7, 0.8, 0.9]
-    num_candles_for_slope_proj = [1, 2.3, 4, 5, 6, 7, 8, 9, 10]
+    num_candles_for_slope_proj = [1, 2,3, 4, 5, 6, 7, 8, 9, 10]
     
     atr_lens = [14]
     super_lens = [200]
