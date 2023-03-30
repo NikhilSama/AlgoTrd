@@ -10,11 +10,13 @@ Created on Tue Mar  7 12:06:54 2023
 import mysql.connector as sqlConnector
 from datetime import date,timedelta,timezone,datetime
 import pandas as pd
+import numpy as np
 from kiteconnect import KiteConnect
 from sqlalchemy import create_engine
 import logging
 import pytz
 import sys
+import os
 
 # set timezone to IST
 ist = pytz.timezone('Asia/Kolkata')
@@ -146,10 +148,27 @@ class DBBasic:
         cursor.execute('Select SQL_NO_CACHE Token, tstamp from TempToken ORDER BY ID DESC LIMIT 1;')
         for row in cursor:
             return row
+    def setTokenInCache(self,s,t):
+        path = "Data/ticker_cache/instr/"+s+".txt"
+        # Open file for writing
+        with open(path, 'w') as f:
+            # Write string to file
+            f.write(str(t))
+    def getTokenFromCache(self,s):
+        path = "Data/ticker_cache/instr/"+s+".txt"
+        if os.path.exists(path):
+            with open(path, 'r') as f:
+                return np.int64(f.read())
+        else:
+            return False
+        
     def get_instrument_token(self, symbol):
         #from sqlalchemy import create_engine
         #engine = create_engine("mysql+pymysql://{user}:{pw}@localhost:3306/{db}"
          #                   .format(user="trading", pw="trading", db="trading"))
+        token = self.getTokenFromCache(symbol);
+        if token:
+            return token
 
         query = f"SELECT instrument_token FROM instruments_zerodha where tradingsymbol = '{symbol}'"
         df = pd.read_sql(query, con=self.engine)
@@ -157,6 +176,7 @@ class DBBasic:
 #        query = "SELECT instrument_token FROM trading.instruments_zerodha where tradingsymbol = '{symbol}'"
  #       df = pd.read_sql(query, con=engine)
         if len(df) > 0:
+            self.setTokenInCache(symbol,df.iloc[0,0])
             return df.iloc[0,0]
         else:
             return -1
