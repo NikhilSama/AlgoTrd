@@ -11,14 +11,41 @@ from matplotlib.widgets import Slider, Button, RadioButtons
 import numpy as np
 import pandas as pd
 import pytz
+import scipy.stats as stats
+
 # set timezone to IST
 ist = pytz.timezone('Asia/Kolkata')
 
 import cfg
 globals().update(vars(cfg))
 
-def plot_backtest(df):
+def plot_trades(df):
+    # create 20 bins based on the range of return values
+    bins = np.linspace(df['return'].min(), df['return'].max(), 20)
+
+    # group the data by the bins and count the frequency of returns in each bin
+    freq, bins = np.histogram(df['return'], bins=bins)
+
+    # plot the histogram
+    plt.bar(bins[:-1], freq, width=(bins[1]-bins[0]))
+
+    # check for normal distribution
+    if df['return'].mean() == np.median(df['return']):
+        print("The distribution is normal")
+    else:
+        print("The distribution is not normal")
+
+    if 'adjCloseGraph' not in plot:
+        plt.show()
+        
+def plot_backtest(df,trades=None):
     
+    # Plot trades 
+    if 'trade_returns' in plot:
+        plot_trades(trades)
+    
+    if 'adjCloseGraph' not in plot:
+        return
         ## PLOTTING CODE FOLLOWS 
     #pprint.pprint(tearsheet, indent=4)
     #df[['ma_superTrend', 'ma_slow', 'ma_fast']].plot(grid=True, figsize=(12, 8))

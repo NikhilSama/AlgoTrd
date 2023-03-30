@@ -79,11 +79,16 @@ def backtest(t,i='minute'):
 
     tearsheet,tearsheetdf = perf.tearsheet(df)
     print(f'Total Return: {tearsheet["return"]*100}%')
+    print(f'Num Trades: {tearsheet["num_trades"]}')
+    print(f'Avg Return Per Trade: {tearsheet["std_dev_pertrade_return"]*100}%')
+    print(f'Std Dev of Returns: {tearsheet["return"]}')
+    print(f'Skewness: {tearsheet["skewness_pertrade_return"]}')
+    print(f'Kurtosis: {tearsheet["kurtosis_pertrade_return"]}')
     df.to_csv("export.csv")
 
     if (plot == False):
         return
-    plot_backtest(df)
+    plot_backtest(df,tearsheet['trades'])
 
     # print (f"END Complete {datetime.now(ist)}")
 
@@ -130,7 +135,7 @@ def compareDayByDayPerformance(t,days=90):
 
 #plot_options(['ASIANPAINT'],10,'minute')
 #backtest('HDFCLIFE','minute',adxThreh=30)
-backtest('HDFCBANK','minute')
+backtest('ASIANPAINT','minute')
 #backtest('HDFCLIFE','minute',adxThreh=25)
 #backtest('ASIANPAINT','minute',adxThreh=25)
 #backtest('HDFCLIFE','minute',adxThreh=30)

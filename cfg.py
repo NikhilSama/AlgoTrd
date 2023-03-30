@@ -11,7 +11,7 @@ cfg = {
     'startHour': 10,
     'endHour': 14,
     'exitHour': 15,
-    'days': 4,
+    'days': 60,
     'superLen': 200,
     'maLen': 20,
     'bandWidth': 2,
@@ -30,7 +30,10 @@ cfg = {
     'obvOscThreshYellowMultiplier': 0.7,
     'obvOscSlopeThresh': 0.3,
     'includeOptions': False,
-    'plot': False,
+    'plot': [
+        'trade_returns'
+#        ,'adjCloseGraph'
+        ],
     'overrideMultiplier': 1.2,
 # google cloud specific stuff 
     'dbhost' : 'localhost',

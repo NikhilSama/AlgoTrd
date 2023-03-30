@@ -158,7 +158,8 @@ def get_trades (df):
 
         #identify the trade by trade num i in main dataframe
         df.loc[prev_date:date, 'trade_num'] = i
-
+        trades.loc[date, 'trade_num'] = i
+        
         #Calculate returns for the trade
         calc_trade_returns(date, trades, df.loc[prev_date:date].copy())
         
@@ -204,6 +205,8 @@ def tearsheet (df):
         #tearsheet["return_fixed_bet"] = df["cum_bnh_returns"][-1]
         tearsheet["average_per_trade_return"] = trades['return'].mean()
         tearsheet["std_dev_pertrade_return"] = trades['return'].std()
+        tearsheet["skewness_pertrade_return"] = trades['return'].skew()
+        tearsheet["kurtosis_pertrade_return"] = trades['return'].kurtosis()
         tearsheet["wins"] = get_trade_stats(trades.loc[trades['return'] > 0, 'return'])
         tearsheet["loss"] = get_trade_stats(trades.loc[trades['return'] < 0, 'return'])
     else:
@@ -216,7 +219,9 @@ def tearsheet (df):
         tearsheet["return_fixed_bet"] = 0
         tearsheet["average_return"] = 0
         tearsheet["std_dev_return"] = 0
-        
+        tearsheet["skewness_pertrade_return"] = 0
+        tearsheet["kurtosis_pertrade_return"] = 0
+
     tearsheetdf = pd.DataFrame(tearsheet,index=[0])
 
     tearsheet['trades'] = trades
