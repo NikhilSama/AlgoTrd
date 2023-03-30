@@ -47,7 +47,8 @@ def getNewAccessToken(kite):
 
 def getAccessToken(kite):
     if 'zerodha_access_token' in cfg:
-        return zerodha_access_token
+        if (zerodha_access_token):
+            return zerodha_access_token
     
     if os.path.isfile(zacceccess_file):
         #logging.debug('Access Token File exists')

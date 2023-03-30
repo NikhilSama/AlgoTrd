@@ -30,11 +30,27 @@ def argGenerator():
     adx_thresholds = [20, 25, 30, 35, 40]
     adx_thresh_yellow_multipliers = [0.5, 0.6, 0.7, 0.8, 0.9]
     num_candles_for_slope_proj = [1, 2.3, 4, 5, 6, 7, 8, 9, 10]
-
-    for params in itertools.product(ma_lens, band_widths, fast_ma_lens, adx_lens, adx_thresholds, adx_thresh_yellow_multipliers, num_candles_for_slope_proj):
-        ma_len, band_width, fast_ma_len, adx_len, adx_thresh, adx_thresh_yellow_multiplier, num_candles = params
+    
+    atr_lens = [14]
+    super_lens = [200]
+    super_bandWidths = [2.5]
+    adx_slope_threshes = [0.06]
+    ma_slope_threshes = [1]
+    ma_slope_thresh_yellow_multipliers = [0.7]
+    ma_slope_slope_threshes = [0.01]
+    obv_osc_threshes = [0.2]
+    obv_osc_thresh_yellow_multipliers = [0.7]
+    obv_osc_slope_threshes = [0.3]
+    override_multipliers = [1.2]
+    
+    for params in itertools.product(ma_lens, band_widths, fast_ma_lens, adx_lens, adx_thresholds, adx_thresh_yellow_multipliers, num_candles_for_slope_proj,
+                                    atr_lens, super_lens, super_bandWidths, adx_slope_threshes, ma_slope_threshes, ma_slope_thresh_yellow_multipliers, ma_slope_slope_threshes,
+                                    obv_osc_slope_threshes, obv_osc_threshes, obv_osc_thresh_yellow_multipliers, override_multipliers):
+        ma_len, band_width, fast_ma_len, adx_len, adx_thresh, adx_thresh_yellow_multiplier, num_candles, atr_len, super_len, super_bandWidth, adx_slope_thresh, \
+            ma_slope_thresh, ma_slope_thresh_yellow_multiplier, ma_slope_slope_thresh, obv_osc_thresh, obv_osc_thresh_yellow_multiplier, ovc_osc_slope_thresh, \
+                override_multiplier = params
         print(f'{cloud_args} maLen:{ma_len} bandWidth:{band_width} fastMALen:{fast_ma_len} adxLen:{adx_len} adxThresh:{adx_thresh} adxThreshYellowMultiplier:{adx_thresh_yellow_multiplier}')
-        yield f'{cloud_args} maLen:{ma_len} bandWidth:{band_width} fastMALen:{fast_ma_len} adxLen:{adx_len} adxThresh:{adx_thresh} adxThreshYellowMultiplier:{adx_thresh_yellow_multiplier}'
+        yield f'{cloud_args} maLen:{ma_len} bandWidth:{band_width} fastMALen:{fast_ma_len} adxLen:{adx_len} adxThresh:{adx_thresh} adxThreshYellowMultiplier:{adx_thresh_yellow_multiplier} numCandlesForSlopeProjection:{num_candles} atrLen:{atr_len} superLen:{super_len} superBandWidth:{super_bandWidth} adxSlopeThresh:{adx_slope_thresh} maSlopeThresh:{ma_slope_thresh} maSlopeThreshYellowMultiplier:{ma_slope_thresh_yellow_multiplier} maSlopeSlopeThresh:{ma_slope_slope_thresh} obvOscThresh:{obv_osc_thresh} obvOscThreshYellowMultiplier:{obv_osc_thresh_yellow_multiplier} obvOscSlopeThresh:{ovc_osc_slope_thresh} overrideMultiplier:{override_multiplier}'
 
     # for maLen in [10,20,30]:
     #     for bandWidth in [2,2.5,3,3.5,4]:

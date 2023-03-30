@@ -31,15 +31,15 @@ cfg = {
     'obvOscSlopeThresh': 0.3,
     'includeOptions': False,
     'plot': [
-        'trade_returns'
+        #'trade_returns'
 #        ,'adjCloseGraph'
         ],
     'overrideMultiplier': 1.2,
 # google cloud specific stuff 
     'dbhost' : 'localhost',
     'dbname' : 'trading',
-#   'zerodha_access_token': 'Evr9jmY6dG4T1n7fQGtwRN4lzNAERgJy',
-#    'dbhost' : '34.131.115.155',
+    'zerodha_access_token': False,
+    'dbhost' : '34.131.115.155',
     'dbuser' : 'trading',
     'dbpass' : 'trading',
     'showTradingViewLive' : True,

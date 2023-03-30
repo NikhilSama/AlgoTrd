@@ -24,7 +24,7 @@ CREATE TABLE backtest (
     created_time DATETIME NOT NULL,
     PRIMARY KEY (id),
     INDEX (trading_days),
-    INDEX (days_in_trade),
+    INDEX (days_in_trade),20 + 2 +1 index
     INDEX (num_trades),
     INDEX (num_winning_trades),
     INDEX (num_losing_trades),
