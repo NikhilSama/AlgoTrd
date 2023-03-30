@@ -29,7 +29,6 @@ apisecret = "skrapb33nfgsrnivz9ms20w0x6odhr3t"
 zacceccess_file = "Data/zerodha_kite_accesstoken.txt"
 tradelog = f"Data/trades/{datetime.now().strftime('%d-%m-%y')}.trades"
 tradelogcsv = f"Data/trades/{datetime.now().strftime('%d-%m-%y')}-trades.csv"
-bet_size = 1000
 
     
 def getNewAccessToken(kite): 

@@ -57,7 +57,7 @@ def test(t='ADANIENT',i='minute'):
 
     signals.applyIntraDayStrategy(df1,dataPopulators,signalGenerators)
 
-def backtest(t='ADANIENT',i='minute'):
+def backtest(t,i='minute'):
 
     print (f'Start {datetime.now(ist)}')
     df = zgetNDays(t,days,i=i)

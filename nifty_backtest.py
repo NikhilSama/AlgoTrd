@@ -56,7 +56,8 @@ legend = []
 
 def zget(interval='minute'):
     global niftydf
-    end =datetime.now()
+#    end =datetime.now()
+    end = datetime(2023, 3, 29, 15, 30, tzinfo=ist)
     start =end - timedelta(days=days)
     niftydf = {}
     for t in nifty_active:
@@ -64,6 +65,7 @@ def zget(interval='minute'):
         niftydf[t]=downloader.zColsToDbCols(niftydf[t])
 
 def backtest(type=1, name='test'):
+    zget()
     performance = pd.DataFrame()
     global results 
     x = 0
@@ -95,7 +97,6 @@ def backtest(type=1, name='test'):
         # tearsheetdf.insert(0, 'bw', bw)
         # tearsheetdf.insert(0, 'sbw', sbw)
         # tearsheetdf.insert(0, 'ticker', t)
-        tearsheetdf.insert(0, 'type', type)
 
         df = df[df['cum_strategy_returns']!=0]
         if plot:
@@ -109,10 +110,21 @@ def backtest(type=1, name='test'):
     perfSummary['num_trades'] = performance['num_trades'].sum()
     perfSummary['num_winning_trades'] = performance['num_winning_trades'].sum()
     perfSummary['num_losing_trades'] = performance['num_losing_trades'].sum()
-    
-    results = pd.concat([results,perfSummary.to_frame().T])
-    results.to_csv("Data/backtest/NIFTY-TUNING-BACKTEST.csv")
-    performance.to_csv(f"Data/backtest/{name}.csv")
+    perfSummary['std_dev_across_stocks'] = performance['return'].std()
+    perfSummary.rename(
+                {'std_dev_pertrade_return':'average_of_per_ticker_std_dev_across_trades'}, inplace=True)
+    perfSummary = perfSummary.to_frame().T
+
+    # Get command-line arguments and add them to the Series
+    perfSummaryfname = 'niftyPerf-'
+    args = sys.argv[1:]
+    for arg in args:
+        key, value = arg.split(':')
+        perfSummary[key] = value
+        perfSummaryfname = perfSummaryfname + '-' + key + '-' + value
+    #results = pd.concat([results,perfSummary.to_frame().T])
+    #results.to_csv("Data/backtest/NIFTY-TUNING-BACKTEST.csv")
+    perfSummary.to_csv(f"Data/backtest/nifty/{perfSummaryfname}.csv")
     
     if plot:
         plt.legend(legend,loc='upper right')
@@ -189,7 +201,6 @@ def groupByDay(df):
 
 #combinator()
 #combinator_interval()
-zget()
 # combinator_variables()
 dataPopulators = [signals.populateBB, signals.populateADX, signals.populateOBV]
 signalGenerators = [signals.getSig_BB_CX
@@ -202,8 +213,8 @@ signalGenerators = [signals.getSig_BB_CX
 backtest(2, 'BB-CX-ADX30-MASLOPE1-OBV.25')
 # backtest(200,20,2,2.5,signals.bollinger_band_cx2,"bb-cx-basis",2)
 # backtest(200,20,2,2.5,signals.bollinger_band_cx_w_flat_superTrend,"bb-cx-super",3)
-print(results)
-results.to_csv("Data/backtest/NIFTY-TUNING-BACKTEST.csv")
+#print(results)
+#results.to_csv("Data/backtest/NIFTY-TUNING-BACKTEST.csv")
 # sl = 100
 # ml = 10
 # bw = 3

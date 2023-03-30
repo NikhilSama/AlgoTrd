@@ -30,7 +30,7 @@ cfg = {
     'obvOscThreshYellowMultiplier': 0.7,
     'obvOscSlopeThresh': 0.3,
     'includeOptions': False,
-    'plot': True,
+    'plot': False,
     'overrideMultiplier': 1.2,
 # google cloud specific stuff 
     'dbhost' : 'localhost',
@@ -39,8 +39,9 @@ cfg = {
 #    'dbhost' : '34.131.115.155',
     'dbuser' : 'trading',
     'dbpass' : 'trading',
-    'showTradingViewLive' : False
-
+    'showTradingViewLive' : True,
+    'cacheTickData' : False, 
+    'bet_size': 1000
 }
 
   
@@ -48,18 +49,24 @@ args = sys.argv[1:]
 arg_dict = {}
 for arg in args:
     key, value = arg.split(':')
-# Convert value to int or float if possible
+    if key not in cfg:
+        print(f'Invalid argument: {key}')
+        sys.exit()
+    # Convert value to int or float if possible
     try:
         value = int(value)
     except ValueError:
         try:
             value = float(value)
         except ValueError:
-            pass 
+            if value == 'False':
+                value = False
+            elif value == 'True':
+                value = True
+            pass
+             
     cfg[key] = value
                
 # Create variables with names as dict keys and values as dict values
 for key, value in cfg.items():
     locals()[key] = value
-
-print(f"threshold is {adxThresh}")

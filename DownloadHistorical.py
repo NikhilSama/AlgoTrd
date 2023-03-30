@@ -23,12 +23,17 @@ import tickerdata as td
 import logging
 import pytz
 import os
+import pickle
+
+import cfg
+globals().update(vars(cfg))
 
 # set timezone to IST
 ist = pytz.timezone('Asia/Kolkata')
 
 db = DBBasic() 
 kite = ki.initKite()
+
 
 def cache_df(df,t,frm,to):
     #create directory if none exists
@@ -49,6 +54,31 @@ def cache_df(df,t,frm,to):
     #check if file exists
     file_name=path+"/ohlv-"+to.strftime("%I:%M%p")+".csv"
     df.to_csv(file_name)
+    
+def loadTickerCache(df,symbol,from_date,to_date,interval):
+    path = "Data/ticker_cache/"
+    fname = path+symbol+ \
+        "__"+from_date.strftime('%d-%m-%y-%H-%M')+"__"+ \
+            interval+"__"+to_date.strftime('%d-%m-%y-%H-%M')+".pickle"
+    if not os.path.exists(path):
+        try: 
+            os.mkdir(path)
+        except OSError as error:
+            print(error)
+    with open(fname,"wb") as f:
+        pickle.dump(df,f)
+        
+def getCachedTikerData(symbol,from_date,to_date,interval):
+    path = "Data/ticker_cache/"
+    fname = path+symbol+ \
+        "__"+from_date.strftime('%d-%m-%y-%H-%M')+"__"+ \
+            interval+"__"+to_date.strftime('%d-%m-%y-%H-%M')+".pickle"
+    if os.path.isfile(fname):
+        with open(fname, "rb") as f:
+            df = pickle.load(f)
+    else:
+        df = pd.DataFrame()
+    return df
 
 def zget_basic(from_date, to_date, symbol,interval='minute',
          continuous=False):
@@ -59,6 +89,13 @@ def zget_basic(from_date, to_date, symbol,interval='minute',
     from_date = from_date.replace(tzinfo=None)
     to_date = to_date.replace(tzinfo=None)
     #print(f"exporting {from_date} to {to_date} for {symbol}")
+    
+    if cacheTickData:
+        df = getCachedTikerData(symbol,from_date,
+                              to_date,interval) 
+        if not df.empty:
+            return df
+    
     token = db.get_instrument_token(symbol)
     if token == -1:
         logging.warning(f'Invalid symbol ({symbol}) provided')
@@ -77,7 +114,10 @@ def zget_basic(from_date, to_date, symbol,interval='minute',
 
     if df.empty:
         logging.info('No data returned')
-    return zColsToDbCols(df)
+    df = zColsToDbCols(df)
+    if cacheTickData:
+        loadTickerCache(df,symbol,from_date,to_date,interval)
+    return df
 
 def zAddOptionsData(df,symbol,from_date,to_date,interval='minute',continuous=False):
     # Add options data

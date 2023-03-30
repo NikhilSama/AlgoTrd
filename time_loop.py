@@ -152,8 +152,7 @@ def exitCurrentPosition(t,positions,net_position,nextPosition):
 def tradeNotification(type, t,ltp,signal,position,net_position):
     subprocess.call(["afplay", '/System/Library/Sounds/Glass.aiff'])
     logging.info(f"GO {type} {t} LastCandleClose:{ltp} Signal:{signal} Position:{position} NetPosition:{net_position}" )
-    if showTradingViewLive and (signal == 1 or signal == -1):
-        print(f'START LIVE @ {datetime.datetime.now(ist).strftime("%I:%M:%S %p")}')
+    if showTradingViewLive:
         global liveTVThread 
         if liveTVThread is not None: 
             liveTVThread.join()
@@ -161,7 +160,6 @@ def tradeNotification(type, t,ltp,signal,position,net_position):
                                                 args=(t,)) # funky syntax needs (t,) if only one arg to signify its a tuple
         liveTVThread.start()
             #liveCharts.loadChart(t)
-        print(f'START LIVE @ {datetime.datetime.now(ist).strftime("%I:%M:%S %p")}')
 
 def Tick(stock,options):
 
