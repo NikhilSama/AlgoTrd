@@ -3,6 +3,7 @@ import subprocess
 import os
 import pandas as pd
 import sys
+import itertools 
 
 cloud_args=''
 if 'cloud' in sys.argv:
@@ -21,22 +22,43 @@ def run_instance(args):
         print('Error in run_instance():', e)
 
 def argGenerator():
-    for maLen in [10,20,30]:
-        for bandWidth in [2,2.5,3,3.5,4]:
-            for fastMALen in [5,7,10]:
-                for adxLen in [10,14,20]:
-                    for adxThresh in [20,25,30,35,40]:
-                        for adxThreshYellowMultiplier in [0.5,0.6,0.7,0.8,0.9]:
-                            for adxThreshYellowMultiplier in [0.5,0.6,0.7,0.8,0.9]:
-                                print(f'{cloud_args} maLen:{maLen} bandWidth:{bandWidth} fastMALen:{fastMALen} adxLen:{adxLen} adxThresh:{adxThresh} adxThreshYellowMultiplier:{adxThreshYellowMultiplier} ')
-                                yield f'{cloud_args} maLen:{maLen} bandWidth:{bandWidth} fastMALen:{fastMALen} adxLen:{adxLen} adxThresh:{adxThresh} adxThreshYellowMultiplier:{adxThreshYellowMultiplier} '
+
+    ma_lens = [10, 20, 30]
+    band_widths = [2, 2.5, 3, 3.5, 4]
+    fast_ma_lens = [5, 7, 10]
+    adx_lens = [10, 14, 20]
+    adx_thresholds = [20, 25, 30, 35, 40]
+    adx_thresh_yellow_multipliers = [0.5, 0.6, 0.7, 0.8, 0.9]
+    num_candles_for_slope_proj = [1, 2.3, 4, 5, 6, 7, 8, 9, 10]
+
+    for params in itertools.product(ma_lens, band_widths, fast_ma_lens, adx_lens, adx_thresholds, adx_thresh_yellow_multipliers, num_candles_for_slope_proj):
+        ma_len, band_width, fast_ma_len, adx_len, adx_thresh, adx_thresh_yellow_multiplier, num_candles = params
+        print(f'{cloud_args} maLen:{ma_len} bandWidth:{band_width} fastMALen:{fast_ma_len} adxLen:{adx_len} adxThresh:{adx_thresh} adxThreshYellowMultiplier:{adx_thresh_yellow_multiplier}')
+        yield f'{cloud_args} maLen:{ma_len} bandWidth:{band_width} fastMALen:{fast_ma_len} adxLen:{adx_len} adxThresh:{adx_thresh} adxThreshYellowMultiplier:{adx_thresh_yellow_multiplier}'
+
+    # for maLen in [10,20,30]:
+    #     for bandWidth in [2,2.5,3,3.5,4]:
+    #         for fastMALen in [5,7,10]:
+    #             for adxLen in [10,14,20]:
+    #                 for adxThresh in [20,25,30,35,40]:
+    #                     for adxThreshYellowMultiplier in [0.5,0.6,0.7,0.8,0.9]:
+    #                         for numCandlesForSlopeProjection in [1,2.3,4,5,6,7,8,9,10]:
+    #                             print(f'{cloud_args} maLen:{maLen} bandWidth:{bandWidth} fastMALen:{fastMALen} adxLen:{adxLen} adxThresh:{adxThresh} adxThreshYellowMultiplier:{adxThreshYellowMultiplier} ')
+    #                             yield f'{cloud_args} maLen:{maLen} bandWidth:{bandWidth} fastMALen:{fastMALen} adxLen:{adxLen} adxThresh:{adxThresh} adxThreshYellowMultiplier:{adxThreshYellowMultiplier} '
     
 
 def argGeneratorTest():
-    for maLen in [20,30]:
-        for bandWidth in [2,4]:
-            print(f"{cloud_args} maLen:{maLen} bandWidth:{bandWidth}")
-            yield f'{cloud_args} maLen:{maLen} bandWidth:{bandWidth}'
+    ma_lens = [10, 20, 30]
+    band_widths = [2, 2.5, 3, 3.5, 4]
+    for params in itertools.product(ma_lens, band_widths):
+        ma_len, band_width = params
+        print(f"{cloud_args} maLen:{ma_len} bandWidth:{band_width}")
+        yield f'{cloud_args} maLen:{ma_len} bandWidth:{band_width}'
+
+    # for maLen in [20,30]:
+    #     for bandWidth in [2,4]:
+    #         print(f"{cloud_args} maLen:{maLen} bandWidth:{bandWidth}")
+    #         yield f'{cloud_args} maLen:{maLen} bandWidth:{bandWidth}'
 
     
 if __name__ == '__main__':
@@ -44,7 +66,7 @@ if __name__ == '__main__':
     args_list = ['maLen:20 cacheTickData:True', 'maLen:200 cacheTickData:True', 'maLen:8 cacheTickData:True']
 
     # Create a Pool object with number of processes equal to number of CPU cores
-    pool = Pool()
+    pool = Pool(processes=8)
 
     # Execute instances in parallel using the Pool object
     pool.map(run_instance, argGeneratorTest())
