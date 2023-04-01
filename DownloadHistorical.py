@@ -109,6 +109,7 @@ def zget_basic(from_date, to_date, symbol,interval='minute',
         return pd.DataFrame()
 
     df = pd.DataFrame(records)
+    
     # Adding new index column
     df.insert(0, 'i', range(1, 1 + len(df)))
 
@@ -163,6 +164,13 @@ def zget(from_date, to_date, symbol,interval='minute',
     #df.drop('volume', inplace=True, axis=1)   
     df['symbol'] = symbol
     df.set_index('date',inplace=True)
+    
+    # Kite can sometimes return junk data before 915 or 1530, wich very 
+    # low or zero volume.  These set the min/max values for OBV and 
+    # affect our analytics and signals for a long time.  So we filter
+    # fileter out these junk values
+
+    df = df.between_time('9:15', '15:29')
     return df
 
 def zColsToDbCols(df):

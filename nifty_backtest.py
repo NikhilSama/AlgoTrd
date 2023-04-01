@@ -59,8 +59,9 @@ legend = []
 def zget(interval='minute'):
     global niftydf
 #    end =datetime.now()
-    end = datetime(2023, 3, 29, 15, 30, tzinfo=ist)
-    start =end - timedelta(days=days)
+    end = datetime(2023, 3, 31, 15, 30, tzinfo=ist)
+    start = datetime(2023, 3, 31, 9, 30, tzinfo=ist)
+    #start =end - timedelta(days=60)
     niftydf = {}
     for t in nifty_active:
         niftydf[t]= downloader.zget(start,end,t,interval,includeOptions=includeOptions) 
@@ -68,9 +69,10 @@ def zget(interval='minute'):
 
 def backtest(type=1, name='test'):
     perfSummaryfname = utils.fileNameFromArgs('niftyPerf-')
-    if utils.fileExists("Data/backtest/nifty/"+perfSummaryfname):
-        print(f"File {perfSummaryfname} exists. Skipping.")
-        sys.exit(0)
+    if perfSummaryfname != 'niftyPerf-.csv':
+        if utils.fileExists("Data/backtest/nifty/"+perfSummaryfname):
+            print(f"File {perfSummaryfname} exists. Skipping.")
+            sys.exit(0)
     zget()
     performance = pd.DataFrame()
     global results 

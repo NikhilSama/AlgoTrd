@@ -4,6 +4,8 @@ import os
 import pandas as pd
 import sys
 import itertools 
+import time 
+perfTIME = time.time()    
 
 cloud_args=''
 if 'cloud' in sys.argv:
@@ -17,41 +19,39 @@ def run_instance(args):
             arg_dict[key] = value
             arg_array.append(arg)
 
-        subprocess.call(f'python3.8 nifty_backtest.py {args}', shell=True) 
+        subprocess.call(f'python3.8 backtest.py {args}', shell=True) 
     except Exception as e:
         print('Error in run_instance():', e)
 
 def argGenerator():
 
     ma_lens = [10, 20, 30]
-    band_widths = [2, 2.5, 3, 3.5, 4]
+    band_widths = [2, 2.5, 3]
     fast_ma_lens = [5, 7, 10]
     adx_lens = [10, 14, 20]
-    adx_thresholds = [20, 25, 30, 35, 40]
-    adx_thresh_yellow_multipliers = [0.5, 0.6, 0.7, 0.8, 0.9]
-    num_candles_for_slope_proj = [1, 2,3, 4, 5, 6, 7, 8, 9, 10]
-    
-    atr_lens = [14]
+    adx_thresholds = [20, 30, 40]
+    adx_thresh_yellow_multipliers = [0.5, 0.7, 0.9]
+    num_candles_for_slope_proj = [1, 2, 4, 6,]
+    atr_lens = [8,14,20]
     super_lens = [200]
     super_bandWidths = [2.5]
-    adx_slope_threshes = [0.06]
-    ma_slope_threshes = [1]
-    ma_slope_thresh_yellow_multipliers = [0.7]
-    ma_slope_slope_threshes = [0.01]
-    obv_osc_threshes = [0.2]
-    obv_osc_thresh_yellow_multipliers = [0.7]
-    obv_osc_slope_threshes = [0.3]
-    override_multipliers = [1.2]
+    adx_slope_threshes = [0.02, 0.06, 0.10]
     
     for params in itertools.product(ma_lens, band_widths, fast_ma_lens, adx_lens, adx_thresholds, adx_thresh_yellow_multipliers, num_candles_for_slope_proj,
-                                    atr_lens, super_lens, super_bandWidths, adx_slope_threshes, ma_slope_threshes, ma_slope_thresh_yellow_multipliers, ma_slope_slope_threshes,
-                                    obv_osc_slope_threshes, obv_osc_threshes, obv_osc_thresh_yellow_multipliers, override_multipliers):
+                                    atr_lens, super_lens, super_bandWidths, adx_slope_threshes):
         ma_len, band_width, fast_ma_len, adx_len, adx_thresh, adx_thresh_yellow_multiplier, num_candles, atr_len, super_len, super_bandWidth, adx_slope_thresh, \
-            ma_slope_thresh, ma_slope_thresh_yellow_multiplier, ma_slope_slope_thresh, obv_osc_thresh, obv_osc_thresh_yellow_multiplier, ovc_osc_slope_thresh, \
-                override_multiplier = params
-        print(f'{cloud_args} maLen:{ma_len} bandWidth:{band_width} fastMALen:{fast_ma_len} adxLen:{adx_len} adxThresh:{adx_thresh} adxThreshYellowMultiplier:{adx_thresh_yellow_multiplier}')
-        yield f'{cloud_args} maLen:{ma_len} bandWidth:{band_width} fastMALen:{fast_ma_len} adxLen:{adx_len} adxThresh:{adx_thresh} adxThreshYellowMultiplier:{adx_thresh_yellow_multiplier} numCandlesForSlopeProjection:{num_candles} atrLen:{atr_len} superLen:{super_len} superBandWidth:{super_bandWidth} adxSlopeThresh:{adx_slope_thresh} maSlopeThresh:{ma_slope_thresh} maSlopeThreshYellowMultiplier:{ma_slope_thresh_yellow_multiplier} maSlopeSlopeThresh:{ma_slope_slope_thresh} obvOscThresh:{obv_osc_thresh} obvOscThreshYellowMultiplier:{obv_osc_thresh_yellow_multiplier} obvOscSlopeThresh:{ovc_osc_slope_thresh} overrideMultiplier:{override_multiplier}'
+        = params
+        #check w db to see if this combination has been run before or is currently running
+        # if not then mark it as running
+        # do it
+        # check that csv exists and mark it as done in db 
+        
+        
+        # will run 3^8 * 4 = 26.2K times == 10 parallel on pc, 8 on mac, 8 more on a amy mac
+        #so 26 in parallel .. 1000 parallel runs will do it 
 
+        print(f'{cloud_args} maLen:{ma_len} bandWidth:{band_width} fastMALen:{fast_ma_len} adxLen:{adx_len} adxThresh:{adx_thresh} adxThreshYellowMultiplier:{adx_thresh_yellow_multiplier}')
+        yield f'{cloud_args} maLen:{ma_len} bandWidth:{band_width} fastMALen:{fast_ma_len} adxLen:{adx_len} adxThresh:{adx_thresh} adxThreshYellowMultiplier:{adx_thresh_yellow_multiplier} numCandlesForSlopeProjection:{num_candles} atrLen:{atr_len} superLen:{super_len} superBandWidth:{super_bandWidth} adxSlopeThresh:{adx_slope_thresh}'
     # for maLen in [10,20,30]:
     #     for bandWidth in [2,2.5,3,3.5,4]:
     #         for fastMALen in [5,7,10]:
@@ -64,8 +64,8 @@ def argGenerator():
     
 
 def argGeneratorTest():
-    ma_lens = [10, 20, 30]
-    band_widths = [2, 2.5, 3, 3.5, 4]
+    ma_lens = [10, 20, 25, 30]
+    band_widths = [2, 2.5, 3]
     for params in itertools.product(ma_lens, band_widths):
         ma_len, band_width = params
         print(f"{cloud_args} maLen:{ma_len} bandWidth:{band_width}")
@@ -85,12 +85,15 @@ if __name__ == '__main__':
     pool = Pool(processes=8)
 
     # Execute instances in parallel using the Pool object
-    pool.map(run_instance, argGenerator())
+    pool.map(run_instance, argGeneratorTest())
 
     # Close the Pool object to free resources
     pool.close()
     pool.join()
-
+    print (f"COMBINED took {round((time.time() - perfTIME)*1000,2)}ms")
+    exit(0)
+    
+    
     # Done with multiprocessing
     # now merge the csv files into one
 
@@ -106,7 +109,7 @@ if __name__ == '__main__':
     for file in csv_files:
         df = pd.read_csv(os.path.join(directory, file))
         df_combined = pd.concat([df_combined, df], axis=0)
-
+    
 #        dfs.append(df)
 
     # Concatenate DataFrames into single DataFrame

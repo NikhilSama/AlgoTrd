@@ -348,7 +348,7 @@ def getSig_BB_CX(type,signal, isLastRow, row, df):
         s = -1*type
 
     if isLastRow and signalChanged(s,signal):
-        logging.info(f'{row.symbol} => BB-CX => signal={signal} s={s} type={type}')
+        logging.info(f'{row.symbol}:{row.i} => BB-CX => signal={signal} s={s} type={type}')
     
     return s
 
@@ -426,6 +426,7 @@ def getSig_MASLOPE_FILTER (type,signal, isLastRow,row,df):
 #the price moves dramatically and it beomes and trend that shows up
 #in MA or ADX etc 
 def getSig_OBV_FILTER (type,signal, isLastRow,row, df):
+    
     if not isLongOrShortSignal(signal):
         return signal
 
@@ -447,9 +448,9 @@ def getSig_OBV_FILTER (type,signal, isLastRow,row, df):
         elif s == -1 and breached == 'H':
             s = 0
         if isLastRow and signalChanged(s,signal):
-            logging.info(f"{row.symbol}:{row.i}  => OBV FILTERER => obv is:{row['OBV-OSC']} >= threshod is:{obvOscThresh} signal={signal} type={type}")
+            logging.info(f"{row.symbol}:{row.i}  => OBV FILTERER => obv is:{row['OBV-OSC']} >= threshod is:{obvOscThresh} Mult: {obvOscThreshYellowMultiplier} Slope: {row['OBV-OSC-PCT-CHNG']} >= {obvOscSlopeThresh} signal={signal} type={type}")
         elif s!=signal:
-            logging.debug(f"{row.symbol}:{row.i} => OBV FILTERER =>  obv is:{row['OBV-OSC']} >= threshod is:{obvOscThresh} signal={signal} type={type}")
+            logging.debug(f"{row.symbol}:{row.i} => OBV FILTERER =>  obv is:{row['OBV-OSC']} >= threshod is:{obvOscThresh} Mult: {obvOscThreshYellowMultiplier} Slope: {row['OBV-OSC-PCT-CHNG']} >= {obvOscSlopeThresh} signal={signal} type={type}")
 
     return s
 
@@ -547,6 +548,7 @@ def getSig_exitAnyExtremeADX_OBV_MA20_OVERRIDE (type, signal, isLastRow, row, df
 
 def getSig_followAllExtremeADX_OBV_MA20_OVERRIDE (type, signal, isLastRow, row, df, 
                                                   last_signal=float('nan')):
+    
     if type == 0:# Dont take new positions when its time to exit only
         return signal
     s = signal 

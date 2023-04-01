@@ -117,15 +117,17 @@ def plot_backtest(df,trades=None):
     
     # Loop over each day in the DataFrame
     for day in np.unique(df.index.date):
+        day_rows = df.loc[df.index.date == day]
+
         # Find the start and end times of the shaded region
         start_time = pd.Timestamp(year=day.year, month=day.month, day=day.day, hour=9, minute=15)
-        end_time = pd.Timestamp(year=day.year, month=day.month, day=day.day, hour=10, minute=0)
+        end_time = pd.Timestamp(year=day.year, month=day.month, day=day.day, hour=9, minute=59)
         start_time = ist.localize(start_time)
         end_time = ist.localize(end_time)
         start_index = 0
         end_index = 0
         try:
-            start_index=df['i'][start_time]
+            start_index=day_rows.loc[day_rows.index[0],'i']
             end_index=df['i'][end_time]
         except:
             print("cant find start or end index(Likely cause data started or ended mid-day) for {start_time} or {end_time}")
@@ -147,7 +149,8 @@ def plot_backtest(df,trades=None):
         try:
 
             start_index=df['i'][start_time]
-            end_index=df['i'][end_time]
+            end_index = day_rows.loc[day_rows.index[-1],'i']
+            
             # Add a shaded rectangle for the time period between start_time and end_time
             ax1.axvspan(start_index, end_index, alpha=0.2, color='yellow')
             ax2.axvspan(start_index, end_index, alpha=0.2, color='yellow')
