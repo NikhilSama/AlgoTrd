@@ -81,7 +81,7 @@ def getCachedTikerData(symbol,from_date,to_date,interval):
     return df
 
 def zget_basic(from_date, to_date, symbol,interval='minute',
-         continuous=False):
+         continuous=False,token=None):
     if from_date > to_date:
         return
     
@@ -95,8 +95,8 @@ def zget_basic(from_date, to_date, symbol,interval='minute',
                               to_date,interval) 
         if not df.empty:
             return df
-    
-    token = db.get_instrument_token(symbol)
+    if token is None:
+        token = db.get_instrument_token(symbol)
     if token == -1:
         logging.warning(f'Invalid symbol ({symbol}) provided')
         return pd.DataFrame()
@@ -142,9 +142,9 @@ def zAddOptionsData(df,symbol,from_date,to_date,interval='minute',continuous=Fal
     return df
     
 def zget(from_date, to_date, symbol,interval='minute',
-         includeOptions=False, continuous=False):
+         includeOptions=False, continuous=False, instrumentToken=None):
     
-    df = zget_basic(from_date, to_date, symbol,interval,continuous)
+    df = zget_basic(from_date, to_date, symbol,interval,continuous,instrumentToken)
     
     if df.empty:
         return df

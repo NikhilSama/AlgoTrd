@@ -7,6 +7,7 @@ Created on Sun Feb  5 14:26:36 2023
 """
 import sys
 cfg = {
+    'cfgFreezeGun': False,
     'startTime': 0,
     'startHour': 10,
     'endHour': 14,
@@ -29,22 +30,27 @@ cfg = {
     'obvOscThresh': 0.2,
     'obvOscThreshYellowMultiplier': 0.7,
     'obvOscSlopeThresh': 0.3,
+    'cfgObvMaxMinDiff_MaxLookbackCandles': 200,
     'includeOptions': False,
     'plot': [
+        
         #'trade_returns'
-#        ,'adjCloseGraph'
+        #,
+        'adjCloseGraph'
+        
         ],
     'overrideMultiplier': 1.2,
 # google cloud specific stuff 
     'dbhost' : 'localhost',
     'dbname' : 'trading',
     'zerodha_access_token': False,
-    'dbhost' : '34.131.115.155',
+    'dbhost' : 'localhost',
+#    'dbhost' : '34.131.115.155',
     'dbuser' : 'trading',
     'dbpass' : 'trading',
-    'showTradingViewLive' : True,
-    'cacheTickData' : False, 
-    'bet_size': 1000
+    'showTradingViewLive' : False,
+    'cacheTickData' : True, 
+    'bet_size': 10000
 }
 
   
