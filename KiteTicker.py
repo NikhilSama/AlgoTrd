@@ -34,10 +34,19 @@ ist = pytz.timezone('Asia/Kolkata')
 db = DBBasic() 
 
 # Initialise
-kws = ki.initKws()
+kws = ki.initKws(tl.get_kite_access_token())
 buy_order_id,sell_order_id = 0,0
 tickersToTrack = {}
 now = datetime.datetime.now(ist)
+
+def tickerlog(s):
+    logtime = datetime.datetime.now(ist).strftime("%I:%M:%S %p")
+    s = f'{logtime} {s}'
+
+    tlogfile = f"Data/logs/{datetime.datetime.now().strftime('%d-%m-%y')}.tickerlog"
+    with open(tlogfile, 'a') as f:
+        f.write(s)
+        f.write('\n')
 
 
 def getTickersToTrack():
@@ -167,8 +176,7 @@ def processTicks(ticks):
 ####### KITE TICKER CALLBACKS #######
 def on_ticks(ws, ticks):
     # Callback to receive ticks.
-    print("Ticks: {}".format(ticks))
-    logging.debug("Ticks: {}".format(ticks))
+    tickerlog("Ticks: {}".format(ticks))
     
     processTicks(ticks)
     bid = ticks[0]['depth']['buy'][0]['price']
@@ -178,13 +186,13 @@ def on_ticks(ws, ticks):
 
 
 def on_connect(ws, response):
-    print("connect called {}".format(response))
+    tickerlog("connect called {}".format(response))
     getTickersToTrack()
     getHistoricalTickerData()
     subscribeToTickerData()
 
 def on_close(ws, code, reason):
-    print(f"Close called Code: {code}  Reason:{reason}")
+    tickerlog(f"Close called Code: {code}  Reason:{reason}")
 
     # On connection close stop the event loop.
     # Reconnection will not happen after executing `ws.stop()`

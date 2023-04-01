@@ -101,6 +101,8 @@ kite = ki.initKite()
 
 def get_positions():
     return ki.get_positions(kite)
+def get_kite_access_token():
+    return ki.getAccessToken(kite)
 
 # BUY CONDITION
 # Buy if current signal is 1 and position is not 1, 
