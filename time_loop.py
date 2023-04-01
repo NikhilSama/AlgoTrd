@@ -96,7 +96,11 @@ logging.debug(f">>>>>>>>DEBUG IS ON>>>>>>>")
 db = DBBasic() 
 
 nifty = td.get_fo_active_nifty_tickers()
-kite, kws = ki.initKiteTicker()
+
+kite = ki.initKite()
+
+def get_positions():
+    return ki.get_positions(kite)
 
 # BUY CONDITION
 # Buy if current signal is 1 and position is not 1, 
@@ -258,7 +262,7 @@ def Tick(stock,options):
     logging.info("\n\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n")
     logging.info(f'Tick @ {now.strftime("%I:%M:%S %p")}')
     logging.info("\n\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n")
-    positions = ki.get_positions(kite)
+    positions = get_positions()
 
     frm = now - timedelta(days=1)
     #get the last date we have in the DB for Adani; assume other stocks are 

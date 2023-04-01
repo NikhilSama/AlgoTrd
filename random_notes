@@ -1,0 +1,62 @@
+ZGet timeline
+
+
+--- 
+Issues to investigate
+at Timestamp('2023-03-31 13:37:00+0530', tz='tzoffset(None, 19800)')
+the OBV-OSC for Reliance is significantly different in hisotical(0.09482582299582268)
+vs live 0.2.  There  are 3 additional rows in historical listed belwo: 
+
+2023-03-31 09:07:00+05:30    1  2255.00  ...          0               NaN
+2023-03-31 09:08:00+05:30    2  2255.00  ...          0               NaN
+2023-03-31 09:11:00+05:30    3  2255.00  ...          0               NaN
+2023-03-31 09:14:00+05:30    4  2255.00  ...          0               NaN
+
+that are not there in online df which starts at 9:15.  Could these rows be the reason for the diff ?? 
+One hypothesis is that the presense of those 3 random rows before 9:15, with Adj Close below 9:15 close, would lead that first minute volume to be counted as UP volume in historical, and start volume in live .. verify .. 
+
+Almost certain this is the issue.  Those candles have zero volume, and they probably mess up the obv_diff.min/max functions.  Solution will likely be to pop any rows before 9:15 or any rows with zero volume in the backtesting, to get clean apples to apples data. 
+
+How do we handle this.  Figure out how to remove the rows in historical to see if we get same results.  Also figure out how to change backtest methods to be par w online if this recurs -- backtest should only consider data 9:15 onwards even if it somehow gets come ticks before that, because thats all that online gets, 
+
+VERIFIED and HACKED For now .. by putting 4 statments to remove the first 4 rows in Download historical zgetbasic.  improve this by programatically removing any leading rows with zero volume. 
+
+Also looking like out OBV/MSSLoope filters are super correct on saying no to bb .. should we just follow them as OR without multiplier for trends as well ?? Seems like a profitable strategy
+
+There is some junk after market data after 3:30 as well that needs to be filtered out .. I think that is messing up OBV calc as well .. 
+mask = ((df.index.hour == 9 & df.index.minute < 15)) | (df.index.hour == 15 & df.index.minute >30) | (df.index.hour < 9) | (df.index.hour > 15))
+        # Use the shift method to get the start and end times of each region where the mask is True
+indexes = df.index[(mask & ~mask.shift(1, fill_value=False))].tolist()
+      
+-- 
+BACK TEST TIME PROFILING 
+
+From Kite 
+1 ticker, 1 day = 0.3 seconds (300 ms)
+
+From cache 
+1 ticker, 1 day = 0.003 seconds (3 ms)
+
+
+1 ticker 1 day (100 ms w/o kite and csv)
+ZGET took 2.93ms (300ms if get from kite -  k)
+SIGNAL GENERATION took 39.74ms
+Tearsheet took took 77.59ms
+to CSV took 93.37ms
+
+1 ticker 5 trading days (300 ms w/o kite and csv)
+ZGET took 13.44ms (395.52ms kite)
+SIGNAL GENERATION took 101.4ms
+Tearsheet took took 111.55ms
+to CSV took 66.2ms
+
+1 ticker 60 days (40 trading days) = 1500ms (1.5ms w/o k and csv)
+ZGET took 1.95 ms (1271.71ms if get from kite)
+SIGNAL GENERATION took 631.28ms
+Tearsheet took took 878.28ms
+to CSV took 609.09ms
+===
+if we take csv out and use cache - should take around 2 to 3 seconds for 60 days per ticker
+10,000 iterations = 30,000 seconds = 500 minutes = 8.33 hours * 50 tickers = 416 hours = 17 days
+1000 iterations = 3000 seconds = 50 minutes * 50 tickers = 2500 minutes = 41.66 hours
+

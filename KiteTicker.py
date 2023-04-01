@@ -34,7 +34,7 @@ ist = pytz.timezone('Asia/Kolkata')
 db = DBBasic() 
 
 # Initialise
-kite, kws = ki.initKiteTicker()
+kws = ki.initKws()
 buy_order_id,sell_order_id = 0,0
 tickersToTrack = {}
 now = datetime.datetime.now(ist)
@@ -154,9 +154,9 @@ def resampleToMinDF():
     return resampled_tokens 
 
 def tick():
-    positions = ki.get_positions(kite)
+    positions = tl.get_positions(kite)
     for token in tickersToTrack.key():
-        tl.tigenerateSignalsAndTradeck(tickersToTrack[token]['df'],positions,True,False)
+        tl.generateSignalsAndTrade(tickersToTrack[token]['df'],positions,True,False)
     
 def processTicks(ticks):
     #add the tick to the tick df
@@ -199,7 +199,7 @@ kws.on_close = on_close
 
 # Infinite loop on the main thread. Nothing after this will run.
 # You have to use the pre-defined callbacks to manage subscriptions.
-#kws.connect()
+kws.connect()
 ########## END KITE TICKER CONFIG AND START ##########
 
 

@@ -71,13 +71,16 @@ def getAccessToken(kite):
 
 def initKite():
     kite = KiteConnect(api_key=api_key)
-    
     kite.set_access_token(getAccessToken(kite))
     return kite
 
+def initKws():
+    kws = KiteTicker(api_key, getAccessToken(kite))
+    return kws 
+
 def initKiteTicker():
     kite = initKite()
-    kws = KiteTicker(api_key, getAccessToken(kite))
+    kws = initKws()
     return kite,kws
 
 def logtrade(s='',ticker=0,position=0,q=0,p=0,e='NSE'):
