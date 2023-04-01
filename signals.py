@@ -43,7 +43,14 @@ def OBV(df):
     df['obv'] = df['obv'].cumsum()
     df['ma_obv'] = df['obv'].ewm(com=20, min_periods=5).mean()
     df['ma_obv_diff'] = df['ma_obv'].diff(5)
-    df['obv_osc'] = df['ma_obv_diff'] / (df['ma_obv_diff'].max() - df['ma_obv_diff'].min())
+    
+    #OBV-Diff Max/Min diff should only look at previous candles, not future candles
+    #Also restrict the lookback to cfgObvMaxMinDiff_MaxLookbackCandles, to keep backtest results consistent
+    #apples to apples with live trading
+    
+    df['ma_obv_diff_max'] = df['ma_obv_diff'].rolling(window=cfgObvMaxMinDiff_MaxLookbackCandles, min_periods=1).max()
+    df['ma_obv_diff_min'] = df['ma_obv_diff'].rolling(window=cfgObvMaxMinDiff_MaxLookbackCandles, min_periods=1).min()
+    df['obv_osc'] = df['ma_obv_diff'] / (df['ma_obv_diff_max'] - df['ma_obv_diff_min'])
     df['obv_osc_pct_change'] = df['obv_osc'].pct_change(periods=3)
     df['obv_osc_pct_change'] = df['obv_osc_pct_change'].clip(lower=-1, upper=1)
     df['obv_trend'] = np.where(df['obv_osc'] > obvOscThresh,1,0)
