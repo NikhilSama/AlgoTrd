@@ -68,7 +68,7 @@ def perfProfiler(name,t):
 def backtest(t,i='minute',exportCSV=False):
     perfTIME = time.time()    
     startingTime = perfTIME
-    zgetFrom = datetime(2023, 3, 31, 9, 0, tzinfo=ist)
+    zgetFrom = datetime(2023, 2, 1, 9, 0, tzinfo=ist    )
     zgetTo = datetime(2023, 3, 31, 17, 30, tzinfo=ist)
     df = zget(t,zgetFrom,zgetTo,i=i)
     if df.empty:
@@ -222,10 +222,10 @@ def backtestCombinator():
         f.write('done')
 
 
-backtestCombinator()       
+#backtestCombinator()       
 #plot_options(['ASIANPAINT'],10,'minute')
 #backtest('HDFCLIFE','minute',adxThreh=30)
-#backtest('HDFCBANK','minute')
+backtest('HDFCBANK','minute')
 #backtest('HDFCLIFE','minute',adxThreh=25)
 #backtest('ASIANPAINT','minute',adxThreh=25)
 #backtest('HDFCLIFE','minute',adxThreh=30)
