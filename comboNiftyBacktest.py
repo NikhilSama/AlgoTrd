@@ -49,18 +49,12 @@ def argGenerator():
         
         # will run 3^8 * 4 = 26.2K times == 10 parallel on pc, 8 on mac, 8 more on a amy mac
         #so 26 in parallel .. 1000 parallel runs will do it 
-
-        print(f'{cloud_args} maLen:{ma_len} bandWidth:{band_width} fastMALen:{fast_ma_len} adxLen:{adx_len} adxThresh:{adx_thresh} adxThreshYellowMultiplier:{adx_thresh_yellow_multiplier}')
+        if os.path.exists(f'Data/backtest/combo/wip/niftyPerf--{ma_len}-{band_width}-{fast_ma_len}-{adx_len}-{adx_thresh}-{adx_thresh_yellow_multiplier}-{num_candles}-{atr_len}-{super_len}-{super_bandWidth}-{adx_slope_thresh}.csv'):
+            print(f'SKIP - Already WIP {cloud_args} maLen:{ma_len} bandWidth:{band_width} fastMALen:{fast_ma_len} adxLen:{adx_len} adxThresh:{adx_thresh} adxThreshYellowMultiplier:{adx_thresh_yellow_multiplier} numCandlesForSlopeProjection:{num_candles} atrLen:{atr_len} superLen:{super_len} superBandWidth:{super_bandWidth} adxSlopeThresh:{adx_slope_thresh}')
+            continue
+        
+        print(f'{cloud_args} maLen:{ma_len} bandWidth:{band_width} fastMALen:{fast_ma_len} adxLen:{adx_len} adxThresh:{adx_thresh} adxThreshYellowMultiplier:{adx_thresh_yellow_multiplier} numCandlesForSlopeProjection:{num_candles} atrLen:{atr_len} superLen:{super_len} superBandWidth:{super_bandWidth} adxSlopeThresh:{adx_slope_thresh}')
         yield f'{cloud_args} maLen:{ma_len} bandWidth:{band_width} fastMALen:{fast_ma_len} adxLen:{adx_len} adxThresh:{adx_thresh} adxThreshYellowMultiplier:{adx_thresh_yellow_multiplier} numCandlesForSlopeProjection:{num_candles} atrLen:{atr_len} superLen:{super_len} superBandWidth:{super_bandWidth} adxSlopeThresh:{adx_slope_thresh}'
-    # for maLen in [10,20,30]:
-    #     for bandWidth in [2,2.5,3,3.5,4]:
-    #         for fastMALen in [5,7,10]:
-    #             for adxLen in [10,14,20]:
-    #                 for adxThresh in [20,25,30,35,40]:
-    #                     for adxThreshYellowMultiplier in [0.5,0.6,0.7,0.8,0.9]:
-    #                         for numCandlesForSlopeProjection in [1,2.3,4,5,6,7,8,9,10]:
-    #                             print(f'{cloud_args} maLen:{maLen} bandWidth:{bandWidth} fastMALen:{fastMALen} adxLen:{adxLen} adxThresh:{adxThresh} adxThreshYellowMultiplier:{adxThreshYellowMultiplier} ')
-    #                             yield f'{cloud_args} maLen:{maLen} bandWidth:{bandWidth} fastMALen:{fastMALen} adxLen:{adxLen} adxThresh:{adxThresh} adxThreshYellowMultiplier:{adxThreshYellowMultiplier} '
     
 
 def argGeneratorTest():
@@ -68,6 +62,10 @@ def argGeneratorTest():
     band_widths = [2, 2.5, 3]
     for params in itertools.product(ma_lens, band_widths):
         ma_len, band_width = params
+        if os.path.exists(f'Data/backtest/combo/wip/niftyPerf--{ma_len}-{band_width}.csv'):
+            print(f'SKIP - Already WIP {cloud_args} maLen:{ma_len} bandWidth:{band_width}')
+            continue
+
         print(f"{cloud_args} maLen:{ma_len} bandWidth:{band_width}")
         yield f'{cloud_args} maLen:{ma_len} bandWidth:{band_width}'
 
@@ -78,11 +76,8 @@ def argGeneratorTest():
 
     
 if __name__ == '__main__':
-    # List of argument strings to pass to instances
-    args_list = ['maLen:20 cacheTickData:True', 'maLen:200 cacheTickData:True', 'maLen:8 cacheTickData:True']
-
     # Create a Pool object with number of processes equal to number of CPU cores
-    pool = Pool(processes=8)
+    pool = Pool()
 
     # Execute instances in parallel using the Pool object
     pool.map(run_instance, argGeneratorTest())

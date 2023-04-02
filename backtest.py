@@ -23,6 +23,9 @@ import ppprint
 from plotting import plot_backtest
 import backtest_log_setup
 import itertools 
+from pathlib import Path
+import utils
+import sys
 
 #cfg has all the config parameters make them all globals here
 import cfg
@@ -103,7 +106,7 @@ def backtest(t,i='minute',exportCSV=False):
     perfTIME = perfProfiler("TOTAL", startingTime)
 
     if (plot == []):
-        return
+        return tearsheetdf
     plot_backtest(df,tearsheet['trades'])
     
     # print (f"END Complete {datetime.now(ist)}")
@@ -150,7 +153,25 @@ def compareDayByDayPerformance(t,days=90):
             ret = round(tearsheet['return'] *100,2)
             print(f"{t} Day:{s} Return:{ret}% Change; {change}%")
 
+def performanceToCSV(performance):
+    ## Add in the config variables it was called with from process combinator 
+    args = sys.argv[1:]
+    for arg in args:
+        key, value = arg.split(':')
+        if key in ['zerodha_access_token','dbuser','dbpass','cacheTickData', 'dbname', 'dbhost']:
+            continue
+        performance[key] = value
+    perfFileName = utils.fileNameFromArgs('Data/backtest/combo/niftyPerf-')
+    performance.to_csv(perfFileName)
+
 def backtestCombinator():
+    
+    # touch the file so it does not get redone by another worker thread
+    path = Path(utils.fileNameFromArgs('Data/backtest/combo/wip/niftyPerf-'))
+    path.touch()
+    
+    performance = pd.DataFrame()
+    
     ma_slope_threshes = [0.5, 1, 1.5]
     ma_slope_thresh_yellow_multipliers = [0.5, 0.7, 0.9]
     ma_slope_slope_threshes = [0.005, 0.01, 0.015]
@@ -158,32 +179,49 @@ def backtestCombinator():
     obv_osc_thresh_yellow_multipliers = [0.5,0.7,0.9]
     obv_osc_slope_threshes = [0.1,0.3,0.5]
     override_multipliers = [1,1.2,1.4]
-    #ITER = 0
+    ITER = 0
+    
+    
+    # This loop will run 3^7 = 2187 times; each run will be about 
+    # 1 second, so total 2187 seconds = 36 minutes
+    # run a combo 
+    
+    # when done w for loop write results to csv and mark done in db 
+    # add to fname string and csv file "maSlopeThresh:{ma_slope_thresh} maSlopeThreshYellowMultiplier:{ma_slope_thresh_yellow_multiplier} maSlopeSlopeThresh:{ma_slope_slope_thresh} obvOscThresh:{obv_osc_thresh} obvOscThreshYellowMultiplier:{obv_osc_thresh_yellow_multiplier} obvOscSlopeThresh:{ovc_osc_slope_thresh} overrideMultiplier:{override_multiplier}"
+    # continue to next combo
+    # output fname and csv row to contain timeframe in 
+    # start and end times, symbol, and all the parameters
+        
     for params in itertools.product(ma_slope_threshes, ma_slope_thresh_yellow_multipliers, ma_slope_slope_threshes,
                                 obv_osc_slope_threshes, obv_osc_threshes, obv_osc_thresh_yellow_multipliers, override_multipliers):
         ma_slope_thresh, ma_slope_thresh_yellow_multiplier, ma_slope_slope_thresh, obv_osc_thresh, obv_osc_thresh_yellow_multiplier, ovc_osc_slope_thresh, \
             override_multiplier = params
-        
+
         signals.updateCFG(ma_slope_thresh, ma_slope_thresh_yellow_multiplier, \
                          ma_slope_slope_thresh, obv_osc_thresh, \
                          obv_osc_thresh_yellow_multiplier, ovc_osc_slope_thresh, \
                          override_multiplier)
-        backtest('HDFCBANK','minute')
-        # ITER = ITER + 1
-        # if (ITER == 5):
-        #     exit(0)
+        tearsheetdf = backtest('HDFCBANK','minute')
+        
+        # Add in config variables we are looping through to the tearsheetdf
+        tearsheetdf['ma_slope_thresh'] = ma_slope_thresh
+        tearsheetdf['ma_slope_thresh_yellow_multiplier'] = ma_slope_thresh_yellow_multiplier
+        tearsheetdf['ma_slope_slope_thresh'] = ma_slope_slope_thresh
+        tearsheetdf['obv_osc_thresh'] = obv_osc_thresh
+        tearsheetdf['obv_osc_thresh_yellow_multiplier'] = obv_osc_thresh_yellow_multiplier
+        tearsheetdf['ovc_osc_slope_thresh'] = ovc_osc_slope_thresh
+        tearsheetdf['override_multiplier'] = override_multiplier
+        
+        performance = pd.concat([performance, tearsheetdf])
 
-#         # This loop will run 3^7 = 2187 times; each run will be about 
-        # 1 second, so total 2187 seconds = 36 minutes
-        # run a combo 
-        
-        # when done w for loop write results to csv and mark done in db 
-        # add to fname string and csv file "maSlopeThresh:{ma_slope_thresh} maSlopeThreshYellowMultiplier:{ma_slope_thresh_yellow_multiplier} maSlopeSlopeThresh:{ma_slope_slope_thresh} obvOscThresh:{obv_osc_thresh} obvOscThreshYellowMultiplier:{obv_osc_thresh_yellow_multiplier} obvOscSlopeThresh:{ovc_osc_slope_thresh} overrideMultiplier:{override_multiplier}"
-        # continue to next combo
-        # output fname and csv row to contain timeframe in 
-        # start and end times, symbol, and all the parameters
-        
- 
+        ITER = ITER + 1
+        if (ITER == 5):
+            break
+    performanceToCSV(performance)
+    with open(utils.fileNameFromArgs('Data/backtest/combo/wip/niftyPerf-'), 'w') as f:
+        f.write('done')
+
+
 backtestCombinator()       
 #plot_options(['ASIANPAINT'],10,'minute')
 #backtest('HDFCLIFE','minute',adxThreh=30)

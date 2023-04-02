@@ -223,7 +223,9 @@ def tearsheet (df):
         tearsheet["kurtosis_pertrade_return"] = 0
 
     tearsheetdf = pd.DataFrame(tearsheet,index=[0])
-
+    # drop the 'wins' and 'loss' columns
+    tearsheetdf = tearsheetdf.drop(['wins', 'loss'], axis=1)
+    
     tearsheet['trades'] = trades
     trades.to_csv('trades.csv')
     df.to_csv('df.csv')
