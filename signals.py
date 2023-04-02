@@ -25,6 +25,31 @@ ist = pytz.timezone('Asia/Kolkata')
 
 tickerStatus = {}
 
+def updateCFG(ma_slope_thresh, ma_slope_thresh_yellow_multiplier, \
+                         ma_slope_slope_thresh, obv_osc_thresh, \
+                         obv_osc_thresh_yellow_multiplier, ovc_osc_slope_thresh, \
+                         override_multiplier):
+    global maSlopeThresh,maSlopeThreshYellowMultiplier, \
+        maSlopeSlopeThresh,obvOscThresh, \
+            obvOscThreshYellowMultiplier, \
+                obvOscSlopeThresh,overrideMultiplier
+    maSlopeThresh = ma_slope_thresh
+    maSlopeThreshYellowMultiplier = ma_slope_thresh_yellow_multiplier
+    maSlopeSlopeThresh = ma_slope_slope_thresh
+    obvOscThresh =  obv_osc_thresh
+    obvOscThreshYellowMultiplier = obv_osc_thresh_yellow_multiplier
+    obvOscSlopeThresh = ovc_osc_slope_thresh
+    overrideMultiplier = override_multiplier
+    
+def printCFG():
+    print(f"maSlopeThresh: {maSlopeThresh}")
+    print(f"maSlopeThreshYellowMultiplier: {maSlopeThreshYellowMultiplier}")
+    print(f"maSlopeSlopeThresh: {maSlopeSlopeThresh}")
+    print(f"obvOscThresh: {obvOscThresh}")
+    print(f"obvOscThreshYellowMultiplier: {obvOscThreshYellowMultiplier}")
+    print(f"obvOscSlopeThresh: {obvOscSlopeThresh}")
+    print(f"overrideMultiplier: {overrideMultiplier}")
+    
 def MACD(DF,f=20,s=50):
     df = DF.copy()
     df["ma_fast"] = df["Adj Close"].ewm(span=f,min_periods=f).mean()
@@ -141,8 +166,7 @@ def addBBStats(df):
     #df.drop(['Open','High','Low'],axis=1,inplace=True,errors='ignore')
     #df.tail(5)
     return df
-    
-
+        
 def eom_effect(df):
     # BUY condition
     df['signal'] = np.where( (df.index.day > 25),1,0)

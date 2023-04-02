@@ -6,7 +6,7 @@ Created on Sun Feb  5 14:26:36 2023
 @author: nikhilsama
 """
 import sys
-cfg = {
+cfgDict = {
     'cfgFreezeGun': False,
     'startTime': 0,
     'startHour': 10,
@@ -36,7 +36,7 @@ cfg = {
         
         #'trade_returns'
         #,
-        'adjCloseGraph'
+        #'adjCloseGraph'
         
         ],
     'overrideMultiplier': 1.2,
@@ -58,7 +58,7 @@ args = sys.argv[1:]
 arg_dict = {}
 for arg in args:
     key, value = arg.split(':')
-    if key not in cfg:
+    if key not in cfgDict:
         print(f'Invalid argument: {key}')
         sys.exit()
     # Convert value to int or float if possible
@@ -74,8 +74,8 @@ for arg in args:
                 value = True
             pass
              
-    cfg[key] = value
+    cfgDict[key] = value
                
 # Create variables with names as dict keys and values as dict values
-for key, value in cfg.items():
+for key, value in cfgDict.items():
     locals()[key] = value

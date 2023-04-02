@@ -22,6 +22,7 @@ import strategies15m as strat15m
 import ppprint
 from plotting import plot_backtest
 import backtest_log_setup
+import itertools 
 
 #cfg has all the config parameters make them all globals here
 import cfg
@@ -62,10 +63,9 @@ def perfProfiler(name,t):
     return time.time()
 
 def backtest(t,i='minute',exportCSV=False):
-
     perfTIME = time.time()    
     startingTime = perfTIME
-    zgetFrom = datetime(2023, 3, 27, 9, 0, tzinfo=ist)
+    zgetFrom = datetime(2023, 3, 31, 9, 0, tzinfo=ist)
     zgetTo = datetime(2023, 3, 31, 17, 30, tzinfo=ist)
     df = zget(t,zgetFrom,zgetTo,i=i)
     if df.empty:
@@ -102,7 +102,7 @@ def backtest(t,i='minute',exportCSV=False):
     perfTIME = perfProfiler("to CSV", perfTIME)
     perfTIME = perfProfiler("TOTAL", startingTime)
 
-    if (plot == False):
+    if (plot == []):
         return
     plot_backtest(df,tearsheet['trades'])
     
@@ -150,19 +150,30 @@ def compareDayByDayPerformance(t,days=90):
             ret = round(tearsheet['return'] *100,2)
             print(f"{t} Day:{s} Return:{ret}% Change; {change}%")
 
-# def backtestCombinator():
-#     ma_slope_threshes = [0.5, 1, 1.5]
-#     ma_slope_thresh_yellow_multipliers = [0.5, 0.7, 0.9]
-#     ma_slope_slope_threshes = [0.005, 0.01, 0.015]
-#     obv_osc_threshes = [0.1, 0.2, 0.3]
-#     obv_osc_thresh_yellow_multipliers = [0.5,0.7,0.9]
-#     obv_osc_slope_threshes = [0.1,0.3,0.5]
-#     override_multipliers = [1,1.2,1.4]
-#     for params in itertools.product(ma_slope_threshes, ma_slope_thresh_yellow_multipliers, ma_slope_slope_threshes,
-#                                 obv_osc_slope_threshes, obv_osc_threshes, obv_osc_thresh_yellow_multipliers, override_multipliers):
+def backtestCombinator():
+    ma_slope_threshes = [0.5, 1, 1.5]
+    ma_slope_thresh_yellow_multipliers = [0.5, 0.7, 0.9]
+    ma_slope_slope_threshes = [0.005, 0.01, 0.015]
+    obv_osc_threshes = [0.1, 0.2, 0.3]
+    obv_osc_thresh_yellow_multipliers = [0.5,0.7,0.9]
+    obv_osc_slope_threshes = [0.1,0.3,0.5]
+    override_multipliers = [1,1.2,1.4]
+    #ITER = 0
+    for params in itertools.product(ma_slope_threshes, ma_slope_thresh_yellow_multipliers, ma_slope_slope_threshes,
+                                obv_osc_slope_threshes, obv_osc_threshes, obv_osc_thresh_yellow_multipliers, override_multipliers):
         ma_slope_thresh, ma_slope_thresh_yellow_multiplier, ma_slope_slope_thresh, obv_osc_thresh, obv_osc_thresh_yellow_multiplier, ovc_osc_slope_thresh, \
-            override_multiplier = params        
-        # This loop will run 3^7 = 2187 times; each run will be about 
+            override_multiplier = params
+        
+        signals.updateCFG(ma_slope_thresh, ma_slope_thresh_yellow_multiplier, \
+                         ma_slope_slope_thresh, obv_osc_thresh, \
+                         obv_osc_thresh_yellow_multiplier, ovc_osc_slope_thresh, \
+                         override_multiplier)
+        backtest('HDFCBANK','minute')
+        # ITER = ITER + 1
+        # if (ITER == 5):
+        #     exit(0)
+
+#         # This loop will run 3^7 = 2187 times; each run will be about 
         # 1 second, so total 2187 seconds = 36 minutes
         # run a combo 
         
@@ -172,10 +183,11 @@ def compareDayByDayPerformance(t,days=90):
         # output fname and csv row to contain timeframe in 
         # start and end times, symbol, and all the parameters
         
-        
+ 
+backtestCombinator()       
 #plot_options(['ASIANPAINT'],10,'minute')
 #backtest('HDFCLIFE','minute',adxThreh=30)
-backtest('INFY','minute')
+#backtest('HDFCBANK','minute')
 #backtest('HDFCLIFE','minute',adxThreh=25)
 #backtest('ASIANPAINT','minute',adxThreh=25)
 #backtest('HDFCLIFE','minute',adxThreh=30)

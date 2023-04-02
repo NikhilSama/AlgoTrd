@@ -60,10 +60,10 @@ def zget(interval='minute'):
     global niftydf
 #    end =datetime.now()
     end = datetime(2023, 3, 31, 15, 30, tzinfo=ist)
-    start = datetime(2023, 3, 31, 9, 30, tzinfo=ist)
+    start = datetime(2023, 2, 3, 9, 30, tzinfo=ist)
     #start =end - timedelta(days=60)
     niftydf = {}
-    for t in nifty_active:
+    for t in nifty:
         niftydf[t]= downloader.zget(start,end,t,interval,includeOptions=includeOptions) 
         niftydf[t]=downloader.zColsToDbCols(niftydf[t])
 
@@ -113,6 +113,10 @@ def backtest(type=1, name='test'):
             x = x + 1
             legend.append(t)
         performance = pd.concat([performance, tearsheetdf])
+    
+    if performance.empty:
+        print("No data to process. Exiting.")
+        exit(0)
     
     perfSummary = performance.mean()
     perfSummary['num_trades'] = performance['num_trades'].sum()

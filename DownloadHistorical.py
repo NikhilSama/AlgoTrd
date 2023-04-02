@@ -83,7 +83,8 @@ def getCachedTikerData(symbol,from_date,to_date,interval):
 def zget_basic(from_date, to_date, symbol,interval='minute',
          continuous=False,token=None):
     if from_date > to_date:
-        return
+        logging.warning(f'start {from_date} is greater than end {to_date}')
+        return pd.DataFrame()
     
     #Kite API doesnt like TZ info in dates
     from_date = from_date.replace(tzinfo=None)
