@@ -114,6 +114,7 @@ def plot_backtest(df,trades=None):
     ax9.axhline(y=obvOscSlopeThresh, color='red', linestyle='--')
     ax9.axhline(y=-obvOscSlopeThresh, color='red', linestyle='--')
     
+    xticks = []
     
     # Loop over each day in the DataFrame
     for day in np.unique(df.index.date):
@@ -132,6 +133,7 @@ def plot_backtest(df,trades=None):
         except:
             print("cant find start or end index(Likely cause data started or ended mid-day) for {start_time} or {end_time}")
         # Add a shaded rectangle for the time period between start_time and end_time
+        xticks.extend([start_index,end_index])
         ax1.axvspan(start_index, end_index, alpha=0.2, color='gray')
         ax2.axvspan(start_index, end_index, alpha=0.2, color='gray')
         ax3.axvspan(start_index, end_index, alpha=0.2, color='gray')
@@ -164,11 +166,12 @@ def plot_backtest(df,trades=None):
         except KeyError:
             print(f"Label '{start_time}' not found in DataFrame index.")
         # Create a boolean mask where 'a' is greater than 'b'
+        xticks.extend([start_index,end_index])
         mask = (df['position'].shift(-1) == 0) & \
-            (df.index.hour >=10) & \
-            (df.index.hour <= 13) & \
-            ((df['Adj Close'] >= df['upper_band']) | \
-            (df['Adj Close'] <= df['lower_band']))
+        (df.index.hour >=10) & \
+        (df.index.hour <= 13) & \
+        ((df['Adj Close'] >= df['upper_band']) | \
+        (df['Adj Close'] <= df['lower_band']))
         # Use the shift method to get the start and end times of each region where the mask is True
         start_times = df.index[(mask & ~mask.shift(1, fill_value=False))].tolist()
         end_times = df.index[(mask & ~mask.shift(-1, fill_value=False))].tolist()
@@ -176,7 +179,8 @@ def plot_backtest(df,trades=None):
         for start_time, end_time in zip(start_times, end_times):
             start_index=df['i'][start_time]
             end_index=df['i'][end_time]
-            
+            xticks.extend([start_index,end_index])
+
             # Add a shaded rectangle for the time period between start_time and end_time
             ax1.axvspan(start_index, end_index, alpha=0.2, color='red')
             ax2.axvspan(start_index, end_index, alpha=0.2, color='red')
@@ -196,7 +200,7 @@ def plot_backtest(df,trades=None):
         for start_time, end_time in zip(start_times, end_times):
             start_index=df['i'][start_time]
             end_index=df['i'][end_time]
-            
+            xticks.extend([start_index,end_index])
             # Add a shaded rectangle for the time period between start_time and end_time
             ax1.axvspan(start_index, end_index, alpha=0.2, color='green')
             ax2.axvspan(start_index, end_index, alpha=0.2, color='green')
@@ -208,7 +212,8 @@ def plot_backtest(df,trades=None):
             ax8.axvspan(start_index, end_index, alpha=0.2, color='green')
             ax9.axvspan(start_index, end_index, alpha=0.2, color='green')
     # create the slider widget
-    axpos = plt.axes([0.25, 0.05, 0.65, 0.03])
+    plt.xticks(xticks,rotation=90)
+    axpos = plt.axes([0.25, 0.01, 0.65, 0.03])
     slider = Slider(axpos, 'Time', df['i'][0], df['i'].iloc[-1], 
                     valinit=df['i'][0])
 

@@ -160,8 +160,8 @@ def exitCurrentPosition(t,positions,net_position,nextPosition):
 
 def tradeNotification(type, t,ltp,signal,position,net_position):
     subprocess.call(["afplay", '/System/Library/Sounds/Glass.aiff'])
-    logging.info(f"GO {type} {t} LastCandleClose:{ltp} Signal:{signal} Position:{position} NetPosition:{net_position}" )
-    if showTradingViewLive:
+    logging.info(f"{type} {t} LastCandleClose:{ltp} Signal:{signal} Position:{position} NetPosition:{net_position}" )
+    if showTradingViewLive and type != 'EXIT':
         global liveTVThread 
         if liveTVThread is not None: 
             liveTVThread.join()
@@ -240,7 +240,7 @@ def generateSignalsAndTrade(df,positions,stock,options,dfStartTime=None):
             ki.nse_buy(kite,t,qToExit=qToExit) 
         if options:
             ki.nfo_sell(kite,tput,tput_lot_size,tput_tick_size,doubleQtoExit=False) 
-        tradeNotification("LONG", t,ltp,df['signal'][-1],df['position'][-1],net_position)
+        tradeNotification("GO LONG", t,ltp,df['signal'][-1],df['position'][-1],net_position)
 
     
     if (sellCondition(df,net_position)): 
@@ -252,11 +252,11 @@ def generateSignalsAndTrade(df,positions,stock,options,dfStartTime=None):
         if options:
             ki.nfo_sell(kite,tcall,tcall_lot_size,tcall_tick_size,doubleQtoExit=False)
         
-        tradeNotification("SHORT", t,ltp,df['signal'][-1],df['position'][-1],net_position)
+        tradeNotification("GO SHORT", t,ltp,df['signal'][-1],df['position'][-1],net_position)
         
 
     if(exitCondition(df,net_position)):
-        logging.info(f"EXITING {t} LastCandleClose:{ltp} Signal:{df['signal'][-1]} Position:{df['position'][-1]} NetPosition:{net_position}" )
+        tradeNotification("EXIT", t,ltp,df['signal'][-1],df['position'][-1],net_position)
         ki.exit_given_positions(kite,positions[t]['positions'])
 
 def Tick(stock,options):
