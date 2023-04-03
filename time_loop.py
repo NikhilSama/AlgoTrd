@@ -83,7 +83,7 @@ startTime = datetime.datetime.now(ist)
 # startTime = datetime.datetime(2000,1,1,10,0,0) #Long ago :-)
 # startTime = ist.localize(startTime)
 now = startTime
-sleep_till_10am()
+#sleep_till_10am()
 
 #sleep a few seconds to ensure we kick off on a rounded minute
 #time.sleep(60-now.second)
@@ -179,7 +179,7 @@ def generateSignalsAndTrade(df,positions,stock,options,dfStartTime=None):
         dfStartTime = df.index[0]
 
     t = df['symbol'][0]
-
+    
     #update moving averages and get signals
     dataPopulators = [signals.populateBB, signals.populateADX, signals.populateOBV]
     signalGenerators = [signals.getSig_BB_CX
@@ -188,7 +188,6 @@ def generateSignalsAndTrade(df,positions,stock,options,dfStartTime=None):
                         ,signals.getSig_OBV_FILTER
                         ,signals.getSig_exitAnyExtremeADX_OBV_MA20_OVERRIDE
                         ,signals.getSig_followAllExtremeADX_OBV_MA20_OVERRIDE
-                                
                         ]
     overrideSignalGenerators = []   
     signals.applyIntraDayStrategy(df,dataPopulators,signalGenerators,
@@ -239,7 +238,7 @@ def generateSignalsAndTrade(df,positions,stock,options,dfStartTime=None):
         if stock:
             ki.nse_buy(kite,t,qToExit=qToExit) 
         if options:
-            ki.nfo_sell(kite,tput,tput_lot_size,tput_tick_size,doubleQtoExit=False) 
+            ki.nfo_sell(kite,tput,tput_lot_size,tput_tick_size,qToExit=0) 
         tradeNotification("GO LONG", t,ltp,df['signal'][-1],df['position'][-1],net_position)
 
     
@@ -250,7 +249,7 @@ def generateSignalsAndTrade(df,positions,stock,options,dfStartTime=None):
         if stock:
             ki.nse_sell(kite,t,qToExit=qToExit)
         if options:
-            ki.nfo_sell(kite,tcall,tcall_lot_size,tcall_tick_size,doubleQtoExit=False)
+            ki.nfo_sell(kite,tcall,tcall_lot_size,tcall_tick_size,qToExit=0)
         
         tradeNotification("GO SHORT", t,ltp,df['signal'][-1],df['position'][-1],net_position)
         
@@ -295,7 +294,7 @@ if isTimeLoop:
         nxt_tick = now + timedelta(minutes=1) - timedelta(seconds=now.second)
 
         #Tick during market hours only
-        positions = Tick(stock=True, options=False)
+        positions = Tick(stock=False, options=includeOptions)
             
         now = datetime.datetime.now(ist)
         #Sleep for seconds until the next minute
