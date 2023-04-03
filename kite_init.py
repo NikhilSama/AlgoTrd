@@ -171,8 +171,13 @@ def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,qToExi
 
     if (ltp ==0):
         #Get ltp if not provided
-        ltp = kite.ltp([f"{exchange}:{t}"])[f"{exchange}:{t}"]['last_price']
-
+        ltp = kite.ltp([f"{exchange}:{t}"])
+        if f"{exchange}:{t}" in ltp.keys():
+            ltp = ltp[f"{exchange}:{t}"]['last_price']
+        else:
+            logging.warning(f"No ltp found for {exchange}:{t}. {ltp} Skipping")
+            return
+        
     if q==0:
         q = getQ(lot_size,ltp,bet_size, qToExit)
             
@@ -331,7 +336,7 @@ def nse_sell (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,exchange='NSE',qTo
                 
             
 
-def nfo_buy (kite,t,lot_size=1,tick_size=0.5, q=1,ltp=0,sl=1,qToExit=0):
+def nfo_buy (kite,t,lot_size=1,tick_size=0.5, q=1,ltp=0,sl=0,qToExit=0):
     return exec(kite,t,'NFO', 'BUY', lot_size,tick_size,q,ltp,sl,qToExit)
 
     if (ltp ==0):
@@ -371,7 +376,7 @@ def nfo_buy (kite,t,lot_size=1,tick_size=0.5, q=1,ltp=0,sl=1,qToExit=0):
     return order_id
 
     
-def nfo_sell (kite, t, lot_size=1, tick_size=0.5, q=0,ltp=0,sl=1, qToExit=0):
+def nfo_sell (kite, t, lot_size=1, tick_size=0.5, q=0,ltp=0,sl=0, qToExit=0):
     return exec(kite,t,'NFO', 'SELL', lot_size,tick_size,q,ltp,sl,qToExit)
     if (ltp ==0):
         #Get ltp if not provided
@@ -427,18 +432,12 @@ def gettFromOption (string):
 def isPutOption (t,exch):
     if(exch != 'NFO'):
         return False
-    
-    # Define regex pattern to match all leading alphabets
-    pattern = re.compile(t + r"\d+[a-zA-Z]+(\w{2})")
-    
-    # Search for the pattern in the string
-    match = pattern.search(t)
-    
-    if match:
-        last_two_chars = match.group(1)
-        print(last_two_chars)
-        if (last_two_chars == 'PE'):
-            return True
+
+    last_two_chars =  t[-2:]
+
+    if (last_two_chars == 'PE'):
+        return True
+
     return False
 
 def isFutureOrOption(exch):
