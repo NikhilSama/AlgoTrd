@@ -24,7 +24,7 @@ import logging
 import pytz
 import os
 import pickle
-
+import utils
 import cfg
 globals().update(vars(cfg))
 
@@ -117,41 +117,7 @@ def zget_basic(from_date, to_date, symbol,interval='minute',
     if df.empty:
         logging.info('No data returned')
     df = zColsToDbCols(df)
-    if cacheTickData:
-        loadTickerCache(df,symbol,from_date,to_date,interval)
-    return df
-
-def zAddOptionsData(df,symbol,from_date,to_date,interval='minute',continuous=False):
-    # Add options data
-    (put_option_ticker,lot_size,tick_size) =db.get_option_ticker(symbol,df['Adj Close'].iloc[-1], 'PE',0)
-    p_df = zget_basic(from_date,to_date,put_option_ticker,interval,continuous)
-    (call_option_ticker,lot_size,tick_size) =db.get_option_ticker(symbol,df['Adj Close'].iloc[-1], 'CE',0)
-    c_df = zget_basic(from_date,to_date,call_option_ticker,interval,continuous)
     
-    df['Open-P'] = p_df['Open']
-    df['High-P'] = p_df['High']
-    df['Low-P'] = p_df['Low']
-    df['Adj Close-P'] = p_df['Adj Close']
-    df['Volume-P'] = p_df['Volume']
-
-    df['Open-C'] = c_df['Open']
-    df['High-C'] = c_df['High']
-    df['Low-C'] = c_df['Low']
-    df['Adj Close-C'] = c_df['Adj Close']
-    df['Volume-C'] = c_df['Volume']
-
-    return df
-    
-def zget(from_date, to_date, symbol,interval='minute',
-         includeOptions=False, continuous=False, instrumentToken=None):
-    
-    df = zget_basic(from_date, to_date, symbol,interval,continuous,instrumentToken)
-    
-    if df.empty:
-        return df
-    
-    if (includeOptions):
-        df = zAddOptionsData(df,symbol,from_date,to_date,interval,continuous)
     #Kite Historical timestamp for a candle contails ohlcv data for the 
     #minute that "STARTED" at the timestamp.
     #
@@ -172,6 +138,45 @@ def zget(from_date, to_date, symbol,interval='minute',
     # fileter out these junk values
 
     df = df.between_time('9:15', '15:29')
+    if cacheTickData:
+        loadTickerCache(df,symbol,from_date,to_date,interval)
+    return df
+
+def zAddOptionsData(df,symbol,from_date,to_date,interval='minute',continuous=False):
+    # Add options data
+    (put_option_ticker,lot_size,tick_size) =db.get_option_ticker(symbol,df['Adj Close'].iloc[-1], 'PE',0)
+    p_df = zget_basic(from_date,to_date,put_option_ticker,interval,continuous)
+    (call_option_ticker,lot_size,tick_size) =db.get_option_ticker(symbol,df['Adj Close'].iloc[-1], 'CE',0)
+    c_df = zget_basic(from_date,to_date,call_option_ticker,interval,continuous)
+
+    df['Open-P'] = p_df['Open']
+    df['High-P'] = p_df['High']
+    df['Low-P'] = p_df['Low']
+    df['Adj Close-P'] = p_df['Adj Close']
+    df['Volume-P'] = p_df['Volume']
+
+    df['Open-C'] = c_df['Open']
+    df['High-C'] = c_df['High']
+    df['Low-C'] = c_df['Low']
+    df['Adj Close-C'] = c_df['Adj Close']
+    df['Volume-C'] = c_df['Volume']
+
+    return df
+    
+def zget(from_date, to_date, symbol,interval='minute',
+         includeOptions=False, continuous=False, instrumentToken=None):
+
+    if utils.tickerIsFuture(symbol):
+        continuous = False # set continuous True for futures//Correction, contiinous only works for day 
+        # candles not for minute candles
+    df = zget_basic(from_date, to_date, symbol,interval,continuous,instrumentToken)
+    
+    if df.empty:
+        return df
+    
+    if (includeOptions):
+        df = zAddOptionsData(df,symbol,from_date,to_date,interval,continuous)
+    
     return df
 
 def zColsToDbCols(df):

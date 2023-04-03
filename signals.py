@@ -421,7 +421,7 @@ def getSig_ADX_FILTER (type,signal, isLastRow,row,df):
     if isLastRow and signalChanged(s,signal):
         logging.info(f"{row.symbol}:{row.i}  => ADX FILTER => ADX:{row['ADX']} > Thresh:{adxThresh} MASLOPE:{row['ma20_pct_change_ma']} signal={signal} s={s} type={type}")
     elif signalChanged(s,signal):
-        logging.debug(f"{row.symbol}:{row.i} => ADX FILTER => ADX:{row['ADX']} > Thresh:{adxThresh} MASLOPE:{row['ma20_pct_change_ma']} signal={signal} s={s} type={type}")
+        logging.debug(f"{row.symbol}:{row.i}:{row.name} => ADX FILTER => ADX:{row['ADX']} > Thresh:{adxThresh} MASLOPE:{row['ma20_pct_change_ma']} signal={signal} s={s} type={type}")
         
     return signal
 
@@ -451,7 +451,7 @@ def getSig_MASLOPE_FILTER (type,signal, isLastRow,row,df):
     if isLastRow and signalChanged(s,signal):
         logging.info(f"{row.symbol}:{row.i}  => MASLOPE FILTER => Slope:{row['ma20_pct_change_ma']} >= Threshold {maSlopeThresh} signal={signal} s={s} type={type}")
     elif signalChanged(s,signal):
-        logging.debug(f"{row.symbol}:{row.i} => MASLOPE FILTER => Slope:{row['ma20_pct_change_ma']} >= Threshold {maSlopeThresh} signal={signal} s={s} type={type}")
+        logging.debug(f"{row.symbol}:{row.i}:{row.name}  => MASLOPE FILTER => Slope:{row['ma20_pct_change_ma']} >= Threshold {maSlopeThresh} signal={signal} s={s} type={type}")
         
     return s
 
@@ -483,7 +483,7 @@ def getSig_OBV_FILTER (type,signal, isLastRow,row, df):
         if isLastRow and signalChanged(s,signal):
             logging.info(f"{row.symbol}:{row.i}  => OBV FILTERER => obv is:{row['OBV-OSC']} >= threshod is:{obvOscThresh} Mult: {obvOscThreshYellowMultiplier} Slope: {row['OBV-OSC-PCT-CHNG']} >= {obvOscSlopeThresh} signal={signal} s={s} type={type}")
         elif signalChanged(s,signal):
-            logging.debug(f"{row.symbol}:{row.i} => OBV FILTERER =>  obv is:{row['OBV-OSC']} >= threshod is:{obvOscThresh} Mult: {obvOscThreshYellowMultiplier} Slope: {row['OBV-OSC-PCT-CHNG']} >= {obvOscSlopeThresh} signal={signal} s={s} type={type}")
+            logging.debug(f"{row.symbol}:{row.i}:{row.name}  => OBV FILTERER =>  obv is:{row['OBV-OSC']} >= threshod is:{obvOscThresh} Mult: {obvOscThreshYellowMultiplier} Slope: {row['OBV-OSC-PCT-CHNG']} >= {obvOscSlopeThresh} signal={signal} s={s} type={type}")
 
     return s
 
@@ -575,7 +575,7 @@ def getSig_exitAnyExtremeADX_OBV_MA20_OVERRIDE (type, signal, isLastRow, row, df
     if isLastRow and signalChanged(s,signal):
         logging.info(f"{row.symbol}:{row.i}  => EXIT => Extreme ADX/OBV/MA20 OVERRIDE SIGNAL({signal})  s={s} / LAST SIGNAL({last_signal}). ADX:{row['ADX']} > {adxThresh*overrideMultiplier} OR OBV:{row['OBV-OSC']} > {obvOscThresh*overrideMultiplier} OR MA20:{row['ma20_pct_change_ma']} > {maSlopeThresh*overrideMultiplier}")                
     elif signalChanged(s,signal):
-        logging.debug(f"{row.symbol}:{row.i} => EXIT => Extreme ADX/OBV/MA20 OVERRIDE SIGNAL({signal})   s={s} / LAST SIGNAL({last_signal}). ADX:{row['ADX']} > {adxThresh*overrideMultiplier} OR OBV:{row['OBV-OSC']} > {obvOscThresh*overrideMultiplier} OR MA20:{row['ma20_pct_change_ma']} > {maSlopeThresh*overrideMultiplier}")                
+        logging.debug(f"{row.symbol}:{row.i}:{row.name}  => EXIT => Extreme ADX/OBV/MA20 OVERRIDE SIGNAL({signal})   s={s} / LAST SIGNAL({last_signal}). ADX:{row['ADX']} > {adxThresh*overrideMultiplier} OR OBV:{row['OBV-OSC']} > {obvOscThresh*overrideMultiplier} OR MA20:{row['ma20_pct_change_ma']} > {maSlopeThresh*overrideMultiplier}")                
                 
     return s
 
@@ -585,10 +585,11 @@ def getSig_followAllExtremeADX_OBV_MA20_OVERRIDE (type, signal, isLastRow, row, 
     if type == 0:# Dont take new positions when its time to exit only
         return signal
     s = signal 
+    adxIsHigh = 1 if row['ADX'] >= adxThresh else 0
+    obvIsHigh = 1 if abs(row['OBV-OSC']) >= obvOscThresh else 0
+    slopeIsHigh = 1 if abs(row['ma20_pct_change_ma']) >= maSlopeThresh else 0
     
-    if abs(row['OBV-OSC']) >= obvOscThresh and \
-        abs(row['ma20_pct_change_ma']) >= maSlopeThresh and \
-        row['ADX'] >= adxThresh:
+    if (adxIsHigh + obvIsHigh + slopeIsHigh) >= cfgNumConditionsForTrendFollow  :
         #We are breaking out Ride the trend
         #print(f"Extreme ADX/OBV/MA20 OVERRIDE FOLLOW TREND: {row.symbol}@{row.name}")
         if row['OBV-OSC'] > 0 and row['ma20_pct_change_ma'] > 0 and signal != 1:
@@ -604,7 +605,7 @@ def getSig_followAllExtremeADX_OBV_MA20_OVERRIDE (type, signal, isLastRow, row, 
             if isLastRow:
                 logging.info(f"{row.symbol}:{row.i} => FOLLOW TREND => Extreme ADX/OBV/MA20 OVERRIDE signal ({signal})  s={s} / last_signal ({last_signal}) TO FOLLOW TREND.ADX:{row['ADX']} > {adxThresh} AND OBV:{row['OBV-OSC']} > {obvOscThresh} AND MA20:{row['ma20_pct_change_ma']} > {maSlopeThresh}")
             else:
-                logging.debug(f"{row.symbol}:{row.i} => FOLLOW TREND => Extreme ADX/OBV/MA20 OVERRIDE signal ({signal})  s={s} / last_signal ({last_signal}) TO FOLLOW TREND.ADX:{row['ADX']} > {adxThresh} AND OBV:{row['OBV-OSC']} > {obvOscThresh} AND MA20:{row['ma20_pct_change_ma']} > {maSlopeThresh}")
+                logging.debug(f"{row.symbol}:{row.i}:{row.name}  => FOLLOW TREND => Extreme ADX/OBV/MA20 OVERRIDE signal ({signal})  s={s} / last_signal ({last_signal}) TO FOLLOW TREND.ADX:{row['ADX']} > {adxThresh} AND OBV:{row['OBV-OSC']} > {obvOscThresh} AND MA20:{row['ma20_pct_change_ma']} > {maSlopeThresh}")
    
     return s
 
@@ -652,7 +653,7 @@ def exitTrendFollowing(type, signal, isLastRow, row, df,
         if isLastRow:
             logging.info(f"{row.symbol}:{row.i}  => EXIT TREND({trend}) on fastMA crossover")
         else:
-            logging.debug(f"{row.symbol}:{row.i} => EXIT TREND({trend}) on fastMA crossover")
+            logging.debug(f"{row.symbol}:{row.i}:{row.name}  => EXIT TREND({trend}) on fastMA crossover")
     return s
     
 ######### END OF SIGNAL GENERATION FUNCTIONS #########

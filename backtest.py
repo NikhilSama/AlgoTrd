@@ -31,12 +31,14 @@ import sys
 import cfg
 globals().update(vars(cfg))
 
+# set timezone to IST
+ist = pytz.timezone('Asia/Kolkata')
+
 tickers = td.get_sp500_tickers()
 nifty = td.get_nifty_tickers()
 index_tickers = td.get_index_tickers()
-
-# set timezone to IST
-ist = pytz.timezone('Asia/Kolkata')
+zgetFrom = datetime(2023, 3, 27, 9, 0, tzinfo=ist)
+zgetTo = datetime(2023, 3, 31, 17, 30, tzinfo=ist)
 
 def zget(t,s,e,i):
     #Get latest minute tick from zerodha
@@ -62,14 +64,12 @@ def test(t='ADANIENT',i='minute'):
     signals.applyIntraDayStrategy(df1,dataPopulators,signalGenerators)
 
 def perfProfiler(name,t):
-    print (f"{name} took {round((time.time() - t)*1000,2)}ms")
+    #print (f"{name} took {round((time.time() - t)*1000,2)}ms")
     return time.time()
 
 def backtest(t,i='minute',exportCSV=False):
     perfTIME = time.time()    
     startingTime = perfTIME
-    zgetFrom = datetime(2023, 2, 1, 9, 0, tzinfo=ist    )
-    zgetTo = datetime(2023, 3, 31, 17, 30, tzinfo=ist)
     df = zget(t,zgetFrom,zgetTo,i=i)
     if df.empty:
         print(f"No data foc {t}")
@@ -77,7 +77,8 @@ def backtest(t,i='minute',exportCSV=False):
     #df = zgetNDays(t,days,i=i)
     perfTime = perfProfiler("ZGET", perfTIME)
     dataPopulators = [signals.populateBB, signals.populateADX, signals.populateOBV]
-    signalGenerators = [signals.getSig_BB_CX
+    signalGenerators = [
+                        signals.getSig_BB_CX
                         ,signals.getSig_ADX_FILTER
                         ,signals.getSig_MASLOPE_FILTER
                         ,signals.getSig_OBV_FILTER
@@ -93,11 +94,11 @@ def backtest(t,i='minute',exportCSV=False):
 
     tearsheet,tearsheetdf = perf.tearsheet(df)
     print(f'Total Return: {tearsheet["return"]*100}%')
-    print(f'Num Trades: {tearsheet["num_trades"]}')
-    print(f'Avg Return Per Trade: {tearsheet["std_dev_pertrade_return"]*100}%')
-    print(f'Std Dev of Returns: {tearsheet["return"]}')
-    print(f'Skewness: {tearsheet["skewness_pertrade_return"]}')
-    print(f'Kurtosis: {tearsheet["kurtosis_pertrade_return"]}')
+    # print(f'Num Trades: {tearsheet["num_trades"]}')
+    # print(f'Avg Return Per Trade: {tearsheet["std_dev_pertrade_return"]*100}%')
+    # print(f'Std Dev of Returns: {tearsheet["return"]}')
+    # print(f'Skewness: {tearsheet["skewness_pertrade_return"]}')
+    # print(f'Kurtosis: {tearsheet["kurtosis_pertrade_return"]}')
     perfTIME = perfProfiler("Tearsheet took", perfTIME)
 
     if (exportCSV == True):
@@ -211,6 +212,11 @@ def backtestCombinator():
         tearsheetdf['obv_osc_thresh_yellow_multiplier'] = obv_osc_thresh_yellow_multiplier
         tearsheetdf['ovc_osc_slope_thresh'] = ovc_osc_slope_thresh
         tearsheetdf['override_multiplier'] = override_multiplier
+        tearsheetdf['ticker'] = 'HDFCBANK'
+        tearsheetdf['interval'] = 'minute'
+        tearsheetdf['startTime'] = zgetFrom
+        tearsheetdf['endTime'] = zgetTo
+        tearsheetdf['duration_in_days'] = (zgetTo - zgetFrom).days
         
         performance = pd.concat([performance, tearsheetdf])
 

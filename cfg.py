@@ -7,7 +7,7 @@ Created on Sun Feb  5 14:26:36 2023
 """
 import sys
 cfgDict = {
-    'cfgFreezeGun': False,
+    'cfgFreezeGun': True,
     'startTime': 0,
     'startHour': 10,
     'endHour': 14,
@@ -31,12 +31,13 @@ cfgDict = {
     'obvOscThreshYellowMultiplier': 0.7,
     'obvOscSlopeThresh': 0.3,
     'cfgObvMaxMinDiff_MaxLookbackCandles': 200,
-    'includeOptions': False,
+    'cfgNumConditionsForTrendFollow': 2,
+    'includeOptions': True,
     'plot': [
         
         #'trade_returns'
         #,
-        #'adjCloseGraph'
+       # 'adjCloseGraph'
         
         ],
     'overrideMultiplier': 1.2,
