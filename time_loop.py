@@ -103,7 +103,8 @@ def get_positions():
     return ki.get_positions(kite)
 def get_kite_access_token():
     return ki.getAccessToken(kite)
-
+def get_ltp(t,exch):
+    return ki.get_ltp(kite,t,exch)
 # BUY CONDITION
 # Buy if current signal is 1 and position is not 1, 
 # or if position is 1 and net position is not 1 as long as signal is not -1
@@ -177,7 +178,10 @@ def generateSignalsAndTrade(df,positions,stock,options,dfStartTime=None):
     if dfStartTime is not None:
         now = df.index[-1]
         dfStartTime = df.index[0]
-
+    
+    if df.empty:
+        return
+    
     t = df['symbol'][0]
     
     #update moving averages and get signals
@@ -220,12 +224,7 @@ def generateSignalsAndTrade(df,positions,stock,options,dfStartTime=None):
 #        elif (not math.isnan(df['signal'][-1])) and df['position'][-1] != 0:
     elif df['position'][-1] != 0:
             logging.info(f"{t}: No Live Kite positions inconsistant with DF ({df['position'][-1]})")
-        
-    # Get Put / CALL option tickerS
-    if options:
-        tput,tput_lot_size,tput_tick_size = db.get_option_ticker(t, ltp, 'PE')
-        tcall,tcall_lot_size,tcall_tick_size = db.get_option_ticker(t, ltp, 'CE')
-    
+            
     if ('signal' not in df.columns or 'position' not in df.columns):
         logging.error('signal or position does not exist in dataframe')
         logging.error(df)
@@ -238,6 +237,7 @@ def generateSignalsAndTrade(df,positions,stock,options,dfStartTime=None):
         if stock:
             ki.nse_buy(kite,t,qToExit=qToExit) 
         if options:
+            tput,tput_lot_size,tput_tick_size = db.get_option_ticker(t, ltp, 'PE',kite)
             ki.nfo_sell(kite,tput,tput_lot_size,tput_tick_size,qToExit=0) 
         tradeNotification("GO LONG", t,ltp,df['signal'][-1],df['position'][-1],net_position)
 
@@ -249,6 +249,7 @@ def generateSignalsAndTrade(df,positions,stock,options,dfStartTime=None):
         if stock:
             ki.nse_sell(kite,t,qToExit=qToExit)
         if options:
+            tcall,tcall_lot_size,tcall_tick_size = db.get_option_ticker(t, ltp, 'CE')
             ki.nfo_sell(kite,tcall,tcall_lot_size,tcall_tick_size,qToExit=0)
         
         tradeNotification("GO SHORT", t,ltp,df['signal'][-1],df['position'][-1],net_position)

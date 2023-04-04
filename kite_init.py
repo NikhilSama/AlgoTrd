@@ -17,6 +17,8 @@ import pytz
 import re
 import pandas as pd
 import numpy as np
+import utils
+
 #cfg has all the config parameters make them all globals here
 import cfg
 globals().update(vars(cfg))
@@ -30,7 +32,7 @@ zacceccess_file = "Data/zerodha_kite_accesstoken.txt"
 tradelog = f"Data/trades/{datetime.now().strftime('%d-%m-%y')}.trades"
 tradelogcsv = f"Data/trades/{datetime.now().strftime('%d-%m-%y')}-trades.csv"
 
-    
+
 def getNewAccessToken(kite): 
     
     r = requests.get(kite.login_url())
@@ -163,6 +165,19 @@ def getTxType(kite,tx_type):
     else:
         logging.error(f"Unknown tx_type {tx_type}")
     return kite_tx_type
+def get_ltp(kite,t,exchange):
+    try: 
+        ltp = kite.ltp([f"{exchange}:{t}"])
+    except:
+        logging.error(f"Error getting ltp for {exchange}:{t}. Skipping")
+        return 0
+    if f"{exchange}:{t}" in ltp.keys():
+        ltp = ltp[f"{exchange}:{t}"]['last_price']
+    else:
+        logging.warning(f"No ltp found for {exchange}:{t}. {ltp} Skipping")
+        return 0
+
+    return ltp
 
 def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,qToExit=0):
     if is_not_tradable(t):
@@ -416,6 +431,10 @@ def nfo_sell (kite, t, lot_size=1, tick_size=0.5, q=0,ltp=0,sl=0, qToExit=0):
     return order_id
 
 def gettFromOption (string):
+    if 'NIFTY' in string:
+        return 'NIFTY23APRFUT' #hack, dont return the index, return the fugure
+    #index is not tradable and does not have volume information, this better
+    
     # Define regex pattern to match all leading alphabets
     pattern = r'^[a-zA-Z]+'
     
@@ -432,13 +451,16 @@ def gettFromOption (string):
 def isPutOption (t,exch):
     if(exch != 'NFO'):
         return False
-
-    last_two_chars =  t[-2:]
-
-    if (last_two_chars == 'PE'):
+    if (utils.optionTypeFromTicker(t) == 'PE'):
         return True
 
     return False
+
+def isOption(exch,t):
+    type = False
+    if (exch == 'NFO'):
+        type = utils.optionTypeFromTicker(t)
+    return True if type else False    
 
 def isFutureOrOption(exch):
     if (exch == 'NFO'):
@@ -544,7 +566,7 @@ def get_positions (kite):
             pos['last_price'] = position['last_price']
             pos['exchange'] = position['exchange']
             pos['long_or_short'] = long_or_short(position)
-            if (isFutureOrOption(position['exchange'])):
+            if isOption(position['exchange'],t):
                 t = gettFromOption(position['tradingsymbol'])
             else:
                 t = position['tradingsymbol']

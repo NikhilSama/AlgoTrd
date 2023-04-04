@@ -40,8 +40,8 @@ ist = pytz.timezone('Asia/Kolkata')
 tickers = td.get_sp500_tickers()
 nifty = td.get_nifty_tickers()
 index_tickers = td.get_index_tickers()
-zgetFrom = datetime(2023, 3, 30, 10, 0, tzinfo=ist)
-zgetTo = datetime(2023, 4, 3, 15, 30, tzinfo=ist)
+zgetFrom = datetime(2023, 3, 25, 10, 0, tzinfo=ist)
+zgetTo = datetime(2023, 3, 28, 15, 30, tzinfo=ist)
 
 def zget(t,s,e,i):
     #Get latest minute tick from zerodha
@@ -87,6 +87,7 @@ def backtest(t,i='minute',exportCSV=False):
                         ,signals.getSig_OBV_FILTER
                         ,signals.getSig_exitAnyExtremeADX_OBV_MA20_OVERRIDE
                         ,signals.getSig_followAllExtremeADX_OBV_MA20_OVERRIDE
+                        #,signals.followTrendReversal
                         ,signals.exitTrendFollowing
                         ]
     overrideSignalGenerators = []   
@@ -239,7 +240,7 @@ def backtestCombinator():
 #backtestCombinator()       
 #plot_options(['ASIANPAINT'],10,'minute')
 #backtest('HDFCLIFE','minute',adxThreh=30)
-backtest('NIFTY2340617250CE','minute')
+backtest('NIFTY23APRFUT','minute')
 #backtest('HDFCLIFE','minute',adxThreh=25)
 #backtest('ASIANPAINT','minute',adxThreh=25)
 #backtest('HDFCLIFE','minute',adxThreh=30)

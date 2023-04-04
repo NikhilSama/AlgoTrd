@@ -137,7 +137,7 @@ def zget_basic(from_date, to_date, symbol,interval='minute',
     # affect our analytics and signals for a long time.  So we filter
     # fileter out these junk values
 
-    df = df.between_time('09:30:00+05:30', '15:29:00+05:30')    
+    df = df.between_time('09:15:00+05:30', '15:29:00+05:30')    
     
     if cacheTickData:
         loadTickerCache(df,symbol,from_date,to_date,interval)
@@ -145,9 +145,9 @@ def zget_basic(from_date, to_date, symbol,interval='minute',
 
 def zAddOptionsData(df,symbol,from_date,to_date,interval='minute',continuous=False):
     # Add options data
-    (put_option_ticker,lot_size,tick_size) =db.get_option_ticker(symbol,df['Adj Close'].iloc[-1], 'PE',0)
+    (put_option_ticker,lot_size,tick_size) =db.get_option_ticker(symbol,df['Adj Close'].iloc[-1], 'PE',kite,0)
     p_df = zget_basic(from_date,to_date,put_option_ticker,interval,continuous)
-    (call_option_ticker,lot_size,tick_size) =db.get_option_ticker(symbol,df['Adj Close'].iloc[-1], 'CE',0)
+    (call_option_ticker,lot_size,tick_size) =db.get_option_ticker(symbol,df['Adj Close'].iloc[-1], 'CE',kite,0)
     c_df = zget_basic(from_date,to_date,call_option_ticker,interval,continuous)
 
     
@@ -170,7 +170,6 @@ def zAddOptionsData(df,symbol,from_date,to_date,interval='minute',continuous=Fal
     df['Volume-C'] = c_df['Volume']
     # df[['Open-C', 'High-C', 'Low-C', 'Adj Close-C', 'Volume-C']] = \
     #     df[['Open-C', 'High-C', 'Low-C', 'Adj Close-C', 'Volume-C']].ffill().bfill()
-
     return df
 
 def zGetSurrogateVolumeFromFuture(symbol,from_date,to_date,interval='minute',continuous=False):

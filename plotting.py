@@ -37,9 +37,20 @@ def plot_trades(df):
 
     if 'adjCloseGraph' not in plot:
         plt.show()
-        
-def plot_backtest(df,trades=None):
+
+def plot_stock_and_option(df):
+    fig, (ax1, ax2, ax3) = \
+        plt.subplots(3, 1, figsize=(8, 8), sharex=True, 
+                    gridspec_kw={'height_ratios': [1,1,1]})
+    df['pct_change_stock'] = df['Adj Close'].pct_change()
+    df['pct_change_put'] = df['Adj Close-P'].pct_change()
+    df['pct_change_call'] = df['Adj Close-C'].pct_change()
+    ax1.plot(df['i'], df['pct_change_stock'], color='red', linewidth=2)
+    ax2.plot(df['i'], -df['pct_change_put'], color='grey', linewidth=2)
+    ax3.plot(df['i'], df['pct_change_call'], color='grey', linewidth=2)
+    plt.show()
     
+def plot_backtest(df,trades=None):
     # Plot trades 
     if 'trade_returns' in plot:
         plot_trades(trades)
@@ -47,6 +58,7 @@ def plot_backtest(df,trades=None):
     if 'adjCloseGraph' not in plot:
         return
         ## PLOTTING CODE FOLLOWS 
+            
     #pprint.pprint(tearsheet, indent=4)
     #df[['ma_superTrend', 'ma_slow', 'ma_fast']].plot(grid=True, figsize=(12, 8))
 #    fig, (ax1, ax2, ax3, ax4, ax5, ax7) = plt.subplots(6, 1, figsize=(8, 8))
@@ -54,8 +66,14 @@ def plot_backtest(df,trades=None):
         plt.subplots(9, 1, figsize=(8, 8), sharex=True, 
                      gridspec_kw={'height_ratios': [4, 1, 1, 1, 1, 1,1,1,1]})
     plt.subplots_adjust(left=0.1, bottom=0.1)
+    df['SLOPE-OSC'].fillna(0, inplace=True)
     df['ma20_pct_change_ma'].fillna(0, inplace=True)
     df['ADX-PCT-CHNG'].fillna(0, inplace=True)
+    
+    if 'OBV-OSC' not in df.columns:
+        df['OBV-OSC'] = 0
+        df['OBV-OSC-PCT-CHNG'] = 0
+        
     df['OBV-OSC-PCT-CHNG'].fillna(0, inplace=True)
 
     # plot the first series in the first subplot
@@ -92,13 +110,13 @@ def plot_backtest(df,trades=None):
     ax5.axhline(y=adxSlopeThresh, color='red', linestyle='--')
     ax5.axhline(y=-adxSlopeThresh, color='red', linestyle='--')
 
-    ax6.plot(df['i'], df['ma20_pct_change_ma'], color='green', linewidth=2)
-    ax6.set_title('ma20_pct_change_ma - MA↓', loc='right')
+    ax6.plot(df['i'], df['SLOPE-OSC'], color='green', linewidth=2)
+    ax6.set_title('SLOPE-OSC↓', loc='right')
     ax6.axhline(y=maSlopeThresh, color='red', linestyle='--')
     ax6.axhline(y=-maSlopeThresh, color='red', linestyle='--')
 
-    ax7.plot(df['i'], df['ma20_pct_change_ma_sq'], color='green', linewidth=2)
-    ax7.set_title('MA slope slope sq ↓', loc='right')
+    ax7.plot(df['i'], df['SLOPE-OSC-SLOPE'], color='green', linewidth=2)
+    ax7.set_title('SLOPE-OSC-SLOPE sq ↓', loc='right')
     ax7.axhline(y=maSlopeSlopeThresh, color='red', linestyle='--')
     ax7.axhline(y=-maSlopeSlopeThresh, color='red', linestyle='--')
 
@@ -113,6 +131,10 @@ def plot_backtest(df,trades=None):
     ax9.set_title('OBV-OSC-PCT-CHNG OSC↓', loc='right')
     ax9.axhline(y=obvOscSlopeThresh, color='red', linestyle='--')
     ax9.axhline(y=-obvOscSlopeThresh, color='red', linestyle='--')
+    
+    if len(df) > 1000:
+        plt.show()
+        return # dont plot the shaded region if there are too many rows
     
     xticks = []
     

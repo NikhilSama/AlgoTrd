@@ -18,6 +18,7 @@ import pytz
 import sys
 import os
 import utils
+import kite_init as ki
 
 # set timezone to IST
 ist = pytz.timezone('Asia/Kolkata')
@@ -121,22 +122,24 @@ class DBBasic:
             return df.iloc[0,0],df.iloc[0,1],df.iloc[0,2]
         else:
             return -1
-    def get_option_ticker(self,ticker,price,type,strike=0):
+    def get_option_ticker(self,ticker,price,type,kite,strike=0):
         #get rid of anything after a space in ticker NIFTY 50 => NIFTY
         ticker = ticker.split(' ',1)[0]
-        
-        if utils.tickerIsFuture(ticker):
-            print(f"{ticker} is future")
-            ticker = utils.getUnderlyingTickerForFuture(ticker)
-            print(f"{ticker} is the underlying")
-            ### TODO: Issue here is that the future prices is not the same as the price
-            ### of the underlying security, so if we use the features price we get a 
-            ### way out the money option. Need to get the price of the underlying
-
-            
+                    
         #find the option for this ticker with strike closest to price, and soonest expiry
-        q = f"SELECT tradingsymbol,lot_size,tick_size FROM trading.instruments_zerodha where instrument_type = '{type}' and underlying_ticker = '{ticker}' AND expiry > '{date.today()}' ORDER BY ABS( strike - {price} ) ASC, expiry ASC LIMIT 1"
-        
+        tickerType = utils.optionTypeFromTicker(ticker)
+        if not tickerType:
+            if (utils.tickerIsFuture(ticker)):#Its not an option, check if it is a future
+                ticker = utils.getUnderlyingTickerForFuture(ticker)
+                price = price -150 #TODO HACK - futures are 150 points off on avg; ideally get the ltp of the future and use that
+        if not tickerType:
+            q = f"SELECT tradingsymbol,lot_size,tick_size FROM trading.instruments_zerodha where instrument_type = '{type}' and underlying_ticker = '{ticker}' AND expiry > '{date.today()}' ORDER BY ABS( strike - {price} ) ASC, expiry ASC LIMIT 1"
+        elif tickerType == type:
+            q = f"SELECT tradingsymbol,lot_size,tick_size FROM trading.instruments_zerodha where instrument_type = '{type}' and tradingsymbol = '{ticker}' AND expiry > '{date.today()}' ORDER BY ABS( strike - {price} ) ASC, expiry ASC LIMIT 1"    
+        else:#Ticker is PE and request is CE or vice versa
+            inverseTicker = utils.convertPEtoCEAndViceVersa(ticker)
+            q = f"SELECT tradingsymbol,lot_size,tick_size FROM trading.instruments_zerodha where instrument_type = '{type}' and tradingsymbol = '{inverseTicker}' AND expiry > '{date.today()}' ORDER BY ABS( strike - {price} ) ASC, expiry ASC LIMIT 1"    
+
         df = pd.read_sql(q, con=self.engine)
         if len(df) > 0:
             return df.iloc[0,0],df.iloc[0,1],df.iloc[0,2]
