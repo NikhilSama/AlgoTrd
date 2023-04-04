@@ -77,9 +77,13 @@ def OBV(df):
     df['ma_obv_diff_min'] = df['ma_obv_diff'].rolling(window=cfgObvMaxMinDiff_MaxLookbackCandles, min_periods=1).min()
     df['obv_osc'] = df['ma_obv_diff'] / (df['ma_obv_diff_max'] - df['ma_obv_diff_min'])
     df['obv_osc_pct_change'] = df['obv_osc'].pct_change(periods=3)
-    df['obv_osc_pct_change'] = df['obv_osc_pct_change'].clip(lower=-1, upper=1)
     df['obv_trend'] = np.where(df['obv_osc'] > obvOscThresh,1,0)
     df['obv_trend'] = np.where(df['obv_osc'] < -obvOscThresh,-1,df['obv_trend'])
+    
+    # CLIP extreme
+    df['obv_osc'] = df['obv_osc'].clip(lower=-1, upper=1)
+    df['obv_osc_pct_change'] = df['obv_osc_pct_change'].clip(lower=-1, upper=1)
+
     return (df['ma_obv'],df['obv_osc'],df['obv_trend'],df['obv_osc_pct_change'])
 
 def tenAMToday (now=0):
@@ -351,6 +355,8 @@ def populateADX (df):
     (df['ADX'],df['ADX-PCT-CHNG']) = ADX(df,maLen)
 
 def populateOBV (df):
+    if (df['Volume'].max() == 0):
+        return False # Index has no volume data so skip it
     (df['OBV'],df['OBV-OSC'],df['OBV-TREND'],df['OBV-OSC-PCT-CHNG']) = OBV(df)
 ########### END OF POPULATE FUNCTIONS ###########
 
@@ -460,7 +466,7 @@ def getSig_MASLOPE_FILTER (type,signal, isLastRow,row,df):
 #in MA or ADX etc 
 def getSig_OBV_FILTER (type,signal, isLastRow,row, df):
     
-    if not isLongOrShortSignal(signal):
+    if (not isLongOrShortSignal(signal)) or (not 'OBV-OSC' in row):
         return signal
 
     s = signal
@@ -530,11 +536,13 @@ def getSig_exitAnyExtremeADX_OBV_MA20_OVERRIDE (type, signal, isLastRow, row, df
         return signal # signal is nan (not -1,0,1) and last signal is nan or 0
                     #we have not current or planned position
 
-            
-    obvBreached = valueBreachedThreshold(row['OBV-OSC'],obvOscThresh,
-                                obvOscThreshYellowMultiplier,
-                                row['OBV-OSC-PCT-CHNG'],obvOscSlopeThresh,"H_OR_L")
-
+    if 'OBV-OSC' in row:
+        obvBreached = valueBreachedThreshold(row['OBV-OSC'],obvOscThresh,
+                                    obvOscThreshYellowMultiplier,
+                                    row['OBV-OSC-PCT-CHNG'],obvOscSlopeThresh,"H_OR_L")
+    else:
+        obvBreached = False
+        
     adxBreached = valueBreachedThreshold(row['ADX'],adxThresh,adxThreshYellowMultiplier,
                               row['ADX-PCT-CHNG'],maSlopeThresh,"H")   
 
@@ -586,16 +594,27 @@ def getSig_followAllExtremeADX_OBV_MA20_OVERRIDE (type, signal, isLastRow, row, 
         return signal
     s = signal 
     adxIsHigh = 1 if row['ADX'] >= adxThresh else 0
-    obvIsHigh = 1 if abs(row['OBV-OSC']) >= obvOscThresh else 0
+    obvIsHigh = 1 if (('OBV-OSC' in row) and (abs(row['OBV-OSC']) >= obvOscThresh)) else 0
     slopeIsHigh = 1 if abs(row['ma20_pct_change_ma']) >= maSlopeThresh else 0
     
-    if (adxIsHigh + obvIsHigh + slopeIsHigh) >= cfgNumConditionsForTrendFollow  :
+    obvOsc = None if (not 'OBV-OSC' in row) else row['OBV-OSC']
+    obvIsPositive = True if ((obvOsc is None) or (obvOsc > 0)) else False
+    obvIsNegative = True if ((obvOsc is None) or (obvOsc < 0)) else False
+    
+    if obvOsc is None:
+        num_conditions = cfgNumConditionsForTrendFollow - 1
+    else:
+        num_conditions = cfgNumConditionsForTrendFollow
+    
+    maSlopesUp = row['ma20_pct_change_ma'] > 0
+    maSlopesDn = row['ma20_pct_change_ma'] < 0
+    if (adxIsHigh + obvIsHigh + slopeIsHigh) >= num_conditions:
         #We are breaking out Ride the trend
         #print(f"Extreme ADX/OBV/MA20 OVERRIDE FOLLOW TREND: {row.symbol}@{row.name}")
-        if row['OBV-OSC'] > 0 and row['ma20_pct_change_ma'] > 0 and signal != 1:
+        if obvIsPositive and maSlopesUp and signal != 1:
             if (last_signal != 1 and signal != 1):
                 s = 1
-        elif row['OBV-OSC'] < 0 and row['ma20_pct_change_ma'] < 0 and signal != -1:
+        elif obvIsNegative and maSlopesDn and signal != -1:
             if (last_signal != -1 and signal != -1):
                 s = -1
         
@@ -603,9 +622,9 @@ def getSig_followAllExtremeADX_OBV_MA20_OVERRIDE (type, signal, isLastRow, row, 
             #print("entering trend following", row.i)
             setTickerTrend(row.symbol, s)
             if isLastRow:
-                logging.info(f"{row.symbol}:{row.i} => FOLLOW TREND => Extreme ADX/OBV/MA20 OVERRIDE signal ({signal})  s={s} / last_signal ({last_signal}) TO FOLLOW TREND.ADX:{row['ADX']} > {adxThresh} AND OBV:{row['OBV-OSC']} > {obvOscThresh} AND MA20:{row['ma20_pct_change_ma']} > {maSlopeThresh}")
+                logging.info(f"{row.symbol}:{row.i} => FOLLOW TREND => Extreme ADX/OBV/MA20 OVERRIDE signal ({signal})  s={s} / last_signal ({last_signal}) TO FOLLOW TREND.ADX:{row['ADX']} > {adxThresh} AND OBV:{obvOsc} > {obvOscThresh} AND MA20:{row['ma20_pct_change_ma']} > {maSlopeThresh}")
             else:
-                logging.debug(f"{row.symbol}:{row.i}:{row.name}  => FOLLOW TREND => Extreme ADX/OBV/MA20 OVERRIDE signal ({signal})  s={s} / last_signal ({last_signal}) TO FOLLOW TREND.ADX:{row['ADX']} > {adxThresh} AND OBV:{row['OBV-OSC']} > {obvOscThresh} AND MA20:{row['ma20_pct_change_ma']} > {maSlopeThresh}")
+                logging.debug(f"{row.symbol}:{row.i}:{row.name}  => FOLLOW TREND => Extreme ADX/OBV/MA20 OVERRIDE signal ({signal})  s={s} / last_signal ({last_signal}) TO FOLLOW TREND.ADX:{row['ADX']} > {adxThresh} AND OBV:{obvOsc} > {obvOscThresh} AND MA20:{row['ma20_pct_change_ma']} > {maSlopeThresh}")
    
     return s
 
@@ -626,10 +645,15 @@ def exitTrendFollowing(type, signal, isLastRow, row, df,
     maIsGettingLower = isGettingLower(row['ma20_pct_change_ma'], maSlopeThresh)
     maIsGettingHigher = isGettingHigher(row['ma20_pct_change_ma'], maSlopeThresh)
     
-    obvIsNotChanging = isNotChanging(row['OBV-OSC-PCT-CHNG'], obvOscSlopeThresh)
-    obvIsGettingLower = isGettingLower(row['OBV-OSC-PCT-CHNG'], obvOscSlopeThresh)
-    obvIsGettingHigher = isGettingHigher(row['OBV-OSC-PCT-CHNG'], obvOscSlopeThresh)
-    
+    if 'OBV-OSC-PCT-CHNG' in row:
+        obvIsNotChanging = isNotChanging(row['OBV-OSC-PCT-CHNG'], obvOscSlopeThresh)
+        obvIsGettingLower = isGettingLower(row['OBV-OSC-PCT-CHNG'], obvOscSlopeThresh)
+        obvIsGettingHigher = isGettingHigher(row['OBV-OSC-PCT-CHNG'], obvOscSlopeThresh)
+    else:
+        obvIsNotChanging = True
+        obvIsGettingLower = False
+        obvIsGettingHigher = False
+            
     #This ticker is trending, lets see if its time to exit
     trend = getTickerTrend(row.symbol)
     if trend == 1:

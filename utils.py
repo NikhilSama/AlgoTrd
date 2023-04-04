@@ -1,6 +1,8 @@
 import sys
 import os
 import re
+import pandas as pd
+import numpy as np
 
 def fileNameFromArgs(prefix=''):
     args = sys.argv[1:]
@@ -23,3 +25,15 @@ def getUnderlyingTickerForFuture(t):
         return uderlying_ticker
     else:
         return None
+def optionTypeFromTicker(t):
+    pattern = r'^[A-Z]+\d+(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)?\d+(?:PE|CE)$'
+    match = re.match(pattern, t)
+    if match:
+        return t[-2:]
+    else:
+        return False
+def convertPEtoCEAndViceVersa(t):
+    if optionTypeFromTicker(t):     
+        return t[:-2] + ('CE' if t[-2] == 'P' else 'PE')
+    else:
+        return t

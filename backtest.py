@@ -20,10 +20,13 @@ import DownloadHistorical as downloader
 import pytz
 import strategies15m as strat15m
 import ppprint
-from plotting import plot_backtest
+from plotting import plot_backtest,plot_stock_and_option
 import backtest_log_setup
 import itertools 
 from pathlib import Path
+
+
+
 import utils
 import sys
 
@@ -37,8 +40,8 @@ ist = pytz.timezone('Asia/Kolkata')
 tickers = td.get_sp500_tickers()
 nifty = td.get_nifty_tickers()
 index_tickers = td.get_index_tickers()
-zgetFrom = datetime(2023, 3, 27, 9, 0, tzinfo=ist)
-zgetTo = datetime(2023, 3, 31, 17, 30, tzinfo=ist)
+zgetFrom = datetime(2023, 3, 30, 10, 0, tzinfo=ist)
+zgetTo = datetime(2023, 4, 3, 15, 30, tzinfo=ist)
 
 def zget(t,s,e,i):
     #Get latest minute tick from zerodha
@@ -106,9 +109,14 @@ def backtest(t,i='minute',exportCSV=False):
     perfTIME = perfProfiler("to CSV", perfTIME)
     perfTIME = perfProfiler("TOTAL", startingTime)
 
-    if (plot == []):
+    if (plot == [] or (not 'trades' in tearsheet.keys())):
         return tearsheetdf
-    plot_backtest(df,tearsheet['trades'])
+    
+    if 'options' in plot:
+        plot_stock_and_option(df)
+        
+    if 'adjCloseGraph' in plot:
+        plot_backtest(df,tearsheet['trades'])
     
     # print (f"END Complete {datetime.now(ist)}")
     return tearsheetdf
@@ -231,7 +239,7 @@ def backtestCombinator():
 #backtestCombinator()       
 #plot_options(['ASIANPAINT'],10,'minute')
 #backtest('HDFCLIFE','minute',adxThreh=30)
-backtest('HDFCBANK','minute')
+backtest('NIFTY2340617250CE','minute')
 #backtest('HDFCLIFE','minute',adxThreh=25)
 #backtest('ASIANPAINT','minute',adxThreh=25)
 #backtest('HDFCLIFE','minute',adxThreh=30)

@@ -96,6 +96,7 @@ def zget_basic(from_date, to_date, symbol,interval='minute',
                               to_date,interval) 
         if not df.empty:
             return df
+        
     if token is None:
         token = db.get_instrument_token(symbol)
     if token == -1:
@@ -110,14 +111,13 @@ def zget_basic(from_date, to_date, symbol,interval='minute',
         return pd.DataFrame()
 
     df = pd.DataFrame(records)
-    
+    if df.empty:
+        logging.info('No data returned')
+        return df
+    df = zColsToDbCols(df)
     # Adding new index column
     df.insert(0, 'i', range(1, 1 + len(df)))
 
-    if df.empty:
-        logging.info('No data returned')
-    df = zColsToDbCols(df)
-    
     #Kite Historical timestamp for a candle contails ohlcv data for the 
     #minute that "STARTED" at the timestamp.
     #
@@ -137,7 +137,8 @@ def zget_basic(from_date, to_date, symbol,interval='minute',
     # affect our analytics and signals for a long time.  So we filter
     # fileter out these junk values
 
-    df = df.between_time('9:15', '15:29')
+    df = df.between_time('09:30:00+05:30', '15:29:00+05:30')    
+    
     if cacheTickData:
         loadTickerCache(df,symbol,from_date,to_date,interval)
     return df
@@ -149,19 +150,34 @@ def zAddOptionsData(df,symbol,from_date,to_date,interval='minute',continuous=Fal
     (call_option_ticker,lot_size,tick_size) =db.get_option_ticker(symbol,df['Adj Close'].iloc[-1], 'CE',0)
     c_df = zget_basic(from_date,to_date,call_option_ticker,interval,continuous)
 
+    
+    # forward fill 0 and NaN volume values
+    p_df['Volume'] = p_df['Volume'].replace(0, pd.np.nan).fillna(method='ffill')
+    c_df['Volume'] = c_df['Volume'].replace(0, pd.np.nan).fillna(method='ffill')
+
     df['Open-P'] = p_df['Open']
     df['High-P'] = p_df['High']
     df['Low-P'] = p_df['Low']
     df['Adj Close-P'] = p_df['Adj Close']
     df['Volume-P'] = p_df['Volume']
+    # df[['Open-P', 'High-P', 'Low-P', 'Adj Close-P', 'Volume-P']] = \
+    #     df[['Open-P', 'High-P', 'Low-P', 'Adj Close-P', 'Volume-P']].ffill().bfill()
 
     df['Open-C'] = c_df['Open']
     df['High-C'] = c_df['High']
     df['Low-C'] = c_df['Low']
     df['Adj Close-C'] = c_df['Adj Close']
     df['Volume-C'] = c_df['Volume']
+    # df[['Open-C', 'High-C', 'Low-C', 'Adj Close-C', 'Volume-C']] = \
+    #     df[['Open-C', 'High-C', 'Low-C', 'Adj Close-C', 'Volume-C']].ffill().bfill()
 
     return df
+
+def zGetSurrogateVolumeFromFuture(symbol,from_date,to_date,interval='minute',continuous=False):
+    (future_ticker,lot_size,tick_size) =db.get_future_ticker(symbol)
+    futDF = zget_basic(from_date,to_date,future_ticker,interval,continuous)
+    
+    
     
 def zget(from_date, to_date, symbol,interval='minute',
          includeOptions=False, continuous=False, instrumentToken=None):
@@ -169,11 +185,15 @@ def zget(from_date, to_date, symbol,interval='minute',
     if utils.tickerIsFuture(symbol):
         continuous = False # set continuous True for futures//Correction, contiinous only works for day 
         # candles not for minute candles
+        
     df = zget_basic(from_date, to_date, symbol,interval,continuous,instrumentToken)
     
     if df.empty:
         return df
     
+    # if (df['Volume'].iloc[-1] == 0):
+    #     # Likely an Index Ticker, use surrogate volume from its future
+    #     df['Volume'] = zGetSurrogateVolumeFromFuture(symbol,from_date,to_date,interval,continuous)
     if (includeOptions):
         df = zAddOptionsData(df,symbol,from_date,to_date,interval,continuous)
     
