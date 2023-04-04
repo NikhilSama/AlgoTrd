@@ -157,7 +157,7 @@ def addBBStats(df):
     df['ma20'] = df['Adj Close'].rolling(window=maLen).mean()
     df['MA-FAST'] = df['Adj Close'].rolling(window=fastMALen).mean()
     df['ma20_pct_change'] = df['ma20'].pct_change(periods=1)
-    df['ma20_pct_change_ma'] = df['ma20_pct_change'].ewm(com=maLen, min_periods=maLen).mean()
+    df['ma20_pct_change_ma'] = df['ma20_pct_change'].ewm(com=5, min_periods=1).mean()
     df['ma20_pct_change_ma_sq'] = df['ma20_pct_change_ma'].pct_change()
     df['ma20_pct_change_ma_sq'] = df['ma20_pct_change_ma_sq'].ewm(com=maLen, min_periods=maLen).mean()
     df['ma20_pct_change_ma_sq'] = df['ma20_pct_change_ma_sq'].clip(lower=-0.5, upper=0.5)
@@ -208,8 +208,8 @@ def isAlmostLow(value,threshold,multiplier):
                  or isSuperLow(value,threshold,multiplier))) and \
         (value <= -threshold*multiplier)
 
-def valueBreachedThreshold (value,threshold,multiplier,slope,
-                            slopeThreshold,type='H'):
+def valueBreachedThreshold (value,threshold,slope,
+                            slopeThreshold,multiplier,type='H'):
     superHigh = value >= threshold/multiplier
     High = (not superHigh) and value >= threshold
     almostHigh = (not (High or superHigh)) and \
@@ -253,16 +253,17 @@ def projectedValueBreachedThreshold(value,threshold,slope,
     #Calc projectedValue is where the value will be after {candlesToProject}
     #if it starts at value and continues at current slope levels
     for counter in range(numCandlesForSlopeProjection):
+        #logging.debug(f"counter is {counter} and value is {value} and slope is {slope} and threshold is {threshold}")
         value = (value + slope) # calculate new value of x after one candle
-    return valueBreachedThreshold(value,threshold,multiplier,0,0.1,type)
+    return valueBreachedThreshold(value,threshold,0,0.1,multiplier,type)
 
 def valueOrProjectedValueBreachedThreshold(value,threshold,slope,
                                     slopeThreshold,multiplier,type):
     p = projectedValueBreachedThreshold(value,threshold,slope,
-                                    slopeThreshold,multiplier,type) 
+                                    slopeThreshold,multiplier,type)
     if p == False:
-        return valueBreachedThreshold(value,threshold,multiplier,slope,
-                                    slopeThreshold,type)
+        return valueBreachedThreshold(value,threshold,slope,
+                                    slopeThreshold,multiplier,type)
     else:
         return p
 def reversalWillComplete(value,threshold,slope,
@@ -412,8 +413,8 @@ def getSig_ADX_FILTER (type,signal, isLastRow,row,df):
     
     s = signal
     
-    if valueOrProjectedValueBreachedThreshold(row['ADX'],adxThresh,adxThreshYellowMultiplier,
-                              row['ADX-PCT-CHNG'],maSlopeThresh,"H"):
+    if valueOrProjectedValueBreachedThreshold(row['ADX'],adxThresh,row['ADX-PCT-CHNG'],
+                                              maSlopeThresh,adxThreshYellowMultiplier,"H"):
         
         i = df.index.get_loc(row.name) # get index of current row
         rollbackCandles = round(adxLen*.6) # how many candles to look back
@@ -431,9 +432,9 @@ def getSig_ADX_FILTER (type,signal, isLastRow,row,df):
             s = 0
         
     if isLastRow and signalChanged(s,signal):
-        logging.info(f"{row.symbol}:{row.i}  => ADX FILTER => ADX:{row['ADX']} > Thresh:{adxThresh} MASLOPE:{row['SLOPE-OSC']} signal={signal} s={s} type={type}")
+        logging.info(f"{row.symbol}:{row.i}  => ADX FILTER => ADX:{row['ADX']} > Thresh:{adxThresh} ADXSLOPE:{row['ADX-PCT-CHNG']} MASLOPE:{row['SLOPE-OSC']} Mult: {adxThreshYellowMultiplier} signal={signal} s={s} type={type}")
     elif signalChanged(s,signal):
-        logging.debug(f"{row.symbol}:{row.i}:{row.name} => ADX FILTER => ADX:{row['ADX']} > Thresh:{adxThresh} MASLOPE:{row['SLOPE-OSC']} signal={signal} s={s} type={type}")
+        logging.debug(f"{row.symbol}:{row.i}:{row.name} => ADX FILTER => ADX:{row['ADX']} > Thresh:{adxThresh}  ADXSLOPE:{row['ADX-PCT-CHNG']} MASLOPE:{row['SLOPE-OSC']} Mult: {adxThreshYellowMultiplier} signal={signal} s={s} type={type}")
         
     return signal
 
@@ -444,8 +445,8 @@ def getSig_MASLOPE_FILTER (type,signal, isLastRow,row,df):
     
     s=signal
     breached = valueOrProjectedValueBreachedThreshold(row['SLOPE-OSC'],
-                                      maSlopeThresh,maSlopeThreshYellowMultiplier,row['SLOPE-OSC-SLOPE'],
-                                      maSlopeSlopeThresh, "H_OR_L")
+                                      maSlopeThresh,row['SLOPE-OSC-SLOPE'],
+                                      maSlopeSlopeThresh, maSlopeThreshYellowMultiplier, "H_OR_L")
 
     # Since this is a FILTER, we only negate long and short signals
     # on extreme MSSLOPE.
@@ -461,9 +462,9 @@ def getSig_MASLOPE_FILTER (type,signal, isLastRow,row,df):
         elif s == -1 and breached == 'H':
             s = 0
     if isLastRow and signalChanged(s,signal):
-        logging.info(f"{row.symbol}:{row.i}  => MASLOPE FILTER => Slope:{row['SLOPE-OSC']} >= Threshold {maSlopeThresh} signal={signal} s={s} type={type}")
+        logging.info(f"{row.symbol}:{row.i}  => MASLOPE FILTER => Slope:{row['SLOPE-OSC']} >= Threshold {maSlopeThresh} SlopeChange:{row['SLOPE-OSC-SLOPE']} Mult: {maSlopeThreshYellowMultiplier} signal={signal} s={s} type={type}")
     elif signalChanged(s,signal):
-        logging.debug(f"{row.symbol}:{row.i}:{row.name}  => MASLOPE FILTER => Slope:{row['SLOPE-OSC']} >= Threshold {maSlopeThresh} signal={signal} s={s} type={type}")
+        logging.debug(f"{row.symbol}:{row.i}:{row.name}  => MASLOPE FILTER => Slope:{row['SLOPE-OSC']} >= Threshold {maSlopeThresh}  SlopeChange:{row['SLOPE-OSC-SLOPE']} Mult: {maSlopeThreshYellowMultiplier} signal={signal} s={s} type={type}")
         
     return s
 
@@ -482,8 +483,8 @@ def getSig_OBV_FILTER (type,signal, isLastRow,row, df):
     # for nan or 0, we just return the signal
     
     breached = valueOrProjectedValueBreachedThreshold(row['OBV-OSC'],obvOscThresh,
-                    obvOscThreshYellowMultiplier,row['OBV-OSC-PCT-CHNG'],
-                    obvOscSlopeThresh, "H_OR_L")
+                    row['OBV-OSC-PCT-CHNG'], obvOscSlopeThresh, 
+                    obvOscThreshYellowMultiplier, "H_OR_L")
 
     if breached == False:
         return s
@@ -493,9 +494,9 @@ def getSig_OBV_FILTER (type,signal, isLastRow,row, df):
         elif s == -1 and breached == 'H':
             s = 0
         if isLastRow and signalChanged(s,signal):
-            logging.info(f"{row.symbol}:{row.i}  => OBV FILTERER => obv is:{row['OBV-OSC']} >= threshod is:{obvOscThresh} Mult: {obvOscThreshYellowMultiplier} Slope: {row['OBV-OSC-PCT-CHNG']} >= {obvOscSlopeThresh} signal={signal} s={s} type={type}")
+            logging.info(f"{row.symbol}:{row.i}  => OBV FILTERER => obv is:{row['OBV-OSC']} >= threshod:{obvOscThresh} Mult: {obvOscThreshYellowMultiplier} Slope: {row['OBV-OSC-PCT-CHNG']} >= {obvOscSlopeThresh} signal={signal} s={s} type={type}")
         elif signalChanged(s,signal):
-            logging.debug(f"{row.symbol}:{row.i}:{row.name}  => OBV FILTERER =>  obv is:{row['OBV-OSC']} >= threshod is:{obvOscThresh} Mult: {obvOscThreshYellowMultiplier} Slope: {row['OBV-OSC-PCT-CHNG']} >= {obvOscSlopeThresh} signal={signal} s={s} type={type}")
+            logging.debug(f"{row.symbol}:{row.i}:{row.name}  => OBV FILTERER =>  obv is:{row['OBV-OSC']} >= threshod:{obvOscThresh} Mult: {obvOscThreshYellowMultiplier} Slope: {row['OBV-OSC-PCT-CHNG']} >= {obvOscSlopeThresh} signal={signal} s={s} type={type}")
 
     return s
 
@@ -542,25 +543,33 @@ def getSig_exitAnyExtremeADX_OBV_MA20_OVERRIDE (type, signal, isLastRow, row, df
         return signal # signal is nan (not -1,0,1) and last signal is nan or 0
                     #we have not current or planned position
 
-    if 'OBV-OSC' in row:
+    if ('OBV-OSC' in row) and (not np.isnan(row['OBV-OSC'])):
         obvBreached = valueBreachedThreshold(row['OBV-OSC'],obvOscThresh,
-                                    obvOscThreshYellowMultiplier,
-                                    row['OBV-OSC-PCT-CHNG'],obvOscSlopeThresh,"H_OR_L")
+                                    row['OBV-OSC-PCT-CHNG'],obvOscSlopeThresh,
+                                    obvOscThreshYellowMultiplier, "H_OR_L")
     else:
         obvBreached = False
-        
-    adxBreached = valueBreachedThreshold(row['ADX'],adxThresh,adxThreshYellowMultiplier,
-                              row['ADX-PCT-CHNG'],maSlopeThresh,"H")   
-
-    slopebreached = valueBreachedThreshold(row['SLOPE-OSC'],
-                                      maSlopeThresh,1,row['SLOPE-OSC-SLOPE'],
-                                    .0001, "H_OR_L")
     
+    if not np.isnan(row['ADX']):
+        adxBreached = valueBreachedThreshold(row['ADX'],adxThresh,
+                                    row['ADX-PCT-CHNG'],adxSlopeThresh,
+                                    adxThreshYellowMultiplier, "H")
+    else:
+        adxBreached = False
+    
+    if not np.isnan(row['SLOPE-OSC']):
+        slopebreached = valueBreachedThreshold(row['SLOPE-OSC'],
+                                        maSlopeThresh,row['SLOPE-OSC-SLOPE'],
+                                        maSlopeSlopeThresh, 
+                                        maSlopeThreshYellowMultiplier, "H_OR_L")
+    else:
+        slopebreached = False
+        
     if obvBreached == False and adxBreached == False and slopebreached == False:
         return signal    
     
     s = signal 
-    
+    #logging.info(f"obvBreached:{obvBreached} adxBreached:{adxBreached} slopebreached:{slopebreached}")
     if obvBreached:
         breach = obvBreached
     elif slopebreached:
@@ -587,9 +596,9 @@ def getSig_exitAnyExtremeADX_OBV_MA20_OVERRIDE (type, signal, isLastRow, row, df
         s = 0
                     
     if isLastRow and signalChanged(s,signal):
-        logging.info(f"{row.symbol}:{row.i}  => EXIT => Extreme ADX/OBV/MA20 OVERRIDE SIGNAL({signal})  s={s} / LAST SIGNAL({last_signal}). ADX:{row['ADX']} > {adxThresh*overrideMultiplier} OR OBV:{row['OBV-OSC']} > {obvOscThresh*overrideMultiplier} OR MA20:{row['SLOPE-OSC']} > {maSlopeThresh*overrideMultiplier}")                
+        logging.info(f"{row.symbol}:{row.i}  => EXIT => Extreme ADX/OBV/MA20 OVERRIDE SIGNAL({signal})  s={s} / LAST SIGNAL({last_signal}). ADX:{row['ADX']} > {adxThresh*overrideMultiplier} OR OBV:{row['OBV-OSC']}/{row['OBV-OSC-PCT-CHNG']} > {obvOscThresh*overrideMultiplier} OR MA20:{row['SLOPE-OSC']}/{row['SLOPE-OSC-SLOPE']} > {maSlopeThresh*overrideMultiplier}")                
     elif signalChanged(s,signal):
-        logging.debug(f"{row.symbol}:{row.i}:{row.name}  => EXIT => Extreme ADX/OBV/MA20 OVERRIDE SIGNAL({signal})   s={s} / LAST SIGNAL({last_signal}). ADX:{row['ADX']} > {adxThresh*overrideMultiplier} OR OBV:{row['OBV-OSC']} > {obvOscThresh*overrideMultiplier} OR MA20:{row['SLOPE-OSC']} > {maSlopeThresh*overrideMultiplier}")                
+        logging.debug(f"{row.symbol}:{row.i}:{row.name}  => EXIT => Extreme ADX/OBV/MA20 OVERRIDE SIGNAL({signal})   s={s} / LAST SIGNAL({last_signal}). ADX:{row['ADX']} > {adxThresh*overrideMultiplier} OR OBV:{row['OBV-OSC']}/{row['OBV-OSC-PCT-CHNG']} > {obvOscThresh*overrideMultiplier} OR MA20:{row['SLOPE-OSC']}/{row['SLOPE-OSC-SLOPE']} > {maSlopeThresh*overrideMultiplier}")                
                 
     return s
 
@@ -712,8 +721,8 @@ def followTrendReversal (type, signal, isLastRow, row, df,
     adxAboveYellow = row['ADX'] > (adxThresh*adxThreshYellowMultiplier)
     
     obvBreached = valueOrProjectedValueBreachedThreshold(row['OBV-OSC'],obvOscThresh,
-                    obvOscThreshYellowMultiplier,row['OBV-OSC-PCT-CHNG'],
-                    obvOscSlopeThresh, "H_OR_L")
+                    row['OBV-OSC-PCT-CHNG'],obvOscSlopeThresh, 
+                    obvOscThreshYellowMultiplier, "H_OR_L")
 
     if slopeHasReversedUp and adxAboveYellow and (obvBreached == 'H'):
         s = 1
