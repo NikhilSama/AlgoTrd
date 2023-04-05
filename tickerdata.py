@@ -89,7 +89,7 @@ def get_sp500_tickers():
     return tickers
 
 def get_fo_active_nifty_tickers():
-    return ['RELIANCE','INFY','BAJFINANCE','SBIN', 'TCS', 'KOTAKBANK', 'ICICIBANK', 'HDFCBANK', 'MARUTI' ]
+    return ['NIFTY 50','NIFTY23APRFUT','RELIANCE','INFY','BAJFINANCE','SBIN', 'TCS', 'KOTAKBANK', 'ICICIBANK', 'HDFCBANK', 'MARUTI' ]
 
 def get_nifty_tickers():
     
@@ -100,6 +100,7 @@ def get_nifty_tickers():
     #return['UPL']
     file_name = "Data/niftytickers.pickle"
     tickers = []
+    
 
     if os.path.isfile(file_name):
         with open(file_name, "rb") as f:

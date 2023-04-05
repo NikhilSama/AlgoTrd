@@ -34,6 +34,7 @@ globals().update(vars(cfg))
 global tickThread
 tickThread = None
 tickThreadBacklog = []
+nifty_ltp = 0
 
 ## TEST FREEZESR START
 
@@ -57,6 +58,9 @@ kws = ki.initKws(tl.get_kite_access_token())
 buy_order_id,sell_order_id = 0,0
 tickersToTrack = {}
 now = datetime.datetime.now(ist)
+
+def getNiftyLTP():
+    return nifty_ltp
 
 def tickerlog(s):
     logtime = datetime.datetime.now(ist).strftime("%I:%M:%S %p")
@@ -116,9 +120,15 @@ def subscribeToTickerData():
     kws.set_mode(kws.MODE_FULL, tokenList)
 
 def addTicksToTickDF(ticks):
+    global nifty_ltp
     #add the tick to the tick df
     for tick in ticks:
         token = tick['instrument_token']
+        if tickersToTrack[token]['ticker'] == 'NIFTY 50':
+            # Dont store/resample nifty ticks as it is not tradable
+            # we subscribe just to get the ltp
+            nifty_ltp = tick['last_price']
+            continue
         
         #Insert this tick into the tick df
         tick_time = tick['exchange_timestamp']
@@ -128,7 +138,7 @@ def addTicksToTickDF(ticks):
             'High': tick['last_price'],
             'Low': tick['last_price'],
             'Adj Close': tick['last_price'],
-            'Volume': tick['volume_traded']
+            'Volume': tick['volume_traded'] if 'volume_traded' in tick else 0
         }
         tickersToTrack[token]['ticks'].loc[tick_time] = tick_df_row    
         
@@ -188,6 +198,9 @@ def resampleToMinDF():
                 tickersToTrack[token]['df']= downloader.zget \
                     (historicalStart,historicalEnd,tickersToTrack[token]['ticker'],'minute',
                     includeOptions=False,instrumentToken=token)
+                #trim to 375 rows/minutes
+                trimMinuteDF(token)
+
             else:
                 # Append the new minute candle rows to the minute candle df
                             #Add in symbol and index to make it at par with the Historical data candles
@@ -199,8 +212,6 @@ def resampleToMinDF():
                                                 axis=0)
                 tickerlog(f"Adding resampled rows {resampled_ticks_upto_this_minute}  to minute candle {tickersToTrack[token]['df'].tail()}")
 
-            #trip to 375 rows/minutes
-            trimMinuteDF(token)
             # Remove the ticks that have been used to create the new minute candle
             tickersToTrack[token]['ticks'] = ticks_after_this_minute
             resampled_tokens.append(token)

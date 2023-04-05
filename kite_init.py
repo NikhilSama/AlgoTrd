@@ -566,7 +566,7 @@ def get_positions (kite):
             pos['last_price'] = position['last_price']
             pos['exchange'] = position['exchange']
             pos['long_or_short'] = long_or_short(position)
-            if isOption(position['exchange'],t):
+            if isOption(position['exchange'],position['tradingsymbol']):
                 t = gettFromOption(position['tradingsymbol'])
             else:
                 t = position['tradingsymbol']

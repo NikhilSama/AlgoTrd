@@ -7,7 +7,7 @@ Created on Sun Feb  5 14:26:36 2023
 """
 import sys
 cfgDict = {
-    'cfgFreezeGun': True,
+    'cfgFreezeGun': False,
     'startTime': 0,
     'startHour': 10,
     'endHour': 14,
@@ -23,22 +23,23 @@ cfgDict = {
     'adxThresh': 30,
     'adxThreshYellowMultiplier': 0.7,
     'numCandlesForSlopeProjection':2,
-    'adxSlopeThresh': 0.06,
+    'adxSlopeThresh': 0.6,
     'maSlopeThresh': 1,
     'maSlopeThreshYellowMultiplier': 0.7,
-    'maSlopeSlopeThresh': 0.01,
+    'maSlopeSlopeThresh': 0.1,
     'obvOscThresh': 0.2,
     'obvOscThreshYellowMultiplier': 0.7,
-    'obvOscSlopeThresh': 0.3,
+    'obvOscSlopeThresh': 0.1,
     'cfgObvMaxMinDiff_MaxLookbackCandles': 200,
     'cfgNumConditionsForTrendFollow': 2,
-    'includeOptions': True,
+    'includeOptions': False,
     'plot': [
         
         #'trade_returns'
         #,
        # 'adjCloseGraph'
-        
+        # ,
+        # 'options'
         ],
     'overrideMultiplier': 1.2,
 # google cloud specific stuff 
@@ -50,8 +51,8 @@ cfgDict = {
     'dbuser' : 'trading',
     'dbpass' : 'trading',
     'showTradingViewLive' : False,
-    'cacheTickData' : True, 
-    'bet_size': 10000
+    'cacheTickData' : False, 
+    'bet_size': 100000
 }
 
   

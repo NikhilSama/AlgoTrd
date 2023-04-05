@@ -175,8 +175,8 @@ def generateSignalsAndTrade(df,positions,stock,options,dfStartTime=None):
     # Stuff to hack if this function is called from KitTicker instaed of 
     # time_loop
     global now
+    now = df.index[-1]
     if dfStartTime is not None:
-        now = df.index[-1]
         dfStartTime = df.index[0]
     
     if df.empty:
@@ -249,7 +249,7 @@ def generateSignalsAndTrade(df,positions,stock,options,dfStartTime=None):
         if stock:
             ki.nse_sell(kite,t,qToExit=qToExit)
         if options:
-            tcall,tcall_lot_size,tcall_tick_size = db.get_option_ticker(t, ltp, 'CE')
+            tcall,tcall_lot_size,tcall_tick_size = db.get_option_ticker(t, ltp, 'CE',kite)
             ki.nfo_sell(kite,tcall,tcall_lot_size,tcall_tick_size,qToExit=0)
         
         tradeNotification("GO SHORT", t,ltp,df['signal'][-1],df['position'][-1],net_position)

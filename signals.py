@@ -16,6 +16,7 @@ import datetime
 import pytz
 import performance as perf
 import logging
+import pickle
 #cfg has all the config parameters make them all globals here
 import cfg
 globals().update(vars(cfg))
@@ -291,9 +292,23 @@ def getLastSignal(signal):
     else:
         last_signal = 0
     return last_signal
-def initTickerStatus(signal):
-    tickerStatus[signal] = {'position':float("nan"), 
+def initTickerStatus(ticker):
+    tickerStatus[ticker] = {'position':float("nan"), 
                                     'trendSignal':float("nan")} 
+    loadTickerStatusFromCache()
+    
+def loadTickerStatusFromCache():
+    tickerStatusCacheFileName = "Data/tickerStatusCache.pickle"
+    if os.path.isfile(tickerStatusCacheFileName):
+        with open(tickerStatusCacheFileName, "rb") as f:
+            tickerStatus = pickle.load(f)
+            logging.info(f"loaded tickerStatus from cache: {tickerStatus}")
+
+def cacheTickerStatus():
+    tickerStatusCacheFileName = "Data/tickerStatusCache.pickle"
+    with open(tickerStatusCacheFileName,"wb") as f:
+        pickle.dump(tickerStatus,f)
+
 def getTickerPosition(ticker):
     if ticker not in tickerStatus:
         return float ('nan')
@@ -306,6 +321,7 @@ def setTickerPosition(ticker,p):
     if ticker not in tickerStatus:
         tickerStatus[ticker] = {}
     tickerStatus[ticker]['position'] = p
+    cacheTickerStatus()
 
 def getTickerTrend(ticker):
     if ticker not in tickerStatus:
@@ -351,6 +367,26 @@ def signalChanged(s,lastS):
     #Oddly s!=lastS is True if both are nan, because nan's cant compare
     return s != lastS and (not math.isnan(s))
 
+def logSignal(msg,reqData,signal,s,row,window,isLastRow,extra='',logWithNoSignalChange=False):
+    rowInfo = f'{row.symbol}:{row.i} '
+    rowPrice = f'p:{round(row["Adj Close"],1)} '
+    sigInfo = f'sig:{"-" if np.isnan(signal) else signal} s:{"-" if np.isnan(s) else s} {"E" if window == 1 else "X"} '
+    dataStrings = {
+        "adxData" : f"ADX:{round(row['ADX'],1)} > {adxThresh}(*{round(adxThreshYellowMultiplier,1)}) adxSLP:{round(row['ADX-PCT-CHNG'],2)}>{adxSlopeThresh} ",
+        "maSlpData" : f"maSlp:{round(row['SLOPE-OSC'],2)} >= {maSlopeThresh}(*{maSlopeThreshYellowMultiplier}) maSlpChng:{round(row['SLOPE-OSC-SLOPE'],2)}>{maSlopeSlopeThresh} ",
+        "obvData" : f"OBV:{round(row['OBV-OSC'],2)} > {obvOscThresh}(*{obvOscThreshYellowMultiplier}) obvSLP:{round(row['OBV-OSC-PCT-CHNG'],2)}>{obvOscSlopeThresh} "
+    }
+    dataString = ''
+    for key in reqData:
+        dataString = dataString+dataStrings[key]
+    if isLastRow and (signalChanged(s,signal) or logWithNoSignalChange):
+        logging.info(rowInfo+' => '+rowPrice+' => '+msg+' '+sigInfo+ ' => '+dataString+' '+extra)
+    elif signalChanged(s,signal) or logWithNoSignalChange:
+        rowTime = row.name.strftime("%d/%m %I:%M")
+        rowInfo = rowInfo+f':{rowTime} ' #backtest needs date
+        logging.debug(rowInfo+' => '+rowPrice+' => '+msg+' '+sigInfo+ ' => '+dataString+' '+extra)
+
+
 #####END OF UTILTIY FUNCTIONS#########
 
 ####### POPULATE FUNCTIONS #######
@@ -391,10 +427,11 @@ def getSig_BB_CX(type,signal, isLastRow, row, df):
         (not tickerIsTrendingUp(row['symbol'])): #Up trending tickers dance around the upper band, dont use that as an exit signal
         s = -1*type
 
-    if isLastRow and signalChanged(s,signal):
-        logging.info(f'{row.symbol}:{row.i} => BB-CX => signal={signal} s={s} type={type}')
-    elif signalChanged(s,signal):
-        logging.debug(f'{row.symbol}:{row.i} => BB-CX => signal={signal} s={s} type={type}')
+    logSignal('BB-X-CX',["adxData"],signal,s,row,type,isLastRow)
+    # if isLastRow and signalChanged(s,signal):
+    #     logging.info(f'{row.symbol}:{row.i} => BB-CX => signal={signal} s={s} type={type}')
+    # elif signalChanged(s,signal):
+    #     logging.debug(f'{row.symbol}:{row.i} => BB-CX => signal={signal} s={s} type={type}')
 
     return s
 
@@ -414,7 +451,7 @@ def getSig_ADX_FILTER (type,signal, isLastRow,row,df):
     s = signal
     
     if valueOrProjectedValueBreachedThreshold(row['ADX'],adxThresh,row['ADX-PCT-CHNG'],
-                                              maSlopeThresh,adxThreshYellowMultiplier,"H"):
+                                              adxSlopeThresh,adxThreshYellowMultiplier,"H"):
         
         i = df.index.get_loc(row.name) # get index of current row
         rollbackCandles = round(adxLen*.6) # how many candles to look back
@@ -430,13 +467,15 @@ def getSig_ADX_FILTER (type,signal, isLastRow,row,df):
             s = 0
         elif s == -1 and oldSlope > 0:
             s = 0
+    
+    logSignal('ADX-FLTR',["adxData","maSlpData"],signal,s,row,type,isLastRow)
+
+    # if isLastRow and signalChanged(s,signal):
+    #     logging.info(f"{row.symbol}:{row.i}  => ADX FILTER => ADX:{row['ADX']} > Thresh:{adxThresh} ADXSLOPE:{row['ADX-PCT-CHNG']} MASLOPE:{row['SLOPE-OSC']} Mult: {adxThreshYellowMultiplier} signal={signal} s={s} type={type}")
+    # elif signalChanged(s,signal):
+    #     logging.debug(f"{row.symbol}:{row.i}:{row.name} => ADX FILTER => ADX:{row['ADX']} > Thresh:{adxThresh}  ADXSLOPE:{row['ADX-PCT-CHNG']} MASLOPE:{row['SLOPE-OSC']} Mult: {adxThreshYellowMultiplier} signal={signal} s={s} type={type}")
         
-    if isLastRow and signalChanged(s,signal):
-        logging.info(f"{row.symbol}:{row.i}  => ADX FILTER => ADX:{row['ADX']} > Thresh:{adxThresh} ADXSLOPE:{row['ADX-PCT-CHNG']} MASLOPE:{row['SLOPE-OSC']} Mult: {adxThreshYellowMultiplier} signal={signal} s={s} type={type}")
-    elif signalChanged(s,signal):
-        logging.debug(f"{row.symbol}:{row.i}:{row.name} => ADX FILTER => ADX:{row['ADX']} > Thresh:{adxThresh}  ADXSLOPE:{row['ADX-PCT-CHNG']} MASLOPE:{row['SLOPE-OSC']} Mult: {adxThreshYellowMultiplier} signal={signal} s={s} type={type}")
-        
-    return signal
+    return s
 
 # MA SLOPE FILTER is to catch spikes, get out dont get caught in them
 def getSig_MASLOPE_FILTER (type,signal, isLastRow,row,df):
@@ -461,10 +500,13 @@ def getSig_MASLOPE_FILTER (type,signal, isLastRow,row,df):
             s = 0
         elif s == -1 and breached == 'H':
             s = 0
-    if isLastRow and signalChanged(s,signal):
-        logging.info(f"{row.symbol}:{row.i}  => MASLOPE FILTER => Slope:{row['SLOPE-OSC']} >= Threshold {maSlopeThresh} SlopeChange:{row['SLOPE-OSC-SLOPE']} Mult: {maSlopeThreshYellowMultiplier} signal={signal} s={s} type={type}")
-    elif signalChanged(s,signal):
-        logging.debug(f"{row.symbol}:{row.i}:{row.name}  => MASLOPE FILTER => Slope:{row['SLOPE-OSC']} >= Threshold {maSlopeThresh}  SlopeChange:{row['SLOPE-OSC-SLOPE']} Mult: {maSlopeThreshYellowMultiplier} signal={signal} s={s} type={type}")
+    
+    logSignal('SLP-FLTR',["maSlpData"],signal,s,row,type,isLastRow)
+
+    # if isLastRow and signalChanged(s,signal):
+    #     logging.info(f"{row.symbol}:{row.i}  => MASLOPE FILTER => Slope:{row['SLOPE-OSC']} >= Threshold {maSlopeThresh} SlopeChange:{row['SLOPE-OSC-SLOPE']} Mult: {maSlopeThreshYellowMultiplier} signal={signal} s={s} type={type}")
+    # elif signalChanged(s,signal):
+    #     logging.debug(f"{row.symbol}:{row.i}:{row.name}  => MASLOPE FILTER => Slope:{row['SLOPE-OSC']} >= Threshold {maSlopeThresh}  SlopeChange:{row['SLOPE-OSC-SLOPE']} Mult: {maSlopeThreshYellowMultiplier} signal={signal} s={s} type={type}")
         
     return s
 
@@ -493,10 +535,11 @@ def getSig_OBV_FILTER (type,signal, isLastRow,row, df):
             s = 0
         elif s == -1 and breached == 'H':
             s = 0
-        if isLastRow and signalChanged(s,signal):
-            logging.info(f"{row.symbol}:{row.i}  => OBV FILTERER => obv is:{row['OBV-OSC']} >= threshod:{obvOscThresh} Mult: {obvOscThreshYellowMultiplier} Slope: {row['OBV-OSC-PCT-CHNG']} >= {obvOscSlopeThresh} signal={signal} s={s} type={type}")
-        elif signalChanged(s,signal):
-            logging.debug(f"{row.symbol}:{row.i}:{row.name}  => OBV FILTERER =>  obv is:{row['OBV-OSC']} >= threshod:{obvOscThresh} Mult: {obvOscThreshYellowMultiplier} Slope: {row['OBV-OSC-PCT-CHNG']} >= {obvOscSlopeThresh} signal={signal} s={s} type={type}")
+        # if isLastRow and signalChanged(s,signal):
+        #     logging.info(f"{row.symbol}:{row.i}  => OBV FILTERER => obv is:{row['OBV-OSC']} >= threshod:{obvOscThresh} Mult: {obvOscThreshYellowMultiplier} Slope: {row['OBV-OSC-PCT-CHNG']} >= {obvOscSlopeThresh} signal={signal} s={s} type={type}")
+        # elif signalChanged(s,signal):
+        #     logging.debug(f"{row.symbol}:{row.i}:{row.name}  => OBV FILTERER =>  obv is:{row['OBV-OSC']} >= threshod:{obvOscThresh} Mult: {obvOscThreshYellowMultiplier} Slope: {row['OBV-OSC-PCT-CHNG']} >= {obvOscSlopeThresh} signal={signal} s={s} type={type}")
+    logSignal('OBV-FLTR',["obvData"],signal,s,row,type,isLastRow)
 
     return s
 
@@ -594,11 +637,13 @@ def getSig_exitAnyExtremeADX_OBV_MA20_OVERRIDE (type, signal, isLastRow, row, df
         s = 0
     elif positionToAnalyse == -1 and breach == 'H':
         s = 0
-                    
-    if isLastRow and signalChanged(s,signal):
-        logging.info(f"{row.symbol}:{row.i}  => EXIT => Extreme ADX/OBV/MA20 OVERRIDE SIGNAL({signal})  s={s} / LAST SIGNAL({last_signal}). ADX:{row['ADX']} > {adxThresh*overrideMultiplier} OR OBV:{row['OBV-OSC']}/{row['OBV-OSC-PCT-CHNG']} > {obvOscThresh*overrideMultiplier} OR MA20:{row['SLOPE-OSC']}/{row['SLOPE-OSC-SLOPE']} > {maSlopeThresh*overrideMultiplier}")                
-    elif signalChanged(s,signal):
-        logging.debug(f"{row.symbol}:{row.i}:{row.name}  => EXIT => Extreme ADX/OBV/MA20 OVERRIDE SIGNAL({signal})   s={s} / LAST SIGNAL({last_signal}). ADX:{row['ADX']} > {adxThresh*overrideMultiplier} OR OBV:{row['OBV-OSC']}/{row['OBV-OSC-PCT-CHNG']} > {obvOscThresh*overrideMultiplier} OR MA20:{row['SLOPE-OSC']}/{row['SLOPE-OSC-SLOPE']} > {maSlopeThresh*overrideMultiplier}")                
+        
+    logSignal('EXIT-EXTRME-COND',["obvData","adxData","maSlpData"],signal,s,row,type,isLastRow)
+
+    # if isLastRow and signalChanged(s,signal):
+    #     logging.info(f"{row.symbol}:{row.i}  => EXIT => Extreme ADX/OBV/MA20 OVERRIDE SIGNAL({signal})  s={s} / LAST SIGNAL({last_signal}). ADX:{row['ADX']} > {adxThresh*overrideMultiplier} OR OBV:{row['OBV-OSC']}/{row['OBV-OSC-PCT-CHNG']} > {obvOscThresh*overrideMultiplier} OR MA20:{row['SLOPE-OSC']}/{row['SLOPE-OSC-SLOPE']} > {maSlopeThresh*overrideMultiplier}")                
+    # elif signalChanged(s,signal):
+    #     logging.debug(f"{row.symbol}:{row.i}:{row.name}  => EXIT => Extreme ADX/OBV/MA20 OVERRIDE SIGNAL({signal})   s={s} / LAST SIGNAL({last_signal}). ADX:{row['ADX']} > {adxThresh*overrideMultiplier} OR OBV:{row['OBV-OSC']}/{row['OBV-OSC-PCT-CHNG']} > {obvOscThresh*overrideMultiplier} OR MA20:{row['SLOPE-OSC']}/{row['SLOPE-OSC-SLOPE']} > {maSlopeThresh*overrideMultiplier}")                
                 
     return s
 
@@ -636,18 +681,22 @@ def getSig_followAllExtremeADX_OBV_MA20_OVERRIDE (type, signal, isLastRow, row, 
         if signalChanged(s,signal):
             #print("entering trend following", row.i)
             setTickerTrend(row.symbol, s)
-            if isLastRow:
-                logging.info(f"{row.symbol}:{row.i} => FOLLOW TREND => Extreme ADX/OBV/MA20 OVERRIDE signal ({signal})  s={s} / last_signal ({last_signal}) TO FOLLOW TREND.ADX:{row['ADX']} > {adxThresh} AND OBV:{obvOsc} > {obvOscThresh} AND MA20:{row['SLOPE-OSC']} > {maSlopeThresh}")
-            else:
-                logging.debug(f"{row.symbol}:{row.i}:{row.name}  => FOLLOW TREND => Extreme ADX/OBV/MA20 OVERRIDE signal ({signal})  s={s} / last_signal ({last_signal}) TO FOLLOW TREND.ADX:{row['ADX']} > {adxThresh} AND OBV:{obvOsc} > {obvOscThresh} AND MA20:{row['SLOPE-OSC']} > {maSlopeThresh}")
-   
+            # if isLastRow:
+            #     logging.info(f"{row.symbol}:{row.i} => FOLLOW TREND => Extreme ADX/OBV/MA20 OVERRIDE signal ({signal})  s={s} / last_signal ({last_signal}) TO FOLLOW TREND.ADX:{row['ADX']} > {adxThresh} AND OBV:{obvOsc} > {obvOscThresh} AND MA20:{row['SLOPE-OSC']} > {maSlopeThresh}")
+            # else:
+            #     logging.debug(f"{row.symbol}:{row.i}:{row.name}  => FOLLOW TREND => Extreme ADX/OBV/MA20 OVERRIDE signal ({signal})  s={s} / last_signal ({last_signal}) TO FOLLOW TREND.ADX:{row['ADX']} > {adxThresh} AND OBV:{obvOsc} > {obvOscThresh} AND MA20:{row['SLOPE-OSC']} > {maSlopeThresh}")
+    logSignal('FLW-TRND',["obvData","adxData","maSlpData"],signal,s,row,type,isLastRow)
+
     return s
 
 def exitTrendFollowing(type, signal, isLastRow, row, df, 
                         last_signal=float('nan')):
-    if not tickerIsTrending(row.symbol):
+    if (not tickerIsTrending(row.symbol)) or \
+        ((not np.isnan(signal)) and (getTickerTrend(row.symbol) == signal)):
         return signal
     
+    #If We get here then ticker is trending, and trend signal no longer matches the trend
+    #Trend may not continue, need to find a good spot to exit 
     s = signal
     i = df.index.get_loc(row.name) # get index of current row
     # oldSlowMA = df.iloc[i - 1,df.columns.get_loc('ma20')]  
@@ -659,6 +708,9 @@ def exitTrendFollowing(type, signal, isLastRow, row, df,
     maIsNotChanging = isNotChanging(row['SLOPE-OSC'], maSlopeThresh)
     maIsGettingLower = isGettingLower(row['SLOPE-OSC'], maSlopeThresh)
     maIsGettingHigher = isGettingHigher(row['SLOPE-OSC'], maSlopeThresh)
+    
+    fastMACrossedOverSlow = row['MA-FAST'] >= row['ma20']
+    fastMACrossedUnderSlow = row['MA-FAST'] <= row['ma20']
     
     if 'OBV-OSC-PCT-CHNG' in row:
         obvIsNotChanging = isNotChanging(row['OBV-OSC-PCT-CHNG'], obvOscSlopeThresh)
@@ -672,13 +724,13 @@ def exitTrendFollowing(type, signal, isLastRow, row, df,
     #This ticker is trending, lets see if its time to exit
     trend = getTickerTrend(row.symbol)
     if trend == 1:
-        if (row['MA-FAST'] <= row['ma20']) and \
+        if fastMACrossedUnderSlow and \
             (adxIsGettingLower or adxIsNotChanging) and \
             (maIsGettingLower or maIsNotChanging) and \
             (obvIsGettingLower or obvIsNotChanging):
             s = 0
     elif trend == -1:   
-        if (row['MA-FAST'] >= row['ma20']) and \
+        if fastMACrossedOverSlow and \
             (adxIsGettingLower or adxIsNotChanging) and \
             (maIsGettingHigher or maIsNotChanging) and \
             (obvIsGettingHigher or obvIsNotChanging):
@@ -686,13 +738,19 @@ def exitTrendFollowing(type, signal, isLastRow, row, df,
     else:
         logging.error("Wierd ! trend should always be 1 or -1")
         return signal
+    
     if signalChanged(s,signal):
         setTickerTrend(row.symbol, 0)
-        #print(f"we did it for {row.symbol}@ {row.i}") 
-        if isLastRow:
-            logging.info(f"{row.symbol}:{row.i}  => EXIT TREND({trend}) on fastMA crossover")
-        else:
-            logging.debug(f"{row.symbol}:{row.i}:{row.name}  => EXIT TREND({trend}) on fastMA crossover")
+        logSignal('EXT-TRND',["obvData","adxData","maSlpData"],signal,s,row,type,isLastRow)
+        #logString = f"{row.symbol}:{row.i}:{{row.name if isLastRow else ''}}  => EXIT TREND({trend}) on fastMA crossover ADX:{row['ADX']} > {adxThresh} AND OBV:{row['OBV-OSC-PCT-CHNG']} > {obvOscThresh} AND MA20:{row['SLOPE-OSC']} > {maSlopeThresh}"
+    else:
+        logSignal('CNT-TRND',["obvData","adxData","maSlpData"],signal,s,row,type,isLastRow," cxOver:{fastMACrossedOverSlow} cxUndr:{fastMACrossedUnderSlow} ",logWithNoSignalChange=True)
+        #logString = f"{row.symbol}:{row.i}:{{row.name if isLastRow else ''}}  => DONT EXIT TREND YET ({trend}) cxOver:{fastMACrossedOverSlow} cxUndr:{fastMACrossedUnderSlow} ADX:{row['ADX']} > {adxThresh} AND OBV:{row['OBV-OSC-PCT-CHNG']} > {obvOscThresh} AND MA20:{row['SLOPE-OSC']} > {maSlopeThresh} "
+    # if isLastRow:
+    #     logging.info(logString)
+    # else:
+    #     logging.debug(logString)
+    
     return s
 
 def followTrendReversal (type, signal, isLastRow, row, df, 
@@ -735,6 +793,7 @@ def followTrendReversal (type, signal, isLastRow, row, df,
             logging.info(f"{row.symbol}:{row.i} => FOLLOW TREND-REVERSAL => Extreme ADX/OBV/MA20 OVERRIDE signal ({signal})  s={s} / last_signal ({last_signal}) TO FOLLOW TREND.ADX:{row['ADX']} > {adxThresh} AND OBV:{obvOsc} > {obvOscThresh} AND MA20:{row['SLOPE-OSC']} > {maSlopeThresh}")
         else:
             logging.debug(f"{row.symbol}:{row.i}:{row.name}  => FOLLOW TREND-REVERSAL => Extreme ADX/OBV/MA20 OVERRIDE signal ({signal})  s={s} / last_signal ({last_signal}) TO FOLLOW TREND.ADX:{row['ADX']} > {adxThresh} AND OBV:{obvOsc} > {obvOscThresh} AND MA20:{row['SLOPE-OSC']} > {maSlopeThresh}")
+    return s 
 
 ######### END OF SIGNAL GENERATION FUNCTIONS #########
 def getOverrideSignal(row,ovSignalGenerators, df):
