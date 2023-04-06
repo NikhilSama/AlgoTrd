@@ -22,6 +22,7 @@ import random
 from freezegun import freeze_time   
 import math
 import threading
+import signals 
 
 import time_loop as tl
 import DownloadHistorical as downloader
@@ -152,7 +153,8 @@ def resampleToMinDF():
         minute_candle_df = tickersToTrack[token]['df']
         
         if tick_df.empty:
-            tickerlog(f"Tick DF is empty for token {token}. {tick_df.empty} {minute_candle_df.empty}")
+            if tickersToTrack[token]['ticker'] != 'NIFTY 50':
+                tickerlog(f"Tick DF is empty for token {token}. {tick_df.empty} {minute_candle_df.empty}")
             continue # no ticks yet, so no resample
         
         if minute_candle_df.empty:

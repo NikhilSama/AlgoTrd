@@ -104,7 +104,7 @@ def logtrade(s='',ticker=0,position=0,q=0,p=0,e='NSE'):
     
 def getQ (lot_size,ltp,betsize, qToExit=0):
     if (lot_size > 1):
-        return lot_size+qToExit if qToExit else lot_size
+        return 10*(lot_size+qToExit) if qToExit else (10*lot_size)
     else:
         return max(1,round(betsize/ltp))+qToExit if qToExit else max(1,round(betsize/ltp))
 
@@ -237,198 +237,15 @@ def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,qToExi
 
 def nse_buy (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,exchange='NSE',qToExit=0):
     return exec(kite,t,exchange,'BUY',lot_size,tick_size,q,ltp,sl,qToExit)
-    
-    # if is_not_tradable(t):
-    #     logging.info(f"{t} is not a tradable instrument.  NSE Buy not executed")
-    #     return
-
-    # if (ltp ==0):
-    #     #Get ltp if not provided
-    #     ltp = kite.ltp([f"NSE:{t}"])[f"NSE:{t}"]['last_price']
-
-    # if q==0:
-    #     q = getQ(1,ltp,bet_size)
-        
-
-    # p = getP(ltp,tick_size,1.001)
-
-    # exch = getExchange(kite,exchange)
-    
-    # logtrade('',t,'BUY',q,p,exchange)
-
-    # # logtrade(f'BUY {t} Q:{q} P:{p} LTP:{ltp} Tick:{tick_size}',
-    # #          t,'BUY',q,p)
-
-    # #1 Min TTL LIMIT ORDER priced really as a market order (10% above market)
-    # try:
-    #     order_id = kite.place_order(variety=kite.VARIETY_REGULAR,tradingsymbol=t,
-    #                  exchange=exch,
-    #                  transaction_type=kite.TRANSACTION_TYPE_BUY,
-    #                  quantity=q,
-    #                  order_type=kite.ORDER_TYPE_LIMIT,
-    #                  product=kite.PRODUCT_MIS,
-    #                  validity=kite.VALIDITY_TTL, price = p, validity_ttl = 1)
-    #     #SL to accompany
-    #     if (sl):
-    #         order_id = kite.place_order(variety=kite.VARIETY_REGULAR,tradingsymbol=t,
-    #                                     exchange=exch,
-    #                                     transaction_type=kite.TRANSACTION_TYPE_SELL,
-    #                                     quantity=q,
-    #                                     order_type=kite.ORDER_TYPE_SL,
-    #                                     product=kite.PRODUCT_MIS,
-    #                                     trigger_price=getP(ltp,tick_size,0.9), 
-    #                                     price = getP(ltp,tick_size,.85))
-    # except Exception as e:
-    #     print(f'NSE Buy Failed for {t}')
-    #     print(e.args[0])
-    #     return -1
-    # return order_id
-
 
 def nse_sell (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,exchange='NSE',qToExit=0):
     return exec(kite,t,exchange,'SELL',lot_size,tick_size,q,ltp,sl,qToExit)
-    # if is_not_tradable(t):
-    #     logging.info(f"{t} is not a tradable instrument.  NSE Sell not executed")
-    #     return
-
-    # if (ltp ==0):
-    #     #Get ltp if not provided
-    #     ltp = kite.ltp([f"NSE:{t}"])[f"NSE:{t}"]['last_price']
-
-    # if q==0:
-    #     q = getQ(1,ltp,bet_size)
-
-    # p = getP(ltp,tick_size,0.999)
-
-    # exch = getExchange(kite,exchange)
-    # logtrade('',t,'SELL',q,p,exchange)
-    # # logtrade(f'{exchange} SELL {t} Q:{q} P:{p} LTP:{ltp} Tick:{tick_size}',
-    # #          t,'SELL',q,p)
-
-    # #1 Min TTL LIMIT ORDER priced really as a market order (10% above market)
-    # try:
-    #     order_id = kite.place_order(variety=kite.VARIETY_REGULAR,tradingsymbol=t,
-    #                  exchange=exch,
-    #                  transaction_type=kite.TRANSACTION_TYPE_SELL,
-    #                  quantity=q,
-    #                  order_type=kite.ORDER_TYPE_LIMIT,
-    #                  product=kite.PRODUCT_MIS,
-    #                  validity=kite.VALIDITY_TTL, price = p, validity_ttl = 1)
-    #     #SL to accompany
-    #     if (sl):
-    #         order_id = kite.place_order(variety=kite.VARIETY_REGULAR,tradingsymbol=t,
-    #                                     exchange=kite.EXCHANGE_NFO,
-    #                                     transaction_type=kite.TRANSACTION_TYPE_BUY,
-    #                                     quantity=q,
-    #                                     order_type=kite.ORDER_TYPE_SL,
-    #                                     product=kite.PRODUCT_MIS,
-    #                                     trigger_price=getP(ltp,tick_size,0.9), 
-    #                                     price = getP(ltp,tick_size,.85))
-    # except Exception as e:
-    #     print(f'NSE Buy Failed for {t}')
-    #     print(e.args[0])
-    #     return -1
-    # return order_id
-
-# def nse_exit (kite,t,lot_size=1,tick_size=0.05):
-#     positions = kite.holdings()
-
-#     logtrade(f"{datetime.now(ist)}NSE EXIT {t} lot_size: {lot_size} tick_size{tick_size}")
-
-#     for position in positions:
-#         #print(position)
-#         symb = position['tradingsymbol']
-#         if t == gettFromOption(symb):
-#             #print ("has it")
-#             q = position['quantity']
-#             ltp = position['last_price']
-#             if (q>0):
-#                 #Long position, need to sell to exit
-#                 nse_sell(kite,symb,lot_size,tick_size, q,ltp)
-#             else:
-#                 #Short position, need to buy to exit
-#                 nse_buy(kite,symb,lot_size,tick_size, -1*q,ltp)
-                
-            
 
 def nfo_buy (kite,t,lot_size=1,tick_size=0.5, q=1,ltp=0,sl=0,qToExit=0):
     return exec(kite,t,'NFO', 'BUY', lot_size,tick_size,q,ltp,sl,qToExit)
-
-    if (ltp ==0):
-        #Get ltp if not provided
-        ltp = kite.ltp([f"NFO:{t}"])[f"NFO:{t}"]['last_price']
-
-    if q==0:
-        q = getQ(lot_size,ltp,bet_size)
-
-    p = getP(ltp,tick_size,1.05)
-
-    logtrade(f"{datetime.now(ist)}NFO BUY {t} Q:{q} P:{p} LTP:: {ltp} Lot:{lot_size} Tick:{tick_size}")
-
-    #1 Min TTL LIMIT ORDER priced really as a market order (10% above market)
-    try:
-        order_id = kite.place_order(variety=kite.VARIETY_REGULAR,tradingsymbol=t,
-                     exchange=kite.EXCHANGE_NFO,
-                     transaction_type=kite.TRANSACTION_TYPE_BUY,
-                     quantity=q,
-                     order_type=kite.ORDER_TYPE_LIMIT,
-                     product=kite.PRODUCT_MIS,
-                     validity=kite.VALIDITY_TTL, price = p, validity_ttl = 1)
-        #SL to accompany
-        # if (sl):
-        #     order_id = kite.place_order(variety=kite.VARIETY_REGULAR,tradingsymbol=t,
-        #                                 exchange=kite.EXCHANGE_NFO,
-        #                                 transaction_type=kite.TRANSACTION_TYPE_SELL,
-        #                                 quantity=q,
-        #                                 order_type=kite.ORDER_TYPE_SL,
-        #                                 product=kite.PRODUCT_MIS,
-        #                                 trigger_price=getP(ltp,tick_size,0.9), 
-        #                                 price = getP(ltp,tick_size,.85))
-    except Exception as e:
-        print(f'NFO Buy Failed for {t}')
-        print(e.args[0])
-        return -1
-    return order_id
-
     
 def nfo_sell (kite, t, lot_size=1, tick_size=0.5, q=0,ltp=0,sl=0, qToExit=0):
     return exec(kite,t,'NFO', 'SELL', lot_size,tick_size,q,ltp,sl,qToExit)
-    if (ltp ==0):
-        #Get ltp if not provided
-        ltp = kite.ltp([f"NFO:{t}"])[f"NFO:{t}"]['last_price']
-    #ltp = kite.ltp([f"NFO:{t}"])
-    if q==0:
-        q = getQ(lot_size,ltp,bet_size)
-
-    p = getP(ltp,tick_size,0.99)
-    logtrade(f"{datetime.now(ist)}NFO SELL {t} Q:{q} P:{p} LTP:: {ltp} Lot:{lot_size} Tick:{tick_size}")
-
- 
-    #1 Min TTL LIMIT ORDER priced really as a market order (10% below market)
-    try:
-        order_id = kite.place_order(variety=kite.VARIETY_REGULAR,tradingsymbol=t,
-                     exchange=kite.EXCHANGE_NFO,
-                     transaction_type=kite.TRANSACTION_TYPE_SELL,
-                     quantity=q,
-                     order_type=kite.ORDER_TYPE_LIMIT,
-                     product=kite.PRODUCT_MIS,
-                     validity=kite.VALIDITY_TTL, price = p, validity_ttl = 1)
-        #SL to accompany
-        # if (sl):
-            # order_id = kite.place_order(variety=kite.VARIETY_REGULAR,tradingsymbol=t,
-            #                             exchange=kite.EXCHANGE_NFO,
-            #                             transaction_type=kite.TRANSACTION_TYPE_BUY,
-            #                             quantity=q,
-            #                             order_type=kite.ORDER_TYPE_SL,
-            #                             product=kite.PRODUCT_MIS,
-            #                             trigger_price=getP(ltp,tick_size,1.1), 
-            #                             price = getP(ltp,tick_size,1.15))
-
-    except Exception as e:
-        print(f'NFO Sell Failed for {t}')
-        print(e.args[0])
-        return -1
-    return order_id
 
 def gettFromOption (string):
     if 'NIFTY' in string:

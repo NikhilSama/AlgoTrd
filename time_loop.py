@@ -54,7 +54,7 @@ signal.signal(signal.SIGTERM, sigterm_handler)
 
 if cfgFreezeGun:
     from freezegun import freeze_time
-    freezeTime = "Mar 28nd, 2023 10:05:00+0530"
+    freezeTime = "Apr 6th, 2023 13:58:00+0530"
     freezer = freeze_time(freezeTime, tick=True)
     freezer.start()
     print ("Freeze gun is on. Time is frozen at: ", freezeTime)
@@ -192,6 +192,7 @@ def generateSignalsAndTrade(df,positions,stock,options,dfStartTime=None):
                         ,signals.getSig_OBV_FILTER
                         ,signals.getSig_exitAnyExtremeADX_OBV_MA20_OVERRIDE
                         ,signals.getSig_followAllExtremeADX_OBV_MA20_OVERRIDE
+                        ,signals.exitTrendFollowing
                         ]
     overrideSignalGenerators = []   
     signals.applyIntraDayStrategy(df,dataPopulators,signalGenerators,
