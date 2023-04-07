@@ -27,20 +27,14 @@ ist = pytz.timezone('Asia/Kolkata')
 tickerStatus = {}
 
 def updateCFG(ma_slope_thresh, ma_slope_thresh_yellow_multiplier, \
-                         ma_slope_slope_thresh, obv_osc_thresh, \
-                         obv_osc_thresh_yellow_multiplier, ovc_osc_slope_thresh, \
-                         override_multiplier):
+                         obv_osc_thresh, \
+                         obv_osc_thresh_yellow_multiplier):
     global maSlopeThresh,maSlopeThreshYellowMultiplier, \
-        maSlopeSlopeThresh,obvOscThresh, \
-            obvOscThreshYellowMultiplier, \
-                obvOscSlopeThresh,overrideMultiplier
+        obvOscThresh, obvOscThreshYellowMultiplier, overrideMultiplier
     maSlopeThresh = ma_slope_thresh
     maSlopeThreshYellowMultiplier = ma_slope_thresh_yellow_multiplier
-    maSlopeSlopeThresh = ma_slope_slope_thresh
     obvOscThresh =  obv_osc_thresh
     obvOscThreshYellowMultiplier = obv_osc_thresh_yellow_multiplier
-    obvOscSlopeThresh = ovc_osc_slope_thresh
-    overrideMultiplier = override_multiplier
     
 def printCFG():
     print(f"maSlopeThresh: {maSlopeThresh}")
@@ -209,7 +203,21 @@ def isAlmostLow(value,threshold,multiplier):
                  or isSuperLow(value,threshold,multiplier))) and \
         (value <= -threshold*multiplier)
 
-def valueBreachedThreshold (value,threshold,slope,
+def valueBreachedThreshold (value,threshold,type='H'):
+    if type == 'H':
+        return value >= threshold
+    elif type == 'L':
+        return value <= -threshold
+    elif type == 'H_OR_L':
+        if value >= threshold:
+            return 'H'
+        elif value <= -threshold:
+            return 'L'
+    else:
+        logging.warning('valueBreachedThreshold: invalid type')
+    return False
+
+def OLD_valueBreachedThreshold (value,threshold,slope,
                             slopeThreshold,multiplier,type='H'):
     superHigh = value >= threshold/multiplier
     High = (not superHigh) and value >= threshold
@@ -250,23 +258,28 @@ def valueBreachedThreshold (value,threshold,slope,
         return False
 
 def projectedValueBreachedThreshold(value,threshold,slope,
-                                    slopeThreshold,multiplier,type):
-    #Calc projectedValue is where the value will be after {candlesToProject}
-    #if it starts at value and continues at current slope levels
-    for counter in range(numCandlesForSlopeProjection):
-        #logging.debug(f"counter is {counter} and value is {value} and slope is {slope} and threshold is {threshold}")
-        value = (value + slope) # calculate new value of x after one candle
-    return valueBreachedThreshold(value,threshold,0,0.1,multiplier,type)
+                                    multiplier,type):
+    if valueBreachedThreshold(value,threshold*multiplier,type) == False:
+        return False # we only project slope if at least close to threshold  
+    value = projectedValue(value,slope)
+    return valueBreachedThreshold(value,threshold,type)
 
 def valueOrProjectedValueBreachedThreshold(value,threshold,slope,
-                                    slopeThreshold,multiplier,type):
-    p = projectedValueBreachedThreshold(value,threshold,slope,
-                                    slopeThreshold,multiplier,type)
+                                            multiplier,type):
+    p = valueBreachedThreshold(value,threshold,type)
     if p == False:
-        return valueBreachedThreshold(value,threshold,slope,
-                                    slopeThreshold,multiplier,type)
+        return projectedValueBreachedThreshold(value,threshold,slope,multiplier,type)
     else:
         return p
+def projectedValue(value,slope):
+    #Calc projectedValue is where the value will be after {candlesToProject}
+    #if it starts at value and continues at current slope levels
+
+    for counter in range(numCandlesForSlopeProjection):
+        #print(f"value is {value} and threshold is {threshold} and slope is {slope}")
+        #logging.debug(f"counter is {counter} and value is {value} and slope is {slope} and threshold is {threshold}")
+        value = (value + slope) # calculate new value of x after one candle
+    return value
 def reversalWillComplete(value,threshold,slope,
                          slopeThreshold,multiplier):
     superHigh = value >= threshold/multiplier
@@ -376,9 +389,9 @@ def logSignal(msg,reqData,signal,s,row,window,isLastRow,extra='',logWithNoSignal
     rowPrice = f'p:{round(row["Adj Close"],1)} '
     sigInfo = f'sig:{"-" if np.isnan(signal) else signal} s:{"-" if np.isnan(s) else s} {"E" if window == 1 else "X"} '
     dataStrings = {
-        "adxData" : f"ADX:{round(row['ADX'],1)} > {adxThresh}(*{round(adxThreshYellowMultiplier,1)}) adxSLP:{round(row['ADX-PCT-CHNG'],2)}>{adxSlopeThresh} ",
-        "maSlpData" : f"maSlp:{round(row['SLOPE-OSC'],2)} >= {maSlopeThresh}(*{maSlopeThreshYellowMultiplier}) maSlpChng:{round(row['SLOPE-OSC-SLOPE'],2)}>{maSlopeSlopeThresh} ",
-        "obvData" : f"OBV:{round(row['OBV-OSC'],2)} > {obvOscThresh}(*{obvOscThreshYellowMultiplier}) obvSLP:{round(row['OBV-OSC-PCT-CHNG'],2)}>{obvOscSlopeThresh} " if "OBV-OSC" in row else 'No Volume Data'
+        "adxData" : f"ADX:{round(row['ADX'],1)} > {adxThresh}(*{round(adxThreshYellowMultiplier,1)}) adxSLP:{round(row['ADX-PCT-CHNG'],2)}*{numCandlesForSlopeProjection} ",
+        "maSlpData" : f"maSlp:{round(row['SLOPE-OSC'],2)} >= {maSlopeThresh}(*{maSlopeThreshYellowMultiplier}) maSlpChng:{round(row['SLOPE-OSC-SLOPE'],2)}>*{numCandlesForSlopeProjection} ",
+        "obvData" : f"OBV:{round(row['OBV-OSC'],2)} > {obvOscThresh}(*{obvOscThreshYellowMultiplier}) obvSLP:{round(row['OBV-OSC-PCT-CHNG'],2)}>*{numCandlesForSlopeProjection} " if "OBV-OSC" in row else 'No Volume Data'
     }
     dataString = ''
     for key in reqData:
@@ -469,7 +482,7 @@ def getSig_ADX_FILTER (type,signal, isLastRow,row,df):
     s = signal
     
     if valueOrProjectedValueBreachedThreshold(row['ADX'],adxThresh,row['ADX-PCT-CHNG'],
-                                              adxSlopeThresh,adxThreshYellowMultiplier,"H"):
+                                            adxThreshYellowMultiplier,"H"):
         
         i = df.index.get_loc(row.name) # get index of current row
         rollbackCandles = round(adxLen*.6) # how many candles to look back
@@ -498,7 +511,7 @@ def getSig_MASLOPE_FILTER (type,signal, isLastRow,row,df):
     s=signal
     breached = valueOrProjectedValueBreachedThreshold(row['SLOPE-OSC'],
                                       maSlopeThresh,row['SLOPE-OSC-SLOPE'],
-                                      maSlopeSlopeThresh, maSlopeThreshYellowMultiplier, "H_OR_L")
+                                      maSlopeThreshYellowMultiplier, "H_OR_L")
 
     # Since this is a FILTER, we only negate long and short signals
     # on extreme MSSLOPE.
@@ -532,7 +545,7 @@ def getSig_OBV_FILTER (type,signal, isLastRow,row, df):
     # for nan or 0, we just return the signal
     
     breached = valueOrProjectedValueBreachedThreshold(row['OBV-OSC'],obvOscThresh,
-                    row['OBV-OSC-PCT-CHNG'], obvOscSlopeThresh, 
+                    row['OBV-OSC-PCT-CHNG'], 
                     obvOscThreshYellowMultiplier, "H_OR_L")
 
     if breached == False:
@@ -581,24 +594,18 @@ def getSig_exitAnyExtremeADX_OBV_MA20_OVERRIDE (type, signal, isLastRow, row, df
     positionToAnalyse =  getTickerPosition(row['symbol'])    
     
     if ('OBV-OSC' in row) and (not np.isnan(row['OBV-OSC'])):
-        obvBreached = valueBreachedThreshold(row['OBV-OSC'],obvOscThresh,
-                                    row['OBV-OSC-PCT-CHNG'],obvOscSlopeThresh,
-                                    obvOscThreshYellowMultiplier, "H_OR_L")
+        obvBreached = valueBreachedThreshold(row['OBV-OSC'],obvOscThresh, "H_OR_L")
     else:
         obvBreached = False
     
     if not np.isnan(row['ADX']):
-        adxBreached = valueBreachedThreshold(row['ADX'],adxThresh,
-                                    row['ADX-PCT-CHNG'],adxSlopeThresh,
-                                    adxThreshYellowMultiplier, "H")
+        adxBreached = valueBreachedThreshold(row['ADX'],adxThresh, "H")
     else:
         adxBreached = False
     
     if not np.isnan(row['SLOPE-OSC']):
         slopebreached = valueBreachedThreshold(row['SLOPE-OSC'],
-                                        maSlopeThresh,row['SLOPE-OSC-SLOPE'],
-                                        maSlopeSlopeThresh, 
-                                        maSlopeThreshYellowMultiplier, "H_OR_L")
+                                        maSlopeThresh, "H_OR_L")
     else:
         slopebreached = False
         
@@ -644,6 +651,8 @@ def getSig_followAllExtremeADX_OBV_MA20_OVERRIDE (type, signal, isLastRow, row, 
     s = signal 
     adxIsHigh = 1 if row['ADX'] >= adxThresh else 0
     obvIsHigh = 1 if (('OBV-OSC' in row) and (abs(row['OBV-OSC']) >= obvOscThresh)) else 0
+    # if adx and obv are high, then maSlope needs to be just somewhat high (yello multiplier)
+    # obv and adx are more telling of trends than ma which could be delayed or less extreme
     slopeIsHigh = 1 if abs(row['SLOPE-OSC']) >= maSlopeThresh*maSlopeThreshYellowMultiplier else 0
     
     obvOsc = None if (not 'OBV-OSC' in row) else row['OBV-OSC']
@@ -691,38 +700,33 @@ def exitTrendFollowing(type, signal, isLastRow, row, df,
     # oldSlowMA = df.iloc[i - 1,df.columns.get_loc('ma20')]  
     # oldFastMA = df.iloc[i - 1,df.columns.get_loc('MA-FAST')]
     
-    adxIsNotChanging = isNotChanging(row['ADX-PCT-CHNG'], adxSlopeThresh)
-    adxIsGettingLower = isGettingLower(row['ADX-PCT-CHNG'], adxSlopeThresh)
-    
-    maIsNotChanging = isNotChanging(row['SLOPE-OSC'], maSlopeThresh)
-    maIsGettingLower = isGettingLower(row['SLOPE-OSC'], maSlopeThresh)
-    maIsGettingHigher = isGettingHigher(row['SLOPE-OSC'], maSlopeThresh)
+    adxIsGettingLower = projectedValue(row['ADX'],row['ADX-PCT-CHNG']) <= adxThresh
+    maIsGettingLower = projectedValue(row['SLOPE-OSC'], row['SLOPE-OSC-SLOPE']) <= maSlopeThresh
+    maIsGettingHigher = projectedValue(row['SLOPE-OSC'], row['SLOPE-OSC-SLOPE']) >= -maSlopeThresh
     
     fastMACrossedOverSlow = row['MA-FAST'] >= row['ma20']
     fastMACrossedUnderSlow = row['MA-FAST'] <= row['ma20']
     
     if 'OBV-OSC-PCT-CHNG' in row:
-        obvIsNotChanging = isNotChanging(row['OBV-OSC-PCT-CHNG'], obvOscSlopeThresh)
-        obvIsGettingLower = isGettingLower(row['OBV-OSC-PCT-CHNG'], obvOscSlopeThresh)
-        obvIsGettingHigher = isGettingHigher(row['OBV-OSC-PCT-CHNG'], obvOscSlopeThresh)
+        obvIsGettingLower = projectedValue(row['OBV-OSC'], row['OBV-OSC-PCT-CHNG']) <= obvOscThresh
+        obvIsGettingHigher = projectedValue(row['OBV-OSC'], row['OBV-OSC-PCT-CHNG']) >= -obvOscThresh
     else:
-        obvIsNotChanging = True
-        obvIsGettingLower = False
-        obvIsGettingHigher = False
+        obvIsGettingLower = True
+        obvIsGettingHigher = True
             
     #This ticker is trending, lets see if its time to exit
     trend = getTickerTrend(row.symbol)
     if trend == 1:
         if fastMACrossedUnderSlow and \
-            (adxIsGettingLower or adxIsNotChanging) and \
-            (maIsGettingLower or maIsNotChanging) and \
-            (obvIsGettingLower or obvIsNotChanging):
+            (adxIsGettingLower) and \
+            (maIsGettingLower) and \
+            (obvIsGettingLower):
             s = 0
     elif trend == -1:   
         if fastMACrossedOverSlow and \
-            (adxIsGettingLower or adxIsNotChanging) and \
-            (maIsGettingHigher or maIsNotChanging) and \
-            (obvIsGettingHigher or obvIsNotChanging):
+            (adxIsGettingLower) and \
+            (maIsGettingHigher) and \
+            (obvIsGettingHigher):
             s = 0
     else:
         logging.error("Wierd ! trend should always be 1 or -1")
@@ -753,22 +757,20 @@ def followTrendReversal (type, signal, isLastRow, row, df,
     maSlopeIsGettingHigher = isGettingHigher(row['SLOPE-OSC'], maSlopeThresh)
     slopeOscIsWillCrossOverLowThreshold = projectedValueBreachedThreshold \
         (row['SLOPE-OSC'], -maSlopeThresh, maSlopeThreshYellowMultiplier,
-         row['SLOPE-OSC-SLOPE'], \
-            maSlopeSlopeThresh, 'H')
+         row['SLOPE-OSC-SLOPE'], 'H')
     slopeHasReversedUp = maSlopeIsLow and maSlopeIsGettingHigher and slopeOscIsWillCrossOverLowThreshold
         
     maSlopeIsHigh = isAlmostHigh(row['SLOPE-OSC'], maSlopeThresh, maSlopeThreshYellowMultiplier)
     maSlopeIsGettingLower = isGettingLower(row['SLOPE-OSC'], maSlopeThresh)
     slopeOscIsWillCrossUnderHighThreshold = projectedValueBreachedThreshold \
         (row['SLOPE-OSC'], -maSlopeThresh, maSlopeThreshYellowMultiplier,
-         row['SLOPE-OSC-SLOPE'], \
-            maSlopeSlopeThresh, 'L')
+         row['SLOPE-OSC-SLOPE'], 'L')
     slopeHasReversedDn = maSlopeIsHigh and maSlopeIsGettingLower and slopeOscIsWillCrossUnderHighThreshold
     
     adxAboveYellow = row['ADX'] > (adxThresh*adxThreshYellowMultiplier)
     
     obvBreached = valueOrProjectedValueBreachedThreshold(row['OBV-OSC'],obvOscThresh,
-                    row['OBV-OSC-PCT-CHNG'],obvOscSlopeThresh, 
+                    row['OBV-OSC-PCT-CHNG'], 
                     obvOscThreshYellowMultiplier, "H_OR_L")
 
     if slopeHasReversedUp and adxAboveYellow and (obvBreached == 'H'):
