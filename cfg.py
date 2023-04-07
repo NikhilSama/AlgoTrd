@@ -23,13 +23,10 @@ cfgDict = {
     'adxThresh': 20,
     'adxThreshYellowMultiplier': 0.7,
     'numCandlesForSlopeProjection':2,
-    'adxSlopeThresh': 0.6,
     'maSlopeThresh': 1,
     'maSlopeThreshYellowMultiplier': 0.7,
-    'maSlopeSlopeThresh': 0.1,
     'obvOscThresh': 0.2,
     'obvOscThreshYellowMultiplier': 0.7,
-    'obvOscSlopeThresh': 0.1,
     'cfgObvMaxMinDiff_MaxLookbackCandles': 200,
     'cfgNumConditionsForTrendFollow': 3,
     'includeOptions': False,
@@ -41,7 +38,6 @@ cfgDict = {
         # ,
         # 'options'
         ],
-    'overrideMultiplier': 1.2,
 # google cloud specific stuff 
     'dbhost' : 'localhost',
     'dbname' : 'trading',

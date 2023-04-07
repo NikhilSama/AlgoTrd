@@ -91,36 +91,32 @@ def run_instance(args):
 def argGenerator():
 
     ma_lens = [10, 20, 30]
-    band_widths = [1,1.5,2,2.5,3]
-    fast_ma_lens = [2,5,7,9]
+    band_widths = [1, 2, 3]
+    fast_ma_lens = [5,7,9]
     adx_lens = [14,20]
-    adx_thresholds = [15, 20, 25, 30, 35]
-    adx_thresh_yellow_multipliers = [0.7, 0.9,1]
+    adx_thresholds = [20, 25, 30]
+    adx_thresh_yellow_multipliers = [0.7, 0.9, 1]
     num_candles_for_slope_proj = [2,6]
     atr_lens = [14,20]
-    super_lens = [200]
-    super_bandWidths = [2.5]
-    adx_slope_threshes = [0.2, 0.6, 1]
     for params in itertools.product(ma_lens, band_widths, fast_ma_lens, adx_lens, adx_thresholds, adx_thresh_yellow_multipliers, num_candles_for_slope_proj,
-                                    atr_lens, super_lens, super_bandWidths, adx_slope_threshes):
-        ma_len, band_width, fast_ma_len, adx_len, adx_thresh, adx_thresh_yellow_multiplier, num_candles, atr_len, super_len, super_bandWidth, adx_slope_thresh, \
+                                    atr_lens):
+        ma_len, band_width, fast_ma_len, adx_len, adx_thresh, adx_thresh_yellow_multiplier, num_candles, atr_len, \
         = params
         #check w db to see if this combination has been run before or is currently running
         # if not then mark it as running
         # do it
         # check that csv exists and mark it as done in db 
         
-        argString = f"maLen:{ma_len} bandWidth:{band_width} fastMALen:{fast_ma_len} adxLen:{adx_len} adxThresh:{adx_thresh} adxThreshYellowMultiplier:{adx_thresh_yellow_multiplier} numCandlesForSlopeProjection:{num_candles} atrLen:{atr_len} superLen:{super_len} superBandWidth:{super_bandWidth} adxSlopeThresh:{adx_slope_thresh}"
+        argString = f"maLen:{ma_len} bandWidth:{band_width} fastMALen:{fast_ma_len} adxLen:{adx_len} adxThresh:{adx_thresh} adxThreshYellowMultiplier:{adx_thresh_yellow_multiplier} numCandlesForSlopeProjection:{num_candles} atrLen:{atr_len}"
                 
-        # will run 3^8 * 4 = 26.2K times == 10 parallel on pc, 8 on mac, 8 more on a amy mac
-        #so 26 in parallel .. 1000 parallel runs will do it         
-        #print(f'{cloud_args} {argString}')
+        # will run 3^5=243 * 2^3=8 = 1944 times == approx 10K min @ 5 min per run 
+        # 100 parallel cpu = 1K min = 16.6 hrs * $4/hr = $66.6
         yield f'{cloud_args} {argString}'
     
 
 def argGeneratorTest():
     ma_lens = [20, 25]
-    band_widths = [2,2.5]
+    band_widths = [2]
     for params in itertools.product(ma_lens, band_widths):
         ma_len, band_width = params
         argString = f"maLen:{ma_len} bandWidth:{band_width}"

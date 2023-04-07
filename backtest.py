@@ -132,6 +132,7 @@ def backtest(t,i='minute',exportCSV=False):
 
     tearsheet,tearsheetdf = perf.tearsheet(df)
     print(f'Total Return: {tearsheet["return"]*100}%')
+    print(f'Sharpe: {tearsheet["sharpe_ratio"]}')
     # print(f'Num Trades: {tearsheet["num_trades"]}')
     # print(f'Avg Return Per Trade: {tearsheet["average_per_trade_return"]*100}%')
     # print(f'Std Dev of Returns: {tearsheet["std_dev_pertrade_return"]*100}%')
@@ -221,10 +222,8 @@ def backtestCombinator():
     
     ma_slope_threshes = [0.5,1,1.5]
     ma_slope_thresh_yellow_multipliers = [0.5,0.7,0.9]
-    ma_slope_slope_threshes = [0.1,0.3,0.7]
     obv_osc_threshes = [0.1, 0.2, 0.4]
     obv_osc_thresh_yellow_multipliers = [0.7,0.9,1]
-    obv_osc_slope_threshes = [0.1,0.2,0.5]
 
     # ma_slope_threshes = [0.5]
     # ma_slope_thresh_yellow_multipliers = [0.5]
@@ -232,11 +231,9 @@ def backtestCombinator():
     # obv_osc_threshes = [0.1]
     # obv_osc_thresh_yellow_multipliers = [0.7]
     # obv_osc_slope_threshes = [0.1,0.2]
-
-    override_multipliers = [1]
     
-    # This loop will run 3^7 = 2187 times; each run will be about 
-    # 1 second, so total 2187 seconds = 36 minutes
+    # This loop will run 3^4 = 89 times; each run will be about 
+    # 3 second, so total 267 seconds = 4.5 minutes
     # run a combo 
     
     # when done w for loop write results to csv and mark done in db 
@@ -245,25 +242,21 @@ def backtestCombinator():
     # output fname and csv row to contain timeframe in 
     # start and end times, symbol, and all the parameters
         
-    for params in itertools.product(ma_slope_threshes, ma_slope_thresh_yellow_multipliers, ma_slope_slope_threshes,
-                                obv_osc_slope_threshes, obv_osc_threshes, obv_osc_thresh_yellow_multipliers, override_multipliers):
-        ma_slope_thresh, ma_slope_thresh_yellow_multiplier, ma_slope_slope_thresh, obv_osc_thresh, obv_osc_thresh_yellow_multiplier, ovc_osc_slope_thresh, \
-            override_multiplier = params
+    for params in itertools.product(ma_slope_threshes, ma_slope_thresh_yellow_multipliers,
+                                 obv_osc_threshes, obv_osc_thresh_yellow_multipliers):
+        ma_slope_thresh, ma_slope_thresh_yellow_multiplier, obv_osc_thresh, obv_osc_thresh_yellow_multiplier, \
+             = params
 
         signals.updateCFG(ma_slope_thresh, ma_slope_thresh_yellow_multiplier, \
-                         ma_slope_slope_thresh, obv_osc_thresh, \
-                         obv_osc_thresh_yellow_multiplier, ovc_osc_slope_thresh, \
-                         override_multiplier)
+                         obv_osc_thresh, \
+                         obv_osc_thresh_yellow_multiplier)
         tearsheetdf = backtest('NIFTY23APRFUT','minute')
         
         # Add in config variables we are looping through to the tearsheetdf
         tearsheetdf['ma_slope_thresh'] = ma_slope_thresh
         tearsheetdf['ma_slope_thresh_yellow_multiplier'] = ma_slope_thresh_yellow_multiplier
-        tearsheetdf['ma_slope_slope_thresh'] = ma_slope_slope_thresh
         tearsheetdf['obv_osc_thresh'] = obv_osc_thresh
         tearsheetdf['obv_osc_thresh_yellow_multiplier'] = obv_osc_thresh_yellow_multiplier
-        tearsheetdf['ovc_osc_slope_thresh'] = ovc_osc_slope_thresh
-        tearsheetdf['override_multiplier'] = override_multiplier
         tearsheetdf['ticker'] = 'NIFTY23APRFUT'
         tearsheetdf['interval'] = 'minute'
         tearsheetdf['startTime'] = zgetFrom
@@ -275,6 +268,7 @@ def backtestCombinator():
     
     # write the DataFrame to a SQL table
     # Connect to the MySQL database
+    #NOTE: HACK: THIS performanceTOCSV also parses arv, and adds it to the performance df
     performance = performanceToCSV(performance)
     mark_task_complete()
     with open(utils.fileNameFromArgs('Data/backtest/combo/wip/niftyPerf-'), 'w') as f:
