@@ -217,15 +217,13 @@ def backtestCombinator():
     
     performance = pd.DataFrame()
     
-    ma_slope_threshes = [1]
-    ma_slope_thresh_yellow_multipliers = [0.7]
-    ma_slope_slope_threshes = [0.1]
-    obv_osc_threshes = [0.1, 0.2, 0.3]
-    obv_osc_thresh_yellow_multipliers = [0.7]
-    obv_osc_slope_threshes = [0.3]
+    ma_slope_threshes = [0.5,1,1.5]
+    ma_slope_thresh_yellow_multipliers = [0.5,0.7,0,0.9]
+    ma_slope_slope_threshes = [0.1,0.3,0.7]
+    obv_osc_threshes = [0.1, 0.2, 0.4]
+    obv_osc_thresh_yellow_multipliers = [0.7,0.9,1]
+    obv_osc_slope_threshes = [0.1,0.2,0.5]
     override_multipliers = [1]
-    ITER = 0
-    
     
     # This loop will run 3^7 = 2187 times; each run will be about 
     # 1 second, so total 2187 seconds = 36 minutes

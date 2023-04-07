@@ -65,21 +65,22 @@ def run_instance(args):
         subprocess.call(f'python3 backtest.py {args}', shell=True) 
     except Exception as e:
         print('Error in run_instance():', e)
-
+iter = 0
 def argGenerator():
 
-    ma_lens = [20, ]
-    band_widths = [2]
-    fast_ma_lens = [7]
-    adx_lens = [14]
+    ma_lens = [10, 20, 30]
+    band_widths = [1,1.5,2,2.5,3]
+    fast_ma_lens = [2,5,7,9]
+    adx_lens = [14,20]
     adx_thresholds = [15, 20, 25, 30, 35]
-    adx_thresh_yellow_multipliers = [0.7, 0.9]
-    num_candles_for_slope_proj = [2,  6]
-    atr_lens = [14]
+    adx_thresh_yellow_multipliers = [0.7, 0.9,1]
+    num_candles_for_slope_proj = [2,6]
+    atr_lens = [14,20]
     super_lens = [200]
     super_bandWidths = [2.5]
     adx_slope_threshes = [0.2, 0.6, 1]
-    
+    global iter
+    iter = 0 
     for params in itertools.product(ma_lens, band_widths, fast_ma_lens, adx_lens, adx_thresholds, adx_thresh_yellow_multipliers, num_candles_for_slope_proj,
                                     atr_lens, super_lens, super_bandWidths, adx_slope_threshes):
         ma_len, band_width, fast_ma_len, adx_len, adx_thresh, adx_thresh_yellow_multiplier, num_candles, atr_len, super_len, super_bandWidth, adx_slope_thresh, \
@@ -98,7 +99,8 @@ def argGenerator():
         
         # will run 3^8 * 4 = 26.2K times == 10 parallel on pc, 8 on mac, 8 more on a amy mac
         #so 26 in parallel .. 1000 parallel runs will do it         
-        print(f'{cloud_args} {argString}')
+        print(f'{iter} : {cloud_args} {argString}')
+        iter = iter + 1
         yield f'{cloud_args} {argString}'
     
 
@@ -129,7 +131,7 @@ if __name__ == '__main__':
     pool = Pool(cpu_count())
 
     # Execute instances in parallel using the Pool object
-    pool.map(run_instance, argGeneratorTest())
+    pool.map(run_instance, argGenerator())
 
     # Close the Pool object to free resources
     pool.close()
