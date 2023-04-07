@@ -24,11 +24,44 @@ from plotting import plot_backtest,plot_stock_and_option
 import backtest_log_setup
 import itertools 
 from pathlib import Path
+from sqlalchemy import create_engine
+import mysql.connector
 
 
 
 import utils
 import sys
+
+def getTaskNameFromArgs():
+    argString = ''
+    args = sys.argv[1:]
+    arg_dict = {}
+    for arg in args:
+        key, value = arg.split(':')
+        if key in ["cacheTickData","zerodha_access_token","dbhost","dbuser", "dbpass" ,"dbname"]:
+            continue
+        argString = argString + ' ' + arg
+    return argString.strip()
+
+def mark_task_complete():
+    task_name = getTaskNameFromArgs()
+    mycursor = mydb.cursor()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    sql = "UPDATE tasks SET status = 1, completed_time = %s WHERE task_name = %s"
+    val = (now,task_name)
+    mycursor.execute(sql, val)
+    mydb.commit()
+
+# Connect to the MySQL database
+mydb = mysql.connector.connect(
+    host="algotrade.cck6cwihhy4y.ap-southeast-1.rds.amazonaws.com",
+    user="trading",
+    password="trading123",
+    database="trading"
+)
+# create a database connection (performance to CSV adds the 
+# argv variables as well to the performance df)
+engine = create_engine('mysql+pymysql://trading:trading123@algotrade.cck6cwihhy4y.ap-southeast-1.rds.amazonaws.com/trading')
 
 #cfg has all the config parameters make them all globals here
 import cfg
@@ -40,15 +73,14 @@ ist = pytz.timezone('Asia/Kolkata')
 tickers = td.get_sp500_tickers()
 nifty = td.get_nifty_tickers()
 index_tickers = td.get_index_tickers()
-zgetFrom = datetime(2023, 3, 25, 10, 0, tzinfo=ist)
-zgetTo = datetime(2023, 3, 28, 15, 30, tzinfo=ist)
+zgetFrom = datetime(2023, 2, 7, 10, 0, tzinfo=ist)
+zgetTo = datetime(2023, 4, 7, 15, 30, tzinfo=ist)
 
 def zget(t,s,e,i):
     #Get latest minute tick from zerodha
     df = downloader.zget(s,e,t,i,includeOptions=includeOptions)
     df = downloader.zColsToDbCols(df)
     return df
-
 def zgetNDays(t,n,e=datetime.now(ist),i="minute"):
     s = e - timedelta(days=n)
     return zget(t, s, e, i)
@@ -97,16 +129,18 @@ def backtest(t,i='minute',exportCSV=False):
 
 
     tearsheet,tearsheetdf = perf.tearsheet(df)
-    print(f'Total Return: {tearsheet["return"]*100}%')
+    # print(f'Total Return: {tearsheet["return"]*100}%')
     # print(f'Num Trades: {tearsheet["num_trades"]}')
-    # print(f'Avg Return Per Trade: {tearsheet["std_dev_pertrade_return"]*100}%')
-    # print(f'Std Dev of Returns: {tearsheet["return"]}')
+    # print(f'Avg Return Per Trade: {tearsheet["average_per_trade_return"]*100}%')
+    # print(f'Std Dev of Returns: {tearsheet["std_dev_pertrade_return"]*100}%')
     # print(f'Skewness: {tearsheet["skewness_pertrade_return"]}')
     # print(f'Kurtosis: {tearsheet["kurtosis_pertrade_return"]}')
+    # pp = pprint.PrettyPrinter(indent=4)
+    # pp.pprint(tearsheet)
     perfTIME = perfProfiler("Tearsheet took", perfTIME)
 
-    if (exportCSV == True):
-        df.to_csv("export.csv")
+    # if (exportCSV == True):
+    #     df.to_csv("export.csv")
     perfTIME = perfProfiler("to CSV", perfTIME)
     perfTIME = perfProfiler("TOTAL", startingTime)
 
@@ -173,6 +207,7 @@ def performanceToCSV(performance):
         performance[key] = value
     perfFileName = utils.fileNameFromArgs('Data/backtest/combo/niftyPerf-')
     performance.to_csv(perfFileName)
+    return performance
 
 def backtestCombinator():
     
@@ -182,13 +217,13 @@ def backtestCombinator():
     
     performance = pd.DataFrame()
     
-    ma_slope_threshes = [0.5, 1, 1.5]
-    ma_slope_thresh_yellow_multipliers = [0.5, 0.7, 0.9]
-    ma_slope_slope_threshes = [0.005, 0.01, 0.015]
+    ma_slope_threshes = [1]
+    ma_slope_thresh_yellow_multipliers = [0.7]
+    ma_slope_slope_threshes = [0.1]
     obv_osc_threshes = [0.1, 0.2, 0.3]
-    obv_osc_thresh_yellow_multipliers = [0.5,0.7,0.9]
-    obv_osc_slope_threshes = [0.1,0.3,0.5]
-    override_multipliers = [1,1.2,1.4]
+    obv_osc_thresh_yellow_multipliers = [0.7]
+    obv_osc_slope_threshes = [0.3]
+    override_multipliers = [1]
     ITER = 0
     
     
@@ -211,7 +246,7 @@ def backtestCombinator():
                          ma_slope_slope_thresh, obv_osc_thresh, \
                          obv_osc_thresh_yellow_multiplier, ovc_osc_slope_thresh, \
                          override_multiplier)
-        tearsheetdf = backtest('HDFCBANK','minute')
+        tearsheetdf = backtest('NIFTY23APRFUT','minute')
         
         # Add in config variables we are looping through to the tearsheetdf
         tearsheetdf['ma_slope_thresh'] = ma_slope_thresh
@@ -221,7 +256,7 @@ def backtestCombinator():
         tearsheetdf['obv_osc_thresh_yellow_multiplier'] = obv_osc_thresh_yellow_multiplier
         tearsheetdf['ovc_osc_slope_thresh'] = ovc_osc_slope_thresh
         tearsheetdf['override_multiplier'] = override_multiplier
-        tearsheetdf['ticker'] = 'HDFCBANK'
+        tearsheetdf['ticker'] = 'NIFTY23APRFUT'
         tearsheetdf['interval'] = 'minute'
         tearsheetdf['startTime'] = zgetFrom
         tearsheetdf['endTime'] = zgetTo
@@ -229,18 +264,20 @@ def backtestCombinator():
         
         performance = pd.concat([performance, tearsheetdf])
 
-        ITER = ITER + 1
-        if (ITER == 5):
-            break
-    performanceToCSV(performance)
+        
+    performance = performanceToCSV(performance)
+    mark_task_complete()
     with open(utils.fileNameFromArgs('Data/backtest/combo/wip/niftyPerf-'), 'w') as f:
         f.write('done')
 
+    # write the DataFrame to a SQL table
+    performance.to_sql('performance', engine, if_exists='append')
 
-#backtestCombinator()       
+
+backtestCombinator()       
 #plot_options(['ASIANPAINT'],10,'minute')
 #backtest('HDFCLIFE','minute',adxThreh=30)
-backtest('NIFTY23APRFUT','minute')
+#backtest('NIFTY23APRFUT','minute')
 #backtest('HDFCLIFE','minute',adxThreh=25)
 #backtest('ASIANPAINT','minute',adxThreh=25)
 #backtest('HDFCLIFE','minute',adxThreh=30)

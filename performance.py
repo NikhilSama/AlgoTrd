@@ -175,7 +175,7 @@ def get_trades (df):
     #exit all positions, therefore returns there are zero anyway
     trades['return'] = trades['return'].shift(-1).fillna(0)
     trades["cum_return"] = (1+trades['return']).cumprod() - 1
-    
+
     return trades
 
 def get_trade_stats (df):
@@ -196,6 +196,9 @@ def tearsheet (df):
     tearsheet["days_in_trade"] = len(np.unique(trades.index.date))
     tearsheet["num_trades"] = len(trades)
     if (tearsheet["num_trades"] > 0):
+        
+        trades['prev_peak_cum_return'] = trades['cum_return'].cummax()
+        trades['drawdown_from_prev_peak'] = trades['cum_return'] - trades['prev_peak_cum_return']
         tearsheet["num_winning_trades"] = len(trades[trades['return'] > 0])
         tearsheet["num_losing_trades"] = len(trades[trades['return'] < 0])
         tearsheet["win_pct"] = tearsheet["num_winning_trades"]/tearsheet["num_trades"]
@@ -203,8 +206,11 @@ def tearsheet (df):
         tearsheet["return per day in trade"] =     tearsheet["return"] / tearsheet["days_in_trade"]
         tearsheet["annualized return"] = tearsheet["return per day in trade"] * 250
         #tearsheet["return_fixed_bet"] = df["cum_bnh_returns"][-1]
+        tearsheet['max_drawdown_from_0'] = trades['cum_return'].min()
+        tearsheet['max_drawdown_from_peak'] = trades['drawdown_from_prev_peak'].min()
         tearsheet["average_per_trade_return"] = trades['return'].mean()
         tearsheet["std_dev_pertrade_return"] = trades['return'].std()
+        tearsheet["sharpe_ratio"] = tearsheet['average_per_trade_return'] / tearsheet['std_dev_pertrade_return']
         tearsheet["skewness_pertrade_return"] = trades['return'].skew()
         tearsheet["kurtosis_pertrade_return"] = trades['return'].kurtosis()
         tearsheet["wins"] = get_trade_stats(trades.loc[trades['return'] > 0, 'return'])

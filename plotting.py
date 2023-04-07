@@ -132,7 +132,7 @@ def plot_backtest(df,trades=None):
     ax9.axhline(y=obvOscSlopeThresh, color='red', linestyle='--')
     ax9.axhline(y=-obvOscSlopeThresh, color='red', linestyle='--')
     
-    if len(df) > 1000:
+    if len(df) > 500:
         plt.show()
         return # dont plot the shaded region if there are too many rows
     

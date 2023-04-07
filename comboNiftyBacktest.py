@@ -1,10 +1,53 @@
-from multiprocessing import Pool
+from multiprocessing import Pool,cpu_count
 import subprocess
 import os
 import pandas as pd
 import sys
 import itertools 
 import time 
+import mysql.connector
+from datetime import datetime
+import socket 
+
+# Connect to the MySQL database
+mydb = mysql.connector.connect(
+    host="algotrade.cck6cwihhy4y.ap-southeast-1.rds.amazonaws.com",
+    user="trading",
+    password="trading123",
+    database="trading"
+)
+
+# Add a task name to the tasks table
+def add_task(task_name):
+    mycursor = mydb.cursor()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    hostname = socket.gethostname()
+    num_cpus = cpu_count()
+
+    sql = "INSERT INTO tasks (task_name,created_time,hostname,num_cpu) VALUES (%s,%s,%s,%s)"
+    val = (task_name,now,hostname,num_cpus)
+    mycursor.execute(sql, val)
+    mydb.commit()
+
+# Check if a task is being worked on by another computer
+def is_task_in_progress(task_name):
+    mycursor = mydb.cursor(buffered=True)
+    mycursor.execute("SELECT * FROM tasks WHERE task_name = %s", (task_name,))
+    result = mycursor.fetchone()
+    mycursor.close()
+
+    if result is not None:
+        return True
+    else:
+        return False
+
+def mark_task_complete(task_name):
+    mycursor = mydb.cursor()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    sql = "UPDATE tasks SET status = 1, completed_time = %s WHERE task_name = %s"
+    val = (now,task_name)
+    mycursor.execute(sql, val)
+    mydb.commit()
 perfTIME = time.time()    
 
 cloud_args=''
@@ -25,17 +68,17 @@ def run_instance(args):
 
 def argGenerator():
 
-    ma_lens = [10, 20, 30]
-    band_widths = [2, 2.5, 3]
-    fast_ma_lens = [5, 7, 10]
-    adx_lens = [10, 14, 20]
-    adx_thresholds = [20, 30, 40]
-    adx_thresh_yellow_multipliers = [0.5, 0.7, 0.9]
-    num_candles_for_slope_proj = [1, 2, 4, 6,]
-    atr_lens = [8,14,20]
+    ma_lens = [20, ]
+    band_widths = [2]
+    fast_ma_lens = [7]
+    adx_lens = [14]
+    adx_thresholds = [15, 20, 25, 30, 35]
+    adx_thresh_yellow_multipliers = [0.7, 0.9]
+    num_candles_for_slope_proj = [2,  6]
+    atr_lens = [14]
     super_lens = [200]
     super_bandWidths = [2.5]
-    adx_slope_threshes = [0.02, 0.06, 0.10]
+    adx_slope_threshes = [0.2, 0.6, 1]
     
     for params in itertools.product(ma_lens, band_widths, fast_ma_lens, adx_lens, adx_thresholds, adx_thresh_yellow_multipliers, num_candles_for_slope_proj,
                                     atr_lens, super_lens, super_bandWidths, adx_slope_threshes):
@@ -46,29 +89,35 @@ def argGenerator():
         # do it
         # check that csv exists and mark it as done in db 
         
+        argString = f"maLen:{ma_len} bandWidth:{band_width} fastMALen:{fast_ma_len} adxLen:{adx_len} adxThresh:{adx_thresh} adxThreshYellowMultiplier:{adx_thresh_yellow_multiplier} numCandlesForSlopeProjection:{num_candles} atrLen:{atr_len} superLen:{super_len} superBandWidth:{super_bandWidth} adxSlopeThresh:{adx_slope_thresh}"
+        
+        if is_task_in_progress(argString):
+            print(f'SKIP - Already running task {argString}')
+            continue
+        add_task(argString)
         
         # will run 3^8 * 4 = 26.2K times == 10 parallel on pc, 8 on mac, 8 more on a amy mac
-        #so 26 in parallel .. 1000 parallel runs will do it 
-        if os.path.exists(f'Data/backtest/combo/wip/niftyPerf--{ma_len}-{band_width}-{fast_ma_len}-{adx_len}-{adx_thresh}-{adx_thresh_yellow_multiplier}-{num_candles}-{atr_len}-{super_len}-{super_bandWidth}-{adx_slope_thresh}.csv'):
-            print(f'SKIP - Already WIP {cloud_args} maLen:{ma_len} bandWidth:{band_width} fastMALen:{fast_ma_len} adxLen:{adx_len} adxThresh:{adx_thresh} adxThreshYellowMultiplier:{adx_thresh_yellow_multiplier} numCandlesForSlopeProjection:{num_candles} atrLen:{atr_len} superLen:{super_len} superBandWidth:{super_bandWidth} adxSlopeThresh:{adx_slope_thresh}')
-            continue
-        
-        print(f'{cloud_args} maLen:{ma_len} bandWidth:{band_width} fastMALen:{fast_ma_len} adxLen:{adx_len} adxThresh:{adx_thresh} adxThreshYellowMultiplier:{adx_thresh_yellow_multiplier} numCandlesForSlopeProjection:{num_candles} atrLen:{atr_len} superLen:{super_len} superBandWidth:{super_bandWidth} adxSlopeThresh:{adx_slope_thresh}')
-        yield f'{cloud_args} maLen:{ma_len} bandWidth:{band_width} fastMALen:{fast_ma_len} adxLen:{adx_len} adxThresh:{adx_thresh} adxThreshYellowMultiplier:{adx_thresh_yellow_multiplier} numCandlesForSlopeProjection:{num_candles} atrLen:{atr_len} superLen:{super_len} superBandWidth:{super_bandWidth} adxSlopeThresh:{adx_slope_thresh}'
+        #so 26 in parallel .. 1000 parallel runs will do it         
+        print(f'{cloud_args} {argString}')
+        yield f'{cloud_args} {argString}'
     
 
 def argGeneratorTest():
-    ma_lens = [10, 20, 25, 30]
-    band_widths = [2, 2.5, 3]
+    ma_lens = [20, 25]
+    band_widths = [2,2.5]
     for params in itertools.product(ma_lens, band_widths):
         ma_len, band_width = params
-        if os.path.exists(f'Data/backtest/combo/wip/niftyPerf--{ma_len}-{band_width}.csv'):
-            print(f'SKIP - Already WIP {cloud_args} maLen:{ma_len} bandWidth:{band_width}')
+        argString = f"maLen:{ma_len} bandWidth:{band_width}"
+        if is_task_in_progress(argString):
+            print(f'SKIP - Already running task {argString}')
             continue
-
-        print(f"{cloud_args} maLen:{ma_len} bandWidth:{band_width}")
-        yield f'{cloud_args} maLen:{ma_len} bandWidth:{band_width}'
-
+        add_task(argString)
+        
+        # will run 3^8 * 4 = 26.2K times == 10 parallel on pc, 8 on mac, 8 more on a amy mac
+        #so 26 in parallel .. 1000 parallel runs will do it         
+        print(f'{cloud_args} {argString}')
+        yield f'{cloud_args} {argString}'
+        
     # for maLen in [20,30]:
     #     for bandWidth in [2,4]:
     #         print(f"{cloud_args} maLen:{maLen} bandWidth:{bandWidth}")
@@ -77,7 +126,7 @@ def argGeneratorTest():
     
 if __name__ == '__main__':
     # Create a Pool object with number of processes equal to number of CPU cores
-    pool = Pool()
+    pool = Pool(cpu_count())
 
     # Execute instances in parallel using the Pool object
     pool.map(run_instance, argGeneratorTest())

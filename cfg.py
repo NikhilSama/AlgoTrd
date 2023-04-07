@@ -20,7 +20,7 @@ cfgDict = {
     'fastMALen': 7,
     'atrLen': 14,
     'adxLen': 14,
-    'adxThresh': 30,
+    'adxThresh': 20,
     'adxThreshYellowMultiplier': 0.7,
     'numCandlesForSlopeProjection':2,
     'adxSlopeThresh': 0.6,
@@ -31,13 +31,13 @@ cfgDict = {
     'obvOscThreshYellowMultiplier': 0.7,
     'obvOscSlopeThresh': 0.1,
     'cfgObvMaxMinDiff_MaxLookbackCandles': 200,
-    'cfgNumConditionsForTrendFollow': 2,
+    'cfgNumConditionsForTrendFollow': 3,
     'includeOptions': False,
     'plot': [
         
         #'trade_returns'
         #,
-       # 'adjCloseGraph'
+        #'adjCloseGraph'
         # ,
         # 'options'
         ],
