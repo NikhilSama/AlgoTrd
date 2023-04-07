@@ -101,7 +101,7 @@ def test(t='ADANIENT',i='minute'):
     signals.applyIntraDayStrategy(df1,dataPopulators,signalGenerators)
 
 def perfProfiler(name,t):
-    #print (f"{name} took {round((time.time() - t)*1000,2)}ms")
+    print (f"{name} took {round((time.time() - t)*1000,2)}ms")
     return time.time()
 
 def backtest(t,i='minute',exportCSV=False):
@@ -112,7 +112,7 @@ def backtest(t,i='minute',exportCSV=False):
         print(f"No data foc {t}")
         return
     #df = zgetNDays(t,days,i=i)
-    perfTime = perfProfiler("ZGET", perfTIME)
+    #perfTime = perfProfiler("ZGET", perfTIME)
     dataPopulators = [signals.populateBB, signals.populateADX, signals.populateOBV]
     signalGenerators = [
                         signals.getSig_BB_CX
@@ -127,11 +127,11 @@ def backtest(t,i='minute',exportCSV=False):
     overrideSignalGenerators = []   
     signals.applyIntraDayStrategy(df,dataPopulators,signalGenerators,
                                   overrideSignalGenerators)
-    perfTIME = perfProfiler("SIGNAL GENERATION", perfTIME)
+    #perfTIME = perfProfiler("SIGNAL GENERATION", perfTIME)
 
 
     tearsheet,tearsheetdf = perf.tearsheet(df)
-    # print(f'Total Return: {tearsheet["return"]*100}%')
+    print(f'Total Return: {tearsheet["return"]*100}%')
     # print(f'Num Trades: {tearsheet["num_trades"]}')
     # print(f'Avg Return Per Trade: {tearsheet["average_per_trade_return"]*100}%')
     # print(f'Std Dev of Returns: {tearsheet["std_dev_pertrade_return"]*100}%')
@@ -139,12 +139,12 @@ def backtest(t,i='minute',exportCSV=False):
     # print(f'Kurtosis: {tearsheet["kurtosis_pertrade_return"]}')
     # pp = pprint.PrettyPrinter(indent=4)
     # pp.pprint(tearsheet)
-    perfTIME = perfProfiler("Tearsheet took", perfTIME)
+    #perfTIME = perfProfiler("Tearsheet took", perfTIME)
 
     # if (exportCSV == True):
     #     df.to_csv("export.csv")
-    perfTIME = perfProfiler("to CSV", perfTIME)
-    perfTIME = perfProfiler("TOTAL", startingTime)
+   # perfTIME = perfProfiler("to CSV", perfTIME)
+    perfTIME = perfProfiler("Backtest:", startingTime)
 
     if (plot == [] or (not 'trades' in tearsheet.keys())):
         return tearsheetdf
@@ -220,7 +220,7 @@ def backtestCombinator():
     performance = pd.DataFrame()
     
     ma_slope_threshes = [0.5,1,1.5]
-    ma_slope_thresh_yellow_multipliers = [0.5,0.7,0,0.9]
+    ma_slope_thresh_yellow_multipliers = [0.5,0.7,0.9]
     ma_slope_slope_threshes = [0.1,0.3,0.7]
     obv_osc_threshes = [0.1, 0.2, 0.4]
     obv_osc_thresh_yellow_multipliers = [0.7,0.9,1]
