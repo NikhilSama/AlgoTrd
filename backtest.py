@@ -45,11 +45,13 @@ def getTaskNameFromArgs():
 
 def mark_task_complete():
     task_name = getTaskNameFromArgs()
+    task_name = ' '+task_name
     mycursor = mydb.cursor()
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     sql = "UPDATE tasks SET status = 1, completed_time = %s WHERE task_name = %s"
     val = (now,task_name)
     mycursor.execute(sql, val)
+    #print(mycursor.statement)
     mydb.commit()
 
 # Connect to the MySQL database
@@ -223,6 +225,14 @@ def backtestCombinator():
     obv_osc_threshes = [0.1, 0.2, 0.4]
     obv_osc_thresh_yellow_multipliers = [0.7,0.9,1]
     obv_osc_slope_threshes = [0.1,0.2,0.5]
+
+    # ma_slope_threshes = [0.5]
+    # ma_slope_thresh_yellow_multipliers = [0.5]
+    # ma_slope_slope_threshes = [0.1]
+    # obv_osc_threshes = [0.1]
+    # obv_osc_thresh_yellow_multipliers = [0.7]
+    # obv_osc_slope_threshes = [0.1,0.2]
+
     override_multipliers = [1]
     
     # This loop will run 3^7 = 2187 times; each run will be about 

@@ -53,6 +53,8 @@ perfTIME = time.time()
 cloud_args=''
 if 'cloud' in sys.argv:
     cloud_args = 'cacheTickData:True zerodha_access_token:b2yEqzNSxUZxU6W7Uu6q7NLfVwvxCoM4 dbhost:algotrade.cck6cwihhy4y.ap-southeast-1.rds.amazonaws.com dbuser:trading dbpass:trading123 dbname:trading'
+iter = 0
+
 def run_instance(args):
     try: 
         arg_dict = {}
@@ -61,11 +63,20 @@ def run_instance(args):
             key, value = arg.split(':')
             arg_dict[key] = value
             arg_array.append(arg)
+        
+        global iter
+        
+        iter = iter + 1
+
+        print(f'{iter}: Runing: {args}')
+        if is_task_in_progress(args):
+            print(f'SKIP - Already running task {args}')
+            return
+        add_task(args)
 
         subprocess.call(f'python3 backtest.py {args}', shell=True) 
     except Exception as e:
         print('Error in run_instance():', e)
-iter = 0
 def argGenerator():
 
     ma_lens = [10, 20, 30]
@@ -79,8 +90,6 @@ def argGenerator():
     super_lens = [200]
     super_bandWidths = [2.5]
     adx_slope_threshes = [0.2, 0.6, 1]
-    global iter
-    iter = 0 
     for params in itertools.product(ma_lens, band_widths, fast_ma_lens, adx_lens, adx_thresholds, adx_thresh_yellow_multipliers, num_candles_for_slope_proj,
                                     atr_lens, super_lens, super_bandWidths, adx_slope_threshes):
         ma_len, band_width, fast_ma_len, adx_len, adx_thresh, adx_thresh_yellow_multiplier, num_candles, atr_len, super_len, super_bandWidth, adx_slope_thresh, \
@@ -91,16 +100,10 @@ def argGenerator():
         # check that csv exists and mark it as done in db 
         
         argString = f"maLen:{ma_len} bandWidth:{band_width} fastMALen:{fast_ma_len} adxLen:{adx_len} adxThresh:{adx_thresh} adxThreshYellowMultiplier:{adx_thresh_yellow_multiplier} numCandlesForSlopeProjection:{num_candles} atrLen:{atr_len} superLen:{super_len} superBandWidth:{super_bandWidth} adxSlopeThresh:{adx_slope_thresh}"
-        
-        if is_task_in_progress(argString):
-            print(f'SKIP - Already running task {argString}')
-            continue
-        add_task(argString)
-        
+                
         # will run 3^8 * 4 = 26.2K times == 10 parallel on pc, 8 on mac, 8 more on a amy mac
         #so 26 in parallel .. 1000 parallel runs will do it         
-        print(f'{iter} : {cloud_args} {argString}')
-        iter = iter + 1
+        #print(f'{cloud_args} {argString}')
         yield f'{cloud_args} {argString}'
     
 
@@ -110,10 +113,10 @@ def argGeneratorTest():
     for params in itertools.product(ma_lens, band_widths):
         ma_len, band_width = params
         argString = f"maLen:{ma_len} bandWidth:{band_width}"
-        if is_task_in_progress(argString):
-            print(f'SKIP - Already running task {argString}')
-            continue
-        add_task(argString)
+        # if is_task_in_progress(argString):
+        #     print(f'SKIP - Already running task {argString}')
+        #     continue
+        # add_task(argString)
         
         # will run 3^8 * 4 = 26.2K times == 10 parallel on pc, 8 on mac, 8 more on a amy mac
         #so 26 in parallel .. 1000 parallel runs will do it         
