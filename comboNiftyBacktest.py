@@ -52,7 +52,7 @@ perfTIME = time.time()
 
 cloud_args=''
 if 'cloud' in sys.argv:
-    cloud_args = 'cacheTickData:True zerodha_access_token:7Xzo3aGAQ06z2cvT8AyppbT2Uh6BD4Ru dbhost:NikhilSama.mysql.pythonanywhere-services.com dbuser:NikhilSama dbpass:trading123 dbname:NikhilSama\$default'
+    cloud_args = 'cacheTickData:True zerodha_access_token:b2yEqzNSxUZxU6W7Uu6q7NLfVwvxCoM4 dbhost:algotrade.cck6cwihhy4y.ap-southeast-1.rds.amazonaws.com dbuser:trading dbpass:trading123 dbname:trading'
 def run_instance(args):
     try: 
         arg_dict = {}
