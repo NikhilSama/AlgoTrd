@@ -9,13 +9,19 @@ import mysql.connector
 from datetime import datetime
 import socket 
 
-# Connect to the MySQL database
-mydb = mysql.connector.connect(
-    host="algotrade.cck6cwihhy4y.ap-southeast-1.rds.amazonaws.com",
-    user="trading",
-    password="trading123",
-    database="trading"
+mydb = None
+
+def connect_to_db():
+    global mydb
+    # Connect to the MySQL database
+    mydb = mysql.connector.connect(
+        host="algotrade.cck6cwihhy4y.ap-southeast-1.rds.amazonaws.com",
+        user="trading",
+        password="trading123",
+        database="trading"
 )
+def close_db():
+    mydb.close()
 
 # Add a task name to the tasks table
 def add_task(task_name):
@@ -51,11 +57,12 @@ def mark_task_complete(task_name):
 perfTIME = time.time()    
 
 cloud_args=''
-if 'cloud' in sys.argv:
-    cloud_args = 'cacheTickData:True zerodha_access_token:b2yEqzNSxUZxU6W7Uu6q7NLfVwvxCoM4 dbhost:algotrade.cck6cwihhy4y.ap-southeast-1.rds.amazonaws.com dbuser:trading dbpass:trading123 dbname:trading'
+#if 'cloud' in sys.argv:
+cloud_args = 'cacheTickData:True zerodha_access_token:b2yEqzNSxUZxU6W7Uu6q7NLfVwvxCoM4 dbhost:algotrade.cck6cwihhy4y.ap-southeast-1.rds.amazonaws.com dbuser:trading dbpass:trading123 dbname:trading'
 iter = 0
 
 def run_instance(args):
+    argString = ''
     try: 
         arg_dict = {}
         arg_array = []
@@ -63,17 +70,21 @@ def run_instance(args):
             key, value = arg.split(':')
             arg_dict[key] = value
             arg_array.append(arg)
+            if key in ["cacheTickData","zerodha_access_token","dbhost","dbuser", "dbpass" ,"dbname"]:
+                continue
+            argString = argString + ' ' + arg
+        argString = argString.strip()
         
         global iter
         
         iter = iter + 1
-
-        print(f'{iter}: Runing: {args}')
-        if is_task_in_progress(args):
-            print(f'SKIP - Already running task {args}')
+        connect_to_db()
+        print(f'{iter}: Runing: {argString}')
+        if is_task_in_progress(argString):
+            print(f'SKIP - Already running task {argString}')
             return
-        add_task(args)
-
+        add_task(argString)
+        close_db()
         subprocess.call(f'python3 backtest.py {args}', shell=True) 
     except Exception as e:
         print('Error in run_instance():', e)

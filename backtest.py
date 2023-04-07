@@ -32,6 +32,8 @@ import mysql.connector
 import utils
 import sys
 
+mydb = None
+
 def getTaskNameFromArgs():
     argString = ''
     args = sys.argv[1:]
@@ -44,8 +46,15 @@ def getTaskNameFromArgs():
     return argString.strip()
 
 def mark_task_complete():
+    global mydb
+    mydb = mysql.connector.connect(
+        host="algotrade.cck6cwihhy4y.ap-southeast-1.rds.amazonaws.com",
+        user="trading",
+        password="trading123",
+        database="trading"
+    )
+
     task_name = getTaskNameFromArgs()
-    task_name = ' '+task_name
     mycursor = mydb.cursor()
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     sql = "UPDATE tasks SET status = 1, completed_time = %s WHERE task_name = %s"
@@ -53,17 +62,8 @@ def mark_task_complete():
     mycursor.execute(sql, val)
     #print(mycursor.statement)
     mydb.commit()
+    mydb.close()
 
-# Connect to the MySQL database
-mydb = mysql.connector.connect(
-    host="algotrade.cck6cwihhy4y.ap-southeast-1.rds.amazonaws.com",
-    user="trading",
-    password="trading123",
-    database="trading"
-)
-# create a database connection (performance to CSV adds the 
-# argv variables as well to the performance df)
-engine = create_engine('mysql+pymysql://trading:trading123@algotrade.cck6cwihhy4y.ap-southeast-1.rds.amazonaws.com/trading')
 
 #cfg has all the config parameters make them all globals here
 import cfg
@@ -272,14 +272,18 @@ def backtestCombinator():
         
         performance = pd.concat([performance, tearsheetdf])
 
-        
+    
+    # write the DataFrame to a SQL table
+    # Connect to the MySQL database
     performance = performanceToCSV(performance)
     mark_task_complete()
     with open(utils.fileNameFromArgs('Data/backtest/combo/wip/niftyPerf-'), 'w') as f:
         f.write('done')
-
-    # write the DataFrame to a SQL table
+    # create a database connection (performance to CSV adds the 
+    # argv variables as well to the performance df)
+    engine = create_engine('mysql+pymysql://trading:trading123@algotrade.cck6cwihhy4y.ap-southeast-1.rds.amazonaws.com/trading')
     performance.to_sql('performance', engine, if_exists='append')
+    engine.dispose()
 
 
 backtestCombinator()       
