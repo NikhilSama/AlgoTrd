@@ -138,7 +138,7 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, exportCSV=False, tradi
 
 
     tearsheet,tearsheetdf = perf.tearsheet(df)
-    print(f'Total Return: {tearsheet["return"]*100}%')
+    # print(f'Total Return: {tearsheet["return"]*100}%')
     # print(f'Sharpe: {tearsheet["sharpe_ratio"]}')
     # print(f'Num Trades: {tearsheet["num_trades"]}')
     # print(f'Avg Return Per Trade: {tearsheet["average_per_trade_return"]*100}%')
