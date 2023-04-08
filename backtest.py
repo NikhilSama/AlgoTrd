@@ -75,7 +75,7 @@ ist = pytz.timezone('Asia/Kolkata')
 tickers = td.get_sp500_tickers()
 nifty = td.get_nifty_tickers()
 index_tickers = td.get_index_tickers()
-zgetFrom = datetime(2023, 2, 7, 10, 0, tzinfo=ist)
+zgetFrom = datetime(2023, 2, 7, 9, 0, tzinfo=ist)
 zgetTo = datetime(2023, 4, 7, 15, 30, tzinfo=ist)
 
 def zget(t,s,e,i):
@@ -133,14 +133,14 @@ def backtest(t,i='minute',exportCSV=False):
     tearsheet,tearsheetdf = perf.tearsheet(df)
     print(f'Total Return: {tearsheet["return"]*100}%')
     print(f'Sharpe: {tearsheet["sharpe_ratio"]}')
-    # print(f'Num Trades: {tearsheet["num_trades"]}')
-    # print(f'Avg Return Per Trade: {tearsheet["average_per_trade_return"]*100}%')
-    # print(f'Std Dev of Returns: {tearsheet["std_dev_pertrade_return"]*100}%')
-    # print(f'Skewness: {tearsheet["skewness_pertrade_return"]}')
-    # print(f'Kurtosis: {tearsheet["kurtosis_pertrade_return"]}')
-    # pp = pprint.PrettyPrinter(indent=4)
-    # pp.pprint(tearsheet)
-    #perfTIME = perfProfiler("Tearsheet took", perfTIME)
+    print(f'Num Trades: {tearsheet["num_trades"]}')
+    print(f'Avg Return Per Trade: {tearsheet["average_per_trade_return"]*100}%')
+    print(f'Std Dev of Returns: {tearsheet["std_dev_pertrade_return"]*100}%')
+    print(f'Skewness: {tearsheet["skewness_pertrade_return"]}')
+    print(f'Kurtosis: {tearsheet["kurtosis_pertrade_return"]}')
+    pp = pprint.PrettyPrinter(indent=4)
+    pp.pprint(tearsheet)
+    perfTIME = perfProfiler("Tearsheet took", perfTIME)
 
     # if (exportCSV == True):
     #     df.to_csv("export.csv")
@@ -220,10 +220,10 @@ def backtestCombinator():
     
     performance = pd.DataFrame()
     
-    ma_slope_threshes = [0.5,1,1.5]
+    ma_slope_threshes = [0.5, 1, 1.5]
     ma_slope_thresh_yellow_multipliers = [0.5,0.7,0.9]
     obv_osc_threshes = [0.1, 0.2, 0.4]
-    obv_osc_thresh_yellow_multipliers = [0.7,0.9,1]
+    obv_osc_thresh_yellow_multipliers = [0.7, 0.9, 1]
 
     # ma_slope_threshes = [0.5]
     # ma_slope_thresh_yellow_multipliers = [0.5]
@@ -280,10 +280,10 @@ def backtestCombinator():
     engine.dispose()
 
 
-backtestCombinator()       
+#backtestCombinator()       
 #plot_options(['ASIANPAINT'],10,'minute')
 #backtest('HDFCLIFE','minute',adxThreh=30)
-#backtest('NIFTY23APRFUT','minute')
+backtest('NIFTY23APRFUT','minute')
 #backtest('HDFCLIFE','minute',adxThreh=25)
 #backtest('ASIANPAINT','minute',adxThreh=25)
 #backtest('HDFCLIFE','minute',adxThreh=30)
@@ -294,3 +294,4 @@ backtestCombinator()
 
     # print hello
 # print hello
+
