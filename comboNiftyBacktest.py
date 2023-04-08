@@ -109,8 +109,11 @@ def argGenerator():
         
         argString = f"maLen:{ma_len} bandWidth:{band_width} fastMALen:{fast_ma_len} adxLen:{adx_len} adxThresh:{adx_thresh} adxThreshYellowMultiplier:{adx_thresh_yellow_multiplier} numCandlesForSlopeProjection:{num_candles} atrLen:{atr_len}"
                 
-        # will run 3^5=243 * 2^3=8 = 1944 times == approx 10K min @ 5 min per run 
-        # 100 parallel cpu = 1K min = 16.6 hrs * $4/hr = $66.6
+        # will run 3^5=243 * 2^3=8 = 1944 times == approx 20K min @ 10 min per run 
+        # 100 parallel cpu = 200 min = 3.2 hrs * $7/hr = $12.8
+        # 64 cpu 20000/64 = 312.5 min = 5.2 hrs * $4/hr = $20.8
+        # create view top_performers as select num_trades,FORMAT(max_drawdown_from_peak*100,2) as percentage,FORMAT(`return`*100,2) as percentage,round(sharpe_ratio,2),maLen,bandWidth,fastMALen,adxLen,adxThresh,adxThreshYellowMultiplier,numCandlesForSlopeProjection,atrLen,ma_slope_thresh,ma_slope_thresh_yellow_multiplier,obv_osc_thresh,obv_osc_thresh_yellow_multiplier from performance order by sharpe_ratio desc limit 10;
+
         yield f'{cloud_args} {argString}'
     
 
@@ -174,3 +177,30 @@ if __name__ == '__main__':
     #print (df_combined)
     # Write combined DataFrame to CSV file
     df_combined.to_csv(directory+'combined.csv', index=False)
+
+
+
+# CREATE VIEW topperf AS 
+# SELECT num_trades,
+#        FORMAT(max_drawdown_from_peak*100,2) AS drawdn,
+#        FORMAT(`return`*100,2) AS retrn,
+#        ROUND(sharpe_ratio,2) AS sharpe,
+#          FORMAT(average_per_trade_return*100,2) AS avgRet,
+#          FORMAT(std_dev_pertrade_return*100,2) AS stdDev,
+#          ROUND(skewness_pertrade_return,1) AS skew,
+#          ROUND(kurtosis_pertrade_return,1) AS kurtosis,
+#        maLen,
+#        bandWidth as bw,
+#        fastMALen as fstMA,
+#        adxLen,
+#        adxThresh,
+#        adxThreshYellowMultiplier as axdMult,
+#        numCandlesForSlopeProjection as candles,
+#        atrLen,
+#        ma_slope_thresh as slpThres,
+#        ma_slope_thresh_yellow_multiplier as slpMult,
+#        obv_osc_thresh as obvThres,
+#        obv_osc_thresh_yellow_multiplier as obvMult
+# FROM performance 
+# ORDER BY sharpe_ratio DESC 
+# LIMIT 10;

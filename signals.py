@@ -60,16 +60,16 @@ def OBV(df):
     df['change'] = df['Adj Close'] - df['Open']
     df['direction'] = df['change'].apply(lambda x: 1 if x > 0 else -1 if x < 0 else 0)
     df['obv'] = df['direction'] * df['Volume']
-    df['obv'] = df['obv'].cumsum()
+    df['obv'] = df['obv'].rolling(window=cfgMaxLookbackCandles, min_periods=1).sum() # instead of cumsum; this restricts it to historical candles spec in cfg
     df['ma_obv'] = df['obv'].ewm(com=20, min_periods=5).mean()
     df['ma_obv_diff'] = df['ma_obv'].diff(5)
     
     #OBV-Diff Max/Min diff should only look at previous candles, not future candles
-    #Also restrict the lookback to cfgObvMaxMinDiff_MaxLookbackCandles, to keep backtest results consistent
+    #Also restrict the lookback to cfgMaxLookbackCandles, to keep backtest results consistent
     #apples to apples with live trading
     
-    df['ma_obv_diff_max'] = df['ma_obv_diff'].rolling(window=cfgObvMaxMinDiff_MaxLookbackCandles, min_periods=1).max()
-    df['ma_obv_diff_min'] = df['ma_obv_diff'].rolling(window=cfgObvMaxMinDiff_MaxLookbackCandles, min_periods=1).min()
+    df['ma_obv_diff_max'] = df['ma_obv_diff'].rolling(window=cfgMaxLookbackCandles, min_periods=1).max()
+    df['ma_obv_diff_min'] = df['ma_obv_diff'].rolling(window=cfgMaxLookbackCandles, min_periods=1).min()
     df['obv_osc'] = df['ma_obv_diff'] / (df['ma_obv_diff_max'] - df['ma_obv_diff_min'])
     df['obv_osc_pct_change'] = df['obv_osc'].diff(2)/2
     df['obv_trend'] = np.where(df['obv_osc'] > obvOscThresh,1,0)
@@ -115,7 +115,7 @@ def ADX(DF, n=adxLen):
     df['ADX-PCT-CHNG'] = df['ADX'].diff(2)/2
     df['ADX-PCT-CHNG'] = df['ADX-PCT-CHNG'].clip(lower=-1, upper=1)
 
-    return (df["ADX"],df['ADX-PCT-CHNG'])
+    return (df["ADX"],df['ADX-PCT-CHNG'],df['ATR'])
 
 
 def RSI(DF, n=14):
@@ -163,8 +163,8 @@ def addBBStats(df):
     df['super_lower_band'] = df['ma20'] - (superBandWidth * df['std'])
     #df.drop(['Open','High','Low'],axis=1,inplace=True,errors='ignore')
     #df.tail(5)
-    slopeStdDev = df['ma20_pct_change_ma'].std()
-    slopeMean = df['ma20_pct_change_ma'].mean()
+    slopeStdDev = df['ma20_pct_change_ma'].rolling(window=cfgMaxLookbackCandles,min_periods=maLen).std()
+    slopeMean = df['ma20_pct_change_ma'].rolling(window=cfgMaxLookbackCandles,min_periods=maLen).mean()
     df['SLOPE-OSC'] = (df['ma20_pct_change_ma'] - slopeMean)/slopeStdDev
     df['SLOPE-OSC-SLOPE'] = df['SLOPE-OSC'].diff(2)/2
     return df
@@ -425,7 +425,7 @@ def populateBB (df):
     addBBStats(df)
 
 def populateADX (df):
-    (df['ADX'],df['ADX-PCT-CHNG']) = ADX(df,maLen)
+    (df['ADX'],df['ADX-PCT-CHNG'],df['ATR']) = ADX(df,maLen)
 
 def populateOBV (df):
     if (df['Volume'].max() == 0):
@@ -823,7 +823,6 @@ def getOverrideSignal(row,ovSignalGenerators, df):
 def getSignal(row,signalGenerators, df):
     s = float("nan")
     isLastRow = row.name == df.index[-1]
-
     #Return nan if its not within trading hours
     if(row.name >= startTime) & \
         (row.name.hour >= startHour):
@@ -854,11 +853,16 @@ def getSignal(row,signalGenerators, df):
     return s
 ## MAIN APPLY STRATEGY FUNCTION
 def applyIntraDayStrategy(df,analyticsGenerators=[populateBB], signalGenerators=[getSig_BB_CX],
-                        overrideSignalGenerators=[]):
+                        overrideSignalGenerators=[],tradingStartTime=None):
     global startTime
-    if startTime == 0:
-        startTime = datetime.datetime(2000,1,1,10,0,0) #Long ago :-)
-        startTime = ist.localize(startTime)
+    if tradingStartTime is not None:
+        startTime = tradingStartTime
+    else:
+        if startTime == 0:
+            if tradingStartTime is None:
+                startTime = datetime.datetime(2000,1,1,10,0,0) #Long ago :-)
+                startTime = ist.localize(startTime)
+            
     df['signal'] = float("nan")
     
     for analGen in analyticsGenerators:

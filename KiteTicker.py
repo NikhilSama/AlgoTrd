@@ -94,15 +94,15 @@ def getTickersToTrack():
         tickersToTrack[token]['ticks'] = pd.DataFrame(columns=columns, index=index)
 
 def trimMinuteDF(t):
-    #trim the minute df to last 375 minutes
-    tickersToTrack[t]['df'] = tickersToTrack[t]['df'].iloc[-375:]
+    #trim the minute df to last cfgMaxLookbackCandles minutes
+    tickersToTrack[t]['df'] = tickersToTrack[t]['df'].iloc[-cfgMaxLookbackCandles:]
 
 def getHistoricalTickerData():
     #This code is intended to run before start of trading on day of
     #
     # We want last day of data only; but because we could start on 
     # monday morning, we request 3 days of data, and then truncate
-    # the df to last 375 minute rows (i.e. last day 9:15 to 3:30)
+    # the df to last cfgMaxLookbackCandles minute rows (i.e. last day 9:15 to 3:30)
     global tickerData, tickersToTrack, now
     start = now - datetime.timedelta(days=5)
     for t in tickersToTrack.keys():
@@ -200,7 +200,7 @@ def resampleToMinDF():
                 tickersToTrack[token]['df']= downloader.zget \
                     (historicalStart,historicalEnd,tickersToTrack[token]['ticker'],'minute',
                     includeOptions=False,instrumentToken=token)
-                #trim to 375 rows/minutes
+                #trim to cfgMaxLookbackCandles rows/minutes
                 trimMinuteDF(token)
 
             else:

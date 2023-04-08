@@ -6,7 +6,8 @@ Created on Sat Feb  4 20:18:29 2023
 @author: nikhilsama
 """
 
-from datetime import date,datetime,timedelta
+from datetime import date,timedelta
+import datetime
 import time
 import tickerdata as td
 import performance as perf
@@ -56,7 +57,7 @@ def mark_task_complete():
 
     task_name = getTaskNameFromArgs()
     mycursor = mydb.cursor()
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     sql = "UPDATE tasks SET status = 1, completed_time = %s WHERE task_name = %s"
     val = (now,task_name)
     mycursor.execute(sql, val)
@@ -75,15 +76,16 @@ ist = pytz.timezone('Asia/Kolkata')
 tickers = td.get_sp500_tickers()
 nifty = td.get_nifty_tickers()
 index_tickers = td.get_index_tickers()
-zgetFrom = datetime(2023, 2, 7, 9, 0, tzinfo=ist)
-zgetTo = datetime(2023, 4, 7, 15, 30, tzinfo=ist)
+firstTradeTime = datetime.datetime(2023, 2,17, 9, 0, tzinfo=ist)
+zgetFrom = firstTradeTime - timedelta(days=10)
+zgetTo = datetime.datetime(2023, 4,7, 15, 30, tzinfo=ist)
 
 def zget(t,s,e,i):
     #Get latest minute tick from zerodha
     df = downloader.zget(s,e,t,i,includeOptions=includeOptions)
     df = downloader.zColsToDbCols(df)
     return df
-def zgetNDays(t,n,e=datetime.now(ist),i="minute"):
+def zgetNDays(t,n,e=datetime.datetime.now(ist),i="minute"):
     s = e - timedelta(days=n)
     return zget(t, s, e, i)
 
@@ -104,13 +106,17 @@ def perfProfiler(name,t):
     print (f"{name} took {round((time.time() - t)*1000,2)}ms")
     return time.time()
 
-def backtest(t,i='minute',exportCSV=False):
-    perfTIME = time.time()    
-    startingTime = perfTIME
-    df = zget(t,zgetFrom,zgetTo,i=i)
+def backtest(t,i='minute',start = zgetFrom, end = zgetTo, exportCSV=False, tradingStartTime = firstTradeTime):
+    #perfTIME = time.time()    
+    #startingTime = perfTIME
+    df = zget(t,start,end,i=i)
     if df.empty:
         print(f"No data foc {t}")
         return
+    if len(df) < cfgMaxLookbackCandles:
+        print(f"Skipping {t} as it has {len(df)} less than {cfgMaxLookbackCandles} candles at {tradingStartTime}")
+        print(df)
+
     #df = zgetNDays(t,days,i=i)
     #perfTime = perfProfiler("ZGET", perfTIME)
     dataPopulators = [signals.populateBB, signals.populateADX, signals.populateOBV]
@@ -125,27 +131,28 @@ def backtest(t,i='minute',exportCSV=False):
                         ,signals.exitTrendFollowing
                         ]
     overrideSignalGenerators = []   
+    
     signals.applyIntraDayStrategy(df,dataPopulators,signalGenerators,
-                                  overrideSignalGenerators)
+                                  overrideSignalGenerators, tradingStartTime=tradingStartTime)
     #perfTIME = perfProfiler("SIGNAL GENERATION", perfTIME)
 
 
     tearsheet,tearsheetdf = perf.tearsheet(df)
     print(f'Total Return: {tearsheet["return"]*100}%')
-    print(f'Sharpe: {tearsheet["sharpe_ratio"]}')
-    print(f'Num Trades: {tearsheet["num_trades"]}')
-    print(f'Avg Return Per Trade: {tearsheet["average_per_trade_return"]*100}%')
-    print(f'Std Dev of Returns: {tearsheet["std_dev_pertrade_return"]*100}%')
-    print(f'Skewness: {tearsheet["skewness_pertrade_return"]}')
-    print(f'Kurtosis: {tearsheet["kurtosis_pertrade_return"]}')
-    pp = pprint.PrettyPrinter(indent=4)
-    pp.pprint(tearsheet)
-    perfTIME = perfProfiler("Tearsheet took", perfTIME)
+    # print(f'Sharpe: {tearsheet["sharpe_ratio"]}')
+    # print(f'Num Trades: {tearsheet["num_trades"]}')
+    # print(f'Avg Return Per Trade: {tearsheet["average_per_trade_return"]*100}%')
+    # print(f'Std Dev of Returns: {tearsheet["std_dev_pertrade_return"]*100}%')
+    # print(f'Skewness: {tearsheet["skewness_pertrade_return"]}')
+    # print(f'Kurtosis: {tearsheet["kurtosis_pertrade_return"]}')
+    # pp = pprint.PrettyPrinter(indent=4)
+    # pp.pprint(tearsheet)
+    #perfTIME = perfProfiler("Tearsheet took", perfTIME)
 
     # if (exportCSV == True):
     #     df.to_csv("export.csv")
    # perfTIME = perfProfiler("to CSV", perfTIME)
-    perfTIME = perfProfiler("Backtest:", startingTime)
+    #perfTIME = perfProfiler("Backtest:", startingTime)
 
     if (plot == [] or (not 'trades' in tearsheet.keys())):
         return tearsheetdf
@@ -156,13 +163,42 @@ def backtest(t,i='minute',exportCSV=False):
     if 'adjCloseGraph' in plot:
         plot_backtest(df,tearsheet['trades'])
     
-    # print (f"END Complete {datetime.now(ist)}")
+    # print (f"END Complete {datetime.datetime.now(ist)}")
     return tearsheetdf
+
+def backtest_daybyday(t,i='minute',exportCSV=False):
+    startingTime = time.time()  
+
+    start_time = datetime.time(hour=9)
+    end_time = datetime.time(hour=16, minute=30)
+
+    dates = []
+    curr_date = firstTradeTime.date()
+    tearsheets = pd.DataFrame()
+    while curr_date <= zgetTo.date():
+        start_date = datetime.datetime.combine(curr_date, start_time, tzinfo=ist)
+        zget_start = start_date - timedelta(days=10)
+        end_date = datetime.datetime.combine(curr_date, end_time, tzinfo=ist)
+
+        tearsheetdf = backtest(t,i=i,start=zget_start, end=end_date, tradingStartTime = start_date, exportCSV=exportCSV)
+        tearsheets = pd.concat([tearsheets, tearsheetdf])
+        dates.append((start_date, end_date))
+        curr_date += timedelta(days=1)
+    # pp = pprint.PrettyPrinter(indent=4)
+    # pp.pprint(dates)
+    print(f"Total Return: {tearsheets['return'].sum()*100}%")
+    print(f"max day return: {tearsheets['return'].max()*100}%")
+    print(f"min day return: {tearsheets['return'].min()*100}%")
+    print(f"avg day return: {tearsheets['return'].mean()*100}%")
+    print(f"std dev day return: {tearsheets['return'].std()*100}%")
+    print(f"kurtosis day return: {tearsheets['return'].kurtosis()}")
+    print(f"skew day return: {tearsheets['return'].skew()}")
+    perfProfiler("Total:", startingTime)
 
 # Plot the graph of closing prices for the array of tickers provided
 # and the interval provided and the number of days provided
 def plot_options(uticker, tickers,i='minute', 
-         days=30, e=datetime.now(ist)):
+         days=30, e=datetime.datetime.now(ist)):
     df={}
     j=0
     color=['blue','green','red','orange']
@@ -191,7 +227,7 @@ def compareDayByDayPerformance(t,days=90):
     i = 0
     while i<days:
         i=i+1
-        s = datetime.now(ist)-timedelta(days=i)
+        s = datetime.datetime.now(ist)-timedelta(days=i)
         df = zgetNDays(t,days,s)
         if(len(df)):
             df = signals.bollinger_band_cx(df)
@@ -276,21 +312,23 @@ def backtestCombinator():
     # create a database connection (performance to CSV adds the 
     # argv variables as well to the performance df)
     engine = create_engine('mysql+pymysql://trading:trading123@algotrade.cck6cwihhy4y.ap-southeast-1.rds.amazonaws.com/trading')
-    performance.to_sql('performance', engine, if_exists='append')
+    performance.to_sql('performancev2', engine, if_exists='append')
     engine.dispose()
 
 
 #backtestCombinator()       
 #plot_options(['ASIANPAINT'],10,'minute')
 #backtest('HDFCLIFE','minute',adxThreh=30)
-backtest('NIFTY23APRFUT','minute')
+#backtest('NIFTY23APRFUT','minute')
+#backtest_daybyday('NIFTY23APRFUT','minute')
+
 #backtest('HDFCLIFE','minute',adxThreh=25)
 #backtest('ASIANPAINT','minute',adxThreh=25)
 #backtest('HDFCLIFE','minute',adxThreh=30)
 #backtest('ADANIENT','minute',adxThreh=30)
 #compareDayByDayPerformance('ONGC')
  
-#plot('INFY',['ASIANPAINT23MAR2840PE','ASIANPAINT23MAR2840CE'],i='minute', days=3,e=datetime.now(ist)-timedelta(days=15))   
+#plot('INFY',['ASIANPAINT23MAR2840PE','ASIANPAINT23MAR2840CE'],i='minute', days=3,e=datetime.datetime.now(ist)-timedelta(days=15))   
 
     # print hello
 # print hello
