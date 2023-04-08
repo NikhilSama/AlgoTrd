@@ -1,0 +1,2 @@
+git pull origin master
+/usr/bin/python3 comboNiftyBacktest.py
