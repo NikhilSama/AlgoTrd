@@ -316,7 +316,7 @@ def backtestCombinator():
     engine.dispose()
 
 
-#backtestCombinator()       
+backtestCombinator()       
 #plot_options(['ASIANPAINT'],10,'minute')
 #backtest('HDFCLIFE','minute',adxThreh=30)
 #backtest('NIFTY23APRFUT','minute')
