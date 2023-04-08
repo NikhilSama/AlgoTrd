@@ -27,7 +27,7 @@ cfgDict = {
     'maSlopeThreshYellowMultiplier': 0.7,
     'obvOscThresh': 0.2,
     'obvOscThreshYellowMultiplier': 0.7,
-    'cfgObvMaxMinDiff_MaxLookbackCandles': 200,
+    'cfgMaxLookbackCandles': 1000,
     'cfgNumConditionsForTrendFollow': 3,
     'includeOptions': False,
     'plot': [
