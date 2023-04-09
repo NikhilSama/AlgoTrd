@@ -98,16 +98,17 @@ def argGenerator():
     adx_thresh_yellow_multipliers = [0.7, 0.9, 1]
     num_candles_for_slope_proj = [2,6]
     atr_lens = [14,20]
+    cfgTickers = ['NIFTY23APRFUT']
     for params in itertools.product(ma_lens, band_widths, fast_ma_lens, adx_lens, adx_thresholds, adx_thresh_yellow_multipliers, num_candles_for_slope_proj,
-                                    atr_lens):
-        ma_len, band_width, fast_ma_len, adx_len, adx_thresh, adx_thresh_yellow_multiplier, num_candles, atr_len, \
+                                    atr_lens, cfgTickers):
+        ma_len, band_width, fast_ma_len, adx_len, adx_thresh, adx_thresh_yellow_multiplier, num_candles, atr_len, cfgTicker, \
         = params
         #check w db to see if this combination has been run before or is currently running
         # if not then mark it as running
         # do it
         # check that csv exists and mark it as done in db 
         
-        argString = f"maLen:{ma_len} bandWidth:{band_width} fastMALen:{fast_ma_len} adxLen:{adx_len} adxThresh:{adx_thresh} adxThreshYellowMultiplier:{adx_thresh_yellow_multiplier} numCandlesForSlopeProjection:{num_candles} atrLen:{atr_len}"
+        argString = f"maLen:{ma_len} bandWidth:{band_width} fastMALen:{fast_ma_len} adxLen:{adx_len} adxThresh:{adx_thresh} adxThreshYellowMultiplier:{adx_thresh_yellow_multiplier} numCandlesForSlopeProjection:{num_candles} atrLen:{atr_len} cfgTicker:{cfgTicker}"
                 
         # will run 3^5=243 * 2^3=8 = 1944 times == approx 20K min @ 10 min per run 
         # 100 parallel cpu = 200 min = 3.2 hrs * $7/hr = $12.8
@@ -120,9 +121,11 @@ def argGenerator():
 def argGeneratorTest():
     ma_lens = [20, 25]
     band_widths = [2]
-    for params in itertools.product(ma_lens, band_widths):
-        ma_len, band_width = params
-        argString = f"maLen:{ma_len} bandWidth:{band_width}"
+    cfgTickers = ['NIFTY23APRFUT']
+
+    for params in itertools.product(ma_lens, band_widths, cfgTickers):
+        ma_len, band_width, cfgTicker = params
+        argString = f"maLen:{ma_len} bandWidth:{band_width} cfgTicker:{cfgTicker}"
         # if is_task_in_progress(argString):
         #     print(f'SKIP - Already running task {argString}')
         #     continue
@@ -144,7 +147,7 @@ if __name__ == '__main__':
     pool = Pool(cpu_count())
 
     # Execute instances in parallel using the Pool object
-    pool.map(run_instance, argGenerator())
+    pool.map(run_instance, argGeneratorTest())
 
     # Close the Pool object to free resources
     pool.close()

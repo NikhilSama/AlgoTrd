@@ -24,7 +24,6 @@ import ppprint
 from plotting import plot_backtest,plot_stock_and_option
 import backtest_log_setup
 import itertools 
-from pathlib import Path
 from sqlalchemy import create_engine
 import mysql.connector
 
@@ -76,7 +75,7 @@ ist = pytz.timezone('Asia/Kolkata')
 tickers = td.get_sp500_tickers()
 nifty = td.get_nifty_tickers()
 index_tickers = td.get_index_tickers()
-firstTradeTime = datetime.datetime(2023, 2,17, 9, 0, tzinfo=ist)
+firstTradeTime = datetime.datetime(2023, 4,5, 9, 0, tzinfo=ist)
 zgetFrom = firstTradeTime - timedelta(days=10)
 zgetTo = datetime.datetime(2023, 4,7, 15, 30, tzinfo=ist)
 
@@ -106,6 +105,24 @@ def perfProfiler(name,t):
     print (f"{name} took {round((time.time() - t)*1000,2)}ms")
     return time.time()
 
+def printTearsheet(tearsheet):
+    print(f"Total Return: {tearsheet['return']:.2%}")
+    print("Sharpe: ", tearsheet['sharpe_ratio'])
+    print("Num Trades: ", tearsheet['num_trades'])
+    print(f"Avg Return per day: {tearsheet['avg_daily_return']:.2%}")
+    print("TRADES: ")
+    for index,trade in tearsheet['trades'].iterrows():
+        if trade['position'] == 0:
+            diff = round(trade['Open'] - entry_price,2)
+            print(f"\t\t{utils.timeToString(index,date=False,time=True)}: EXIT @ {trade['Open']:.2f}({diff} or {diff/entry_price:.2%})")
+        else:
+            entry_price = trade['Open']
+            print(f"\t{utils.timeToString(index,date=True)} Position: {trade['position']} @ {trade['Open']} Return:{trade['return']:.2%} \tCUM=>{trade['sum_return']:.2%}")
+    print("Days: ")
+    daily_returns = tearsheet['trades']['return'].resample('D').sum()
+    for index,day in daily_returns.iteritems():
+        print(f"\t {utils.timeToString(index,date=True,time=False)} Return:{day:.2%}")
+    
 def backtest(t,i='minute',start = zgetFrom, end = zgetTo, exportCSV=False, tradingStartTime = firstTradeTime):
     #perfTIME = time.time()    
     #startingTime = perfTIME
@@ -138,6 +155,7 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, exportCSV=False, tradi
 
 
     tearsheet,tearsheetdf = perf.tearsheet(df)
+    printTearsheet(tearsheet)
     # print(f'Total Return: {tearsheet["return"]*100}%')
     # print(f'Sharpe: {tearsheet["sharpe_ratio"]}')
     # print(f'Num Trades: {tearsheet["num_trades"]}')
@@ -149,8 +167,8 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, exportCSV=False, tradi
     # pp.pprint(tearsheet)
     #perfTIME = perfProfiler("Tearsheet took", perfTIME)
 
-    # if (exportCSV == True):
-    #     df.to_csv("export.csv")
+    if (exportCSV == True):
+        df.to_csv("export.csv")
    # perfTIME = perfProfiler("to CSV", perfTIME)
     #perfTIME = perfProfiler("Backtest:", startingTime)
 
@@ -244,29 +262,24 @@ def performanceToCSV(performance):
         if key in ['zerodha_access_token','dbuser','dbpass','cacheTickData', 'dbname', 'dbhost']:
             continue
         performance[key] = value
-    perfFileName = utils.fileNameFromArgs('Data/backtest/combo/niftyPerf-')
-    performance.to_csv(perfFileName)
+    #perfFileName = utils.fileNameFromArgs('Data/backtest/combo/niftyPerf-')
+    #performance.to_csv(perfFileName)
     return performance
 
 def backtestCombinator():
-    
-    # touch the file so it does not get redone by another worker thread
-    path = Path(utils.fileNameFromArgs('Data/backtest/combo/wip/niftyPerf-'))
-    path.touch()
-    
+        
     performance = pd.DataFrame()
     
-    ma_slope_threshes = [0.5, 1, 1.5]
-    ma_slope_thresh_yellow_multipliers = [0.5,0.7,0.9]
-    obv_osc_threshes = [0.1, 0.2, 0.4]
-    obv_osc_thresh_yellow_multipliers = [0.7, 0.9, 1]
+    # ma_slope_threshes = [0.5, 1, 1.5]
+    # ma_slope_thresh_yellow_multipliers = [0.5,0.7,0.9]
+    # obv_osc_threshes = [0.1, 0.2, 0.4]
+    # obv_osc_thresh_yellow_multipliers = [0.7, 0.9, 1]
 
-    # ma_slope_threshes = [0.5]
-    # ma_slope_thresh_yellow_multipliers = [0.5]
-    # ma_slope_slope_threshes = [0.1]
-    # obv_osc_threshes = [0.1]
-    # obv_osc_thresh_yellow_multipliers = [0.7]
-    # obv_osc_slope_threshes = [0.1,0.2]
+    ma_slope_threshes = [0.5]
+    ma_slope_thresh_yellow_multipliers = [0.5]
+    ma_slope_slope_threshes = [0.1]
+    obv_osc_threshes = [0.1]
+    obv_osc_thresh_yellow_multipliers = [0.7,0.9]
     
     # This loop will run 3^4 = 89 times; each run will be about 
     # 3 second, so total 267 seconds = 4.5 minutes
@@ -286,7 +299,7 @@ def backtestCombinator():
         signals.updateCFG(ma_slope_thresh, ma_slope_thresh_yellow_multiplier, \
                          obv_osc_thresh, \
                          obv_osc_thresh_yellow_multiplier)
-        tearsheetdf = backtest('NIFTY23APRFUT','minute')
+        tearsheetdf = backtest(cfgTicker,'minute')
         
         # Add in config variables we are looping through to the tearsheetdf
         tearsheetdf['ma_slope_thresh'] = ma_slope_thresh
@@ -295,7 +308,7 @@ def backtestCombinator():
         tearsheetdf['obv_osc_thresh_yellow_multiplier'] = obv_osc_thresh_yellow_multiplier
         tearsheetdf['ticker'] = 'NIFTY23APRFUT'
         tearsheetdf['interval'] = 'minute'
-        tearsheetdf['startTime'] = zgetFrom
+        tearsheetdf['startTime'] = firstTradeTime
         tearsheetdf['endTime'] = zgetTo
         tearsheetdf['duration_in_days'] = (zgetTo - zgetFrom).days
         
@@ -307,8 +320,6 @@ def backtestCombinator():
     #NOTE: HACK: THIS performanceTOCSV also parses arv, and adds it to the performance df
     performance = performanceToCSV(performance)
     mark_task_complete()
-    with open(utils.fileNameFromArgs('Data/backtest/combo/wip/niftyPerf-'), 'w') as f:
-        f.write('done')
     # create a database connection (performance to CSV adds the 
     # argv variables as well to the performance df)
     engine = create_engine('mysql+pymysql://trading:trading123@algotrade.cck6cwihhy4y.ap-southeast-1.rds.amazonaws.com/trading')
@@ -319,7 +330,7 @@ def backtestCombinator():
 backtestCombinator()       
 #plot_options(['ASIANPAINT'],10,'minute')
 #backtest('HDFCLIFE','minute',adxThreh=30)
-#backtest('NIFTY23APRFUT','minute')
+#backtest(cfgTicker,'minute')
 #backtest_daybyday('NIFTY23APRFUT','minute')
 
 #backtest('HDFCLIFE','minute',adxThreh=25)
