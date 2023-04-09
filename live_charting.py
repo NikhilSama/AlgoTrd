@@ -3,7 +3,7 @@ from selenium.webdriver.common.keys import Keys
 import os
 import subprocess
 from selenium.webdriver.chrome.options import Options
-
+import socket
 
 # Display charts of current positions on Trading View
 chrome_driver_path = '/Users/nikhilsama/Dropbox/Coding/AlgoTrading/Data/chromedriver' # Replace with the path to your ChromeDriver executable
@@ -50,7 +50,7 @@ def initTradingView():
     user = keys[0]
     pwd = keys[1]
     browser.get(tv_first_url)
-    browser.implicitly_wait(2)
+    browser.implicitly_wait(5)
     login_icon = browser.find_element_by_xpath(xpaths['login_icon'])
     login_icon.click()
     browser.implicitly_wait(2)
@@ -112,3 +112,52 @@ def loadChart(ticker):
 def init():
     initTradingView()
     init4ChartLayout()
+
+def listen():
+
+    # create a socket object
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    # bind the socket to a public host and port
+    server_socket.bind(('localhost', 8000))
+
+    # listen for incoming connections
+    server_socket.listen(1)
+
+    print('Listening for incoming messages...')
+
+    while True:
+        # wait for a connection
+        client_socket, client_address = server_socket.accept()
+
+        # receive the message
+        message = client_socket.recv(1024)
+
+        # process the message
+        print('Received message: ', message.decode())
+
+        # close the client connection
+        client_socket.close()
+
+def show(ticker):
+    # Define the IP address and port to connect to
+    ip_address = '192.168.0.134'
+    port = 8000
+    print(f"Sending message to {ip_address}:{port}...{ticker}")
+    # Create a socket object
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    # Connect to the socket
+    client_socket.connect((ip_address, port))
+
+    # Send a message to the server
+    message = ticker
+    client_socket.send(message.encode())
+    print(f"Sent message to {ip_address}:{port}...{ticker}")
+
+    # Close the socket
+    client_socket.close()
+
+
+if __name__ == '__main__':
+    listen()
