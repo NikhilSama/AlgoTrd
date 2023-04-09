@@ -98,7 +98,7 @@ def argGenerator():
     adx_thresh_yellow_multipliers = [0.7, 0.9, 1]
     num_candles_for_slope_proj = [2,6]
     atr_lens = [14,20]
-    cfgTickers = ['NIFTY23APRFUT']
+    cfgTickers = ['HDFCBANK','ICICIBANK']
     for params in itertools.product(ma_lens, band_widths, fast_ma_lens, adx_lens, adx_thresholds, adx_thresh_yellow_multipliers, num_candles_for_slope_proj,
                                     atr_lens, cfgTickers):
         ma_len, band_width, fast_ma_len, adx_len, adx_thresh, adx_thresh_yellow_multiplier, num_candles, atr_len, cfgTicker, \
@@ -183,16 +183,21 @@ if __name__ == '__main__':
 
 
 
-# CREATE VIEW topperf AS 
+# CREATE VIEW pview AS 
 # SELECT num_trades,
 #        FORMAT(max_drawdown_from_peak*100,2) AS drawdn,
 #        FORMAT(`return`*100,2) AS retrn,
 #        ROUND(sharpe_ratio,2) AS sharpe,
-#          FORMAT(average_per_trade_return*100,2) AS avgRet,
-#          FORMAT(std_dev_pertrade_return*100,2) AS stdDev,
-#          ROUND(skewness_pertrade_return,1) AS skew,
-#          ROUND(kurtosis_pertrade_return,1) AS kurtosis,
-#        maLen,
+#         FORMAT(average_per_trade_return*100,2) AS avgRet,
+#         FORMAT(std_dev_pertrade_return*100,2) AS stdDev,
+#         ROUND(skewness_pertrade_return,1) AS skew,
+#         ROUND(kurtosis_pertrade_return,1) AS kurtosis,
+#         FORMAT(avg_daily_return*100,2) AS dayAv,
+#         ROUND(sharpe_daily_return,2) AS dayShrp,
+#         FORMAT(std_daily_return*100,2) AS dayStd,
+#         ROUND(skew_daily_return,1) AS daySkew,
+#         ROUND(kurtosis_daily_return,1) AS dayKurt,
+#         maLen as maLen,
 #        bandWidth as bw,
 #        fastMALen as fstMA,
 #        adxLen,
@@ -204,6 +209,4 @@ if __name__ == '__main__':
 #        ma_slope_thresh_yellow_multiplier as slpMult,
 #        obv_osc_thresh as obvThres,
 #        obv_osc_thresh_yellow_multiplier as obvMult
-# FROM performance 
-# ORDER BY sharpe_ratio DESC 
-# LIMIT 10;
+# FROM performancev2
