@@ -3,6 +3,16 @@ import os
 import re
 import pandas as pd
 import numpy as np
+from datetime import datetime
+import time
+
+def timeToString(t,date=False,time=True):
+    if date and time:
+        return t.strftime("%d-%m %I:%M %p")
+    elif date:
+        return t.strftime("%d-%m")
+    else:
+        return t.strftime("%I:%M:%S %p")
 
 def fileNameFromArgs(prefix=''):
     args = sys.argv[1:]
