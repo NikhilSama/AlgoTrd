@@ -107,8 +107,8 @@ def plot_backtest(df,trades=None):
 
     ax5.plot(df['i'], df['ADX-PCT-CHNG'], color='green', linewidth=2)
     ax5.set_title('ADX-PCT-CHNG↓', loc='right')
-    ax5.axhline(y=adxSlopeThresh, color='red', linestyle='--')
-    ax5.axhline(y=-adxSlopeThresh, color='red', linestyle='--')
+    # ax5.axhline(y=adxSlopeThresh, color='red', linestyle='--')
+    # ax5.axhline(y=-adxSlopeThresh, color='red', linestyle='--')
 
     ax6.plot(df['i'], df['SLOPE-OSC'], color='green', linewidth=2)
     ax6.set_title('SLOPE-OSC↓', loc='right')
@@ -117,8 +117,8 @@ def plot_backtest(df,trades=None):
 
     ax7.plot(df['i'], df['SLOPE-OSC-SLOPE'], color='green', linewidth=2)
     ax7.set_title('SLOPE-OSC-SLOPE sq ↓', loc='right')
-    ax7.axhline(y=maSlopeSlopeThresh, color='red', linestyle='--')
-    ax7.axhline(y=-maSlopeSlopeThresh, color='red', linestyle='--')
+    # ax7.axhline(y=maSlopeSlopeThresh, color='red', linestyle='--')
+    # ax7.axhline(y=-maSlopeSlopeThresh, color='red', linestyle='--')
 
     ax8.plot(df['i'], df['OBV-OSC'], color='green', linewidth=2)
     ax8.set_title('OBV OSC↓', loc='right')
@@ -129,8 +129,8 @@ def plot_backtest(df,trades=None):
 
     ax9.plot(df['i'], df['OBV-OSC-PCT-CHNG'], color='green', linewidth=2)
     ax9.set_title('OBV-OSC-PCT-CHNG OSC↓', loc='right')
-    ax9.axhline(y=obvOscSlopeThresh, color='red', linestyle='--')
-    ax9.axhline(y=-obvOscSlopeThresh, color='red', linestyle='--')
+    # ax9.axhline(y=obvOscSlopeThresh, color='red', linestyle='--')
+    # ax9.axhline(y=-obvOscSlopeThresh, color='red', linestyle='--')
     
     if len(df) > 500:
         plt.show()
