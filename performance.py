@@ -167,6 +167,7 @@ def get_trades (df):
         i = i + 1
         prev_date = date
     
+
     #return on each trade row here, are really returns for the trade that
     #started on the date of the previous row, and ended on this date
     #better to have those returns listed with previous rows by shifting them up 
@@ -174,6 +175,11 @@ def get_trades (df):
     #assumption here is that the last row is anyway the closing trade wehere we
     #exit all positions, therefore returns there are zero anyway
     trades['return'] = trades['return'].shift(-1).fillna(0)
+    
+    # remove trades where we just exited, and didnt take a position
+    # also removes the last exit which na we just filled with 0
+    #trades = trades[trades['return'] != 0]
+
     trades["cum_return"] = (1+trades['return']).cumprod() - 1
     trades["sum_return"] = trades['return'].cumsum() #more appropriate since our bet_size doesnt change based on prev trade performance
 
