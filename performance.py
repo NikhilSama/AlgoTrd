@@ -207,7 +207,7 @@ def addDailyReturns(trades,tearsheet):
     worst_date = daily_returns.idxmin().strftime('%Y-%m-%d')
 
     # print the results
-    print(f"Daily return: avg:{avg_return:.2%} sharpe:{avg_return/daily_returns.std():.2f} kurtosis:{daily_returns.kurtosis():.2f} skew:{daily_returns.skew():.2f} max:{best_return:.2%} min:{worst_return:.2%}")
+    #print(f"Daily return: avg:{avg_return:.2%} sharpe:{avg_return/daily_returns.std():.2f} kurtosis:{daily_returns.kurtosis():.2f} skew:{daily_returns.skew():.2f} max:{best_return:.2%} min:{worst_return:.2%}")
 
     # print(f"Best daily return ({best_date}): {best_return:.2%}")
     # print(f"Worst daily return ({worst_date}): {worst_return:.2%}")

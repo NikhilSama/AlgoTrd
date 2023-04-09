@@ -15,7 +15,7 @@ def connect_to_db():
     global mydb
     # Connect to the MySQL database
     mydb = mysql.connector.connect(
-        host="algotrade.cck6cwihhy4y.ap-southeast-1.rds.amazonaws.com",
+        host="trading.ca6bwmzs39pr.ap-south-1.rds.amazonaws.com",
         user="trading",
         password="trading123",
         database="trading"
@@ -58,7 +58,7 @@ perfTIME = time.time()
 
 cloud_args=''
 #if 'cloud' in sys.argv:
-cloud_args = 'cacheTickData:True zerodha_access_token:jwfl0et3mnJrafIL5OlzCGpNwWqiqIH3 dbhost:algotrade.cck6cwihhy4y.ap-southeast-1.rds.amazonaws.com dbuser:trading dbpass:trading123 dbname:trading'
+cloud_args = 'cacheTickData:True zerodha_access_token:jwfl0et3mnJrafIL5OlzCGpNwWqiqIH3 dbhost:trading.ca6bwmzs39pr.ap-south-1.rds.amazonaws.com dbuser:trading dbpass:trading123 dbname:trading'
 iter = 0
 
 def run_instance(args):

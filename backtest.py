@@ -48,7 +48,7 @@ def getTaskNameFromArgs():
 def mark_task_complete():
     global mydb
     mydb = mysql.connector.connect(
-        host="algotrade.cck6cwihhy4y.ap-southeast-1.rds.amazonaws.com",
+        host="trading.ca6bwmzs39pr.ap-south-1.rds.amazonaws.com",
         user="trading",
         password="trading123",
         database="trading"
@@ -155,7 +155,7 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, exportCSV=False, tradi
 
 
     tearsheet,tearsheetdf = perf.tearsheet(df)
-    printTearsheet(tearsheet)
+    #printTearsheet(tearsheet)
     # print(f'Total Return: {tearsheet["return"]*100}%')
     # print(f'Sharpe: {tearsheet["sharpe_ratio"]}')
     # print(f'Num Trades: {tearsheet["num_trades"]}')
@@ -322,7 +322,7 @@ def backtestCombinator():
     mark_task_complete()
     # create a database connection (performance to CSV adds the 
     # argv variables as well to the performance df)
-    engine = create_engine('mysql+pymysql://trading:trading123@algotrade.cck6cwihhy4y.ap-southeast-1.rds.amazonaws.com/trading')
+    engine = create_engine('mysql+pymysql://trading:trading123@trading.ca6bwmzs39pr.ap-south-1.rds.amazonaws.com/trading')
     performance.to_sql('performancev2', engine, if_exists='append')
     engine.dispose()
 
