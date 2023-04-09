@@ -7,6 +7,7 @@ Created on Sun Feb  5 14:26:36 2023
 """
 import sys
 cfgDict = {
+    'cfgTicker': 'NIFTY23APRFUT',
     'cfgFreezeGun': False,
     'startTime': 0,
     'startHour': 10,
@@ -40,9 +41,9 @@ cfgDict = {
         ],
 # google cloud specific stuff 
     'dbhost' : 'localhost',
+    #'dbhost' : 'algotrade.cck6cwihhy4y.ap-southeast-1.rds.amazonaws.com',
     'dbname' : 'trading',
     'zerodha_access_token': False,
-    'dbhost' : 'localhost',
 #    'dbhost' : '34.131.115.155',
     'dbuser' : 'trading',
     'dbpass' : 'trading',
