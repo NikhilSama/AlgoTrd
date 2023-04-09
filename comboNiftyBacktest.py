@@ -58,7 +58,7 @@ perfTIME = time.time()
 
 cloud_args=''
 #if 'cloud' in sys.argv:
-cloud_args = 'cacheTickData:True zerodha_access_token:b2yEqzNSxUZxU6W7Uu6q7NLfVwvxCoM4 dbhost:algotrade.cck6cwihhy4y.ap-southeast-1.rds.amazonaws.com dbuser:trading dbpass:trading123 dbname:trading'
+cloud_args = 'cacheTickData:True zerodha_access_token:jwfl0et3mnJrafIL5OlzCGpNwWqiqIH3 dbhost:algotrade.cck6cwihhy4y.ap-southeast-1.rds.amazonaws.com dbuser:trading dbpass:trading123 dbname:trading'
 iter = 0
 
 def run_instance(args):
