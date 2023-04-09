@@ -27,10 +27,10 @@ if root.handlers:
 #####
 
  
-logging.basicConfig(filename=f'Data/logs/{fname}.log', level='DEBUG', 
+logging.basicConfig(filename=f'Data/logs/{fname}.log', level='ERROR', 
                     format=log_format, datefmt='%I:%M:%S %p')
 
-print(f"Logging to Data/logs/{fname}.log")
+#print(f"Logging to Data/logs/{fname}.log")
 logging.debug("LOG SETUP")
 logging.info("This is an informational message")
 #logging.warning("Careful! Something does not look right")
