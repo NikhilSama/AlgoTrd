@@ -147,7 +147,7 @@ if __name__ == '__main__':
     pool = Pool(cpu_count())
 
     # Execute instances in parallel using the Pool object
-    pool.map(run_instance, argGeneratorTest())
+    pool.map(run_instance, argGenerator())
 
     # Close the Pool object to free resources
     pool.close()
