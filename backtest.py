@@ -168,7 +168,7 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
 
 
     tearsheet,tearsheetdf = perf.tearsheet(df)
-    # printTearsheet(tearsheet)
+    printTearsheet(tearsheet) if isMain else None
     # print(f'Total Return: {tearsheet["return"]*100}%')
     # print(f'Sharpe: {tearsheet["sharpe_ratio"]}')
     #print(f'Num Trades: {tearsheet["num_trades"]}')
@@ -314,7 +314,8 @@ def backtestCombinator():
         signals.updateCFG(ma_slope_thresh, ma_slope_thresh_yellow_multiplier, \
                          obv_osc_thresh, \
                          obv_osc_thresh_yellow_multiplier, obv_ma_len)
-        tearsheetdf = backtest(cfgTicker,'minute',applyTickerSpecificConfig=False)
+        tearsheetdf = backtest(cfgTicker,'minute',exportCSV=False,
+                               applyTickerSpecificConfig=False)
         
         # Add in config variables we are looping through to the tearsheetdf
         tearsheetdf['ma_slope_thresh'] = ma_slope_thresh
@@ -339,14 +340,14 @@ def backtestCombinator():
     # create a database connection (performance to CSV adds the 
     # argv variables as well to the performance df)
     engine = create_engine('mysql+pymysql://trading:trading123@trading.ca6bwmzs39pr.ap-south-1.rds.amazonaws.com/trading')
-    performance.to_sql('performancev2', engine, if_exists='append')
+    performance.to_sql('performancev3', engine, if_exists='append')
     engine.dispose()
 
 if isMain:
     #backtestCombinator()       
     #plot_options(['ASIANPAINT'],10,'minute')
-    #backtest('HDFCLIFE','minute',adxThreh=30)
-    backtest(cfgTicker,'minute')
+    backtest('RELIANCE','minute')
+    #backtest(cfgTicker,'minute')
     #backtest_daybyday('NIFTY23APRFUT','minute')
 
     #backtest('HDFCLIFE','minute',adxThreh=25)
