@@ -85,12 +85,12 @@ def initKiteTicker():
     kws = initKws(getAccessToken(kite))
     return kite,kws
 
-def logtrade(s='',ticker=0,position=0,q=0,p=0,e='NSE'):
+def logtrade(s='',ticker=0,position=0,q=0,p=0,ltp=0,lot_size=0,e='NSE'):
     time = datetime.now(ist).strftime("%I:%M:%S %p")
     p = round(p,2)
         
     if s == '':
-        s = f'{time} -> {position} {q} {e}:{ticker} @ {p}'
+        s = f'{time} -> {position} {q} {e}:{ticker} @ {p} (ltp:{ltp}, lot:{lot_size})'
     else:
         s = f'{time} -> {s}' 
     with open(tradelog, "a") as f:
@@ -104,6 +104,8 @@ def logtrade(s='',ticker=0,position=0,q=0,p=0,e='NSE'):
     
 def getQ (lot_size,ltp,betsize, qToExit=0):
     if (lot_size > 1):
+        q = max(round((betsize/ltp)/lot_size),1)*lot_size
+        return q+qToExit if qToExit else q
         return 10*(lot_size+qToExit) if qToExit else (10*lot_size)
     else:
         return max(1,round(betsize/ltp))+qToExit if qToExit else max(1,round(betsize/ltp))
@@ -141,7 +143,7 @@ def getExchange(kite,exchange):
 def getDelta(exchange,tx_type):
     if exchange == 'NFO':
         if tx_type == 'BUY':
-            return 1.03
+            return 1.01
         elif tx_type == 'SELL':
             return 0.99
         else:
@@ -204,7 +206,7 @@ def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,qToExi
 
     kite_tx_type = getTxType(kite,tx_type)
 
-    logtrade('',t,tx_type,q,p,exchange)
+    logtrade('',t,tx_type,q,p,ltp,lot_size,exchange)
         
     # logtrade(f'{tx_type} {t} Q:{q} P:{p} LTP:{ltp} Tick:{tick_size}',
     #          t,tx_type,q,p)
@@ -356,9 +358,10 @@ def exit_given_position(kite,p):
         logging.error(f"Unhandled Exchange type ({p['exchange']}) in positions")
         print(f"Unhandled Exchange type ({p['exchange']})in positions")
 
-def exit_given_positions(kite,positions):
+def exit_given_positions(kite,positions,desiredPos=0):
     for position in positions:
-        exit_given_position(kite, position)
+        if long_or_short(position) != desiredPos:
+            exit_given_position(kite, position)
 
 def exitNFOPositionsONLY(kite,positions):
     for position in positions:
