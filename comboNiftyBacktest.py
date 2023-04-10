@@ -85,9 +85,10 @@ def run_instance(args):
             return
         add_task(argString)
         close_db()
-        subprocess.call(f'python3 backtest.py {args}', shell=True) 
+        subprocess.call(f'python3 backtest_combinator.py {args}', shell=True) 
     except Exception as e:
         print('Error in run_instance():', e)
+        
 def argGenerator():
 
     ma_lens = [10, 20, 30]

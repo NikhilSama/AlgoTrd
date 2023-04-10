@@ -5,6 +5,7 @@ Created on Sat Feb  4 20:18:29 2023
 
 @author: nikhilsama
 """
+isMain = True if __name__ == '__main__' else False
 
 from datetime import date,timedelta
 import datetime
@@ -287,12 +288,14 @@ def backtestCombinator():
     obv_osc_threshes = [0.1, 0.2, 0.4]
     obv_osc_thresh_yellow_multipliers = [0.7, 0.9, 1]
     obv_ma_lens = [10,20,30]
+
     # ma_slope_threshes = [0.5]
     # ma_slope_thresh_yellow_multipliers = [0.5]
     # ma_slope_slope_threshes = [0.1]
     # obv_osc_threshes = [0.1]
     # obv_osc_thresh_yellow_multipliers = [0.7,0.9]
-    
+    # obv_ma_lens = [20]
+
     # This loop will run 3^4 = 89 times; each run will be about 
     # 3 second, so total 267 seconds = 4.5 minutes
     # run a combo 
@@ -339,21 +342,21 @@ def backtestCombinator():
     performance.to_sql('performancev2', engine, if_exists='append')
     engine.dispose()
 
+if isMain:
+    #backtestCombinator()       
+    #plot_options(['ASIANPAINT'],10,'minute')
+    #backtest('HDFCLIFE','minute',adxThreh=30)
+    backtest(cfgTicker,'minute')
+    #backtest_daybyday('NIFTY23APRFUT','minute')
 
-backtestCombinator()       
-#plot_options(['ASIANPAINT'],10,'minute')
-#backtest('HDFCLIFE','minute',adxThreh=30)
-#backtest(cfgTicker,'minute')
-#backtest_daybyday('NIFTY23APRFUT','minute')
-
-#backtest('HDFCLIFE','minute',adxThreh=25)
-#backtest('ASIANPAINT','minute',adxThreh=25)
-#backtest('HDFCLIFE','minute',adxThreh=30)
-#backtest('ADANIENT','minute',adxThreh=30)
-#compareDayByDayPerformance('ONGC')
- 
-#plot('INFY',['ASIANPAINT23MAR2840PE','ASIANPAINT23MAR2840CE'],i='minute', days=3,e=datetime.datetime.now(ist)-timedelta(days=15))   
+    #backtest('HDFCLIFE','minute',adxThreh=25)
+    #backtest('ASIANPAINT','minute',adxThreh=25)
+    #backtest('HDFCLIFE','minute',adxThreh=30)
+    #backtest('ADANIENT','minute',adxThreh=30)
+    #compareDayByDayPerformance('ONGC')
+    
+    #plot('INFY',['ASIANPAINT23MAR2840PE','ASIANPAINT23MAR2840CE'],i='minute', days=3,e=datetime.datetime.now(ist)-timedelta(days=15))   
 
     # print hello
-# print hello
+    # print hello
 
