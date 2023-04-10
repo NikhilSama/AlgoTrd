@@ -22,10 +22,10 @@ import pytz
 import strategies15m as strat15m
 import ppprint
 from plotting import plot_backtest,plot_stock_and_option
-import backtest_log_setup
 import itertools 
 from sqlalchemy import create_engine
 import mysql.connector
+import backtest_log_setup
 
 
 
@@ -76,7 +76,7 @@ tickers = td.get_sp500_tickers()
 nifty = td.get_nifty_tickers()
 index_tickers = td.get_index_tickers()
 firstTradeTime = datetime.datetime(2023, 2,17, 9, 0, tzinfo=ist)
-zgetFrom = firstTradeTime - timedelta(days=10)
+zgetFrom = firstTradeTime - timedelta(days=cfgHistoricalDaysToGet)
 zgetTo = datetime.datetime(2023, 4,7, 15, 30, tzinfo=ist)
 
 def zget(t,s,e,i):
@@ -133,7 +133,15 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, exportCSV=False, tradi
     if len(df) < cfgMaxLookbackCandles:
         print(f"Skipping {t} as it has {len(df)} less than {cfgMaxLookbackCandles} candles at {tradingStartTime}")
         print(df)
+    else:#trim the df to maxlookbackcandles
+        df_head = df.loc[:firstTradeTime].iloc[-cfgMaxLookbackCandles:]
+        df_tail = df.loc[firstTradeTime:]
+        df = pd.concat([df_head, df_tail])
 
+    # print (len(df))
+    # print(len(df_head))
+    # print(len(df_tail))
+    # exit(0)
     #df = zgetNDays(t,days,i=i)
     #perfTime = perfProfiler("ZGET", perfTIME)
     dataPopulators = [signals.populateBB, signals.populateADX, signals.populateOBV]
@@ -155,7 +163,7 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, exportCSV=False, tradi
 
 
     tearsheet,tearsheetdf = perf.tearsheet(df)
-    #printTearsheet(tearsheet)
+    # printTearsheet(tearsheet)
     # print(f'Total Return: {tearsheet["return"]*100}%')
     # print(f'Sharpe: {tearsheet["sharpe_ratio"]}')
     #print(f'Num Trades: {tearsheet["num_trades"]}')
@@ -274,7 +282,7 @@ def backtestCombinator():
     ma_slope_thresh_yellow_multipliers = [0.5,0.7,0.9]
     obv_osc_threshes = [0.1, 0.2, 0.4]
     obv_osc_thresh_yellow_multipliers = [0.7, 0.9, 1]
-
+    obv_ma_lens = [10,20,30]
     # ma_slope_threshes = [0.5]
     # ma_slope_thresh_yellow_multipliers = [0.5]
     # ma_slope_slope_threshes = [0.1]
@@ -292,13 +300,13 @@ def backtestCombinator():
     # start and end times, symbol, and all the parameters
         
     for params in itertools.product(ma_slope_threshes, ma_slope_thresh_yellow_multipliers,
-                                 obv_osc_threshes, obv_osc_thresh_yellow_multipliers):
-        ma_slope_thresh, ma_slope_thresh_yellow_multiplier, obv_osc_thresh, obv_osc_thresh_yellow_multiplier, \
+                                 obv_osc_threshes, obv_osc_thresh_yellow_multipliers,obv_ma_lens):
+        ma_slope_thresh, ma_slope_thresh_yellow_multiplier, obv_osc_thresh, obv_osc_thresh_yellow_multiplier, obv_ma_len \
              = params
 
         signals.updateCFG(ma_slope_thresh, ma_slope_thresh_yellow_multiplier, \
                          obv_osc_thresh, \
-                         obv_osc_thresh_yellow_multiplier)
+                         obv_osc_thresh_yellow_multiplier, obv_ma_len)
         tearsheetdf = backtest(cfgTicker,'minute')
         
         # Add in config variables we are looping through to the tearsheetdf
@@ -306,6 +314,7 @@ def backtestCombinator():
         tearsheetdf['ma_slope_thresh_yellow_multiplier'] = ma_slope_thresh_yellow_multiplier
         tearsheetdf['obv_osc_thresh'] = obv_osc_thresh
         tearsheetdf['obv_osc_thresh_yellow_multiplier'] = obv_osc_thresh_yellow_multiplier
+        tearsheetdf['obv_ma_len'] = obv_ma_len
         tearsheetdf['ticker'] = 'NIFTY23APRFUT'
         tearsheetdf['interval'] = 'minute'
         tearsheetdf['startTime'] = firstTradeTime
@@ -317,7 +326,7 @@ def backtestCombinator():
     
     # write the DataFrame to a SQL table
     # Connect to the MySQL database
-    #NOTE: HACK: THIS performanceTOCSV also parses arv, and adds it to the performance df
+    #HACK THIS performanceTOCSV also parses arv, and adds it to the performance df
     performance = performanceToCSV(performance)
     mark_task_complete()
     # create a database connection (performance to CSV adds the 
