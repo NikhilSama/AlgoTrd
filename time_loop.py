@@ -218,8 +218,8 @@ def generateSignalsAndTrade(df,positions,stock,options,dfStartTime=None):
         # if inconsistent, then we need to exit all positions
         if (np.isnan(df['signal'][-1]) and df['position'][-1] != net_position):
 #                if (df['signal'][-1] != net_position):
-            logging.info(f"{t}: Exiting all Positions.  Live Kite positions({positions[t]['net_position']} inconsistant with DF pos:{df['position'][-1]} signal: {df['signal'][-1]} ")
-            ki.exit_given_positions(kite,positions[t]['positions'])
+            logging.info(f"{t}: Exiting inconsistant Positions.  Live Kite positions({positions[t]['net_position']} inconsistant with DF pos:{df['position'][-1]} signal: {df['signal'][-1]} ")
+            ki.exit_given_positions(kite,positions[t]['positions'],df['signal'][-1])
             net_position =0
             del positions[t]
 #        elif (not math.isnan(df['signal'][-1])) and df['position'][-1] != 0:
