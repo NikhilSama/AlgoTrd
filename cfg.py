@@ -7,7 +7,8 @@ Created on Sun Feb  5 14:26:36 2023
 """
 import sys
 cfgDict = {
-    'cfgTicker': 'NIFTY23APRFUT',
+    'cfgTicker': 'ICICIBANK',
+    'cfgHistoricalDaysToGet': 10,
     'cfgFreezeGun': False,
     'startTime': 0,
     'startHour': 10,
@@ -26,6 +27,7 @@ cfgDict = {
     'numCandlesForSlopeProjection':2,
     'maSlopeThresh': 1,
     'maSlopeThreshYellowMultiplier': 0.7,
+    'cfgObvMaLen': 20,
     'obvOscThresh': 0.2,
     'obvOscThreshYellowMultiplier': 0.7,
     'cfgMaxLookbackCandles': 1000,
@@ -49,7 +51,7 @@ cfgDict = {
     'dbpass' : 'trading',
     'showTradingViewLive' : False,
     'cacheTickData' : False, 
-    'bet_size': 100000
+    'bet_size': 10000
 }
 
   
