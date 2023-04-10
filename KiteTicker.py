@@ -196,7 +196,7 @@ def resampleToMinDF():
             if minute_candle_df.empty:
                 tickerlog(f"Min candle emply. First call for {token}. Getting historical, and ignoring this first half formed tick candle")
                 historicalEnd = tick_df.index[-1] #downloader will remove lst min half formed candle
-                historicalStart = historicalEnd - datetime.timedelta(days=5)
+                historicalStart = historicalEnd - datetime.timedelta(days=cfgHistoricalDaysToGet)
                 tickersToTrack[token]['df']= downloader.zget \
                     (historicalStart,historicalEnd,tickersToTrack[token]['ticker'],'minute',
                     includeOptions=False,instrumentToken=token)
