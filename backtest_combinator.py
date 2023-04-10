@@ -8,4 +8,4 @@ Created on Sun Feb  5 14:26:36 2023
 
 import backtest
 
-backtestCombinator()       
+backtest.backtestCombinator()       
