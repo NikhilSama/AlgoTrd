@@ -28,13 +28,15 @@ tickerStatus = {}
 
 def updateCFG(ma_slope_thresh, ma_slope_thresh_yellow_multiplier, \
                          obv_osc_thresh, \
-                         obv_osc_thresh_yellow_multiplier):
+                         obv_osc_thresh_yellow_multiplier, \
+                         obv_ma_len):
     global maSlopeThresh,maSlopeThreshYellowMultiplier, \
         obvOscThresh, obvOscThreshYellowMultiplier, overrideMultiplier
     maSlopeThresh = ma_slope_thresh
     maSlopeThreshYellowMultiplier = ma_slope_thresh_yellow_multiplier
     obvOscThresh =  obv_osc_thresh
     obvOscThreshYellowMultiplier = obv_osc_thresh_yellow_multiplier
+    cfgObvMaLen = obv_ma_len
     
 def printCFG():
     print(f"maSlopeThresh: {maSlopeThresh}")
@@ -60,16 +62,16 @@ def OBV(df):
     df['change'] = df['Adj Close'] - df['Open']
     df['direction'] = df['change'].apply(lambda x: 1 if x > 0 else -1 if x < 0 else 0)
     df['obv'] = df['direction'] * df['Volume']
-    df['obv'] = df['obv'].rolling(window=cfgMaxLookbackCandles, min_periods=1).sum() # instead of cumsum; this restricts it to historical candles spec in cfg
-    df['ma_obv'] = df['obv'].ewm(com=20, min_periods=5).mean()
+    df['obv'] = df['obv'].rolling(window=round(cfgMaxLookbackCandles/2), min_periods=round(cfgMaxLookbackCandles/2)).sum() # instead of cumsum; this restricts it to historical candles spec in cfg
+    df['ma_obv'] = df['obv'].rolling(window=cfgObvMaLen, min_periods=5).mean()
     df['ma_obv_diff'] = df['ma_obv'].diff(5)
     
     #OBV-Diff Max/Min diff should only look at previous candles, not future candles
     #Also restrict the lookback to cfgMaxLookbackCandles, to keep backtest results consistent
     #apples to apples with live trading
     
-    df['ma_obv_diff_max'] = df['ma_obv_diff'].rolling(window=cfgMaxLookbackCandles, min_periods=1).max()
-    df['ma_obv_diff_min'] = df['ma_obv_diff'].rolling(window=cfgMaxLookbackCandles, min_periods=1).min()
+    df['ma_obv_diff_max'] = df['ma_obv_diff'].rolling(window=round(cfgMaxLookbackCandles/2), min_periods=round(cfgMaxLookbackCandles/2)).max()
+    df['ma_obv_diff_min'] = df['ma_obv_diff'].rolling(window=round(cfgMaxLookbackCandles/2), min_periods=round(cfgMaxLookbackCandles/2)).min()
     df['obv_osc'] = df['ma_obv_diff'] / (df['ma_obv_diff_max'] - df['ma_obv_diff_min'])
     df['obv_osc_pct_change'] = df['obv_osc'].diff(2)/2
     df['obv_trend'] = np.where(df['obv_osc'] > obvOscThresh,1,0)
@@ -77,7 +79,8 @@ def OBV(df):
     
     # CLIP extreme
     df['obv_osc'] = df['obv_osc'].clip(lower=-1, upper=1)
-
+    # df.to_csv("obv1.csv")
+    # exit(0)
     return (df['ma_obv'],df['obv_osc'],df['obv_trend'],df['obv_osc_pct_change'])
 
 def tenAMToday (now=0):
@@ -463,8 +466,12 @@ def getSig_BB_CX(type,signal, isLastRow, row, df):
             s = -1
         else:
             raise Exception(f'Invalid type {type}')
-
-
+    
+    if tickerIsTrending(row['symbol']) and signalChanged(s,signal):
+        logging.warning("BB CX reset trend before exit trend exiter")
+        #Ideally this should never happen, as trend exiter should exit before this, but if it does happen then 
+        setTickerTrend(row.symbol, 0) #reset trend if we changed a trending ticker
+    
     logSignal('BB-X-CX',["adxData"],signal,s,row,type,isLastRow)
 
     return s
@@ -569,7 +576,7 @@ def getSig_OBV_FILTER (type,signal, isLastRow,row, df):
 # provide buy/sell signals that override BB for breakout trends
 def getSig_exitAnyExtremeADX_OBV_MA20_OVERRIDE (type, signal, isLastRow, row, df, 
                                                 last_signal=float('nan')):    
-    if not np.isnan(signal):
+    if (not np.isnan(signal)) or (tickerIsTrending(row.symbol)):
         # if singal =0, we are exiting already, nothing for this filter to do
         # if it is 1 or -1, its already been through relavent filters
         # Only if it is nan, then we have to ensure conditions have not gotten too bad
@@ -586,6 +593,8 @@ def getSig_exitAnyExtremeADX_OBV_MA20_OVERRIDE (type, signal, isLastRow, row, df
         #
         # NOTE: WE DO NOT WANT TO EXIT ON GENTLE BB CROSSOVERS IN THE EXIT HOUR
         # ONLY WE GET A GOOD PRICE OR IF CONDITIONS GET EXTREME IN THE WRONG DIRECTION
+        #
+        # Also ignore trending tickers; let signal exit handle them
         return signal 
 
     if not tickerHasPosition(row['symbol']):
@@ -737,7 +746,27 @@ def exitTrendFollowing(type, signal, isLastRow, row, df,
         logSignal('EXT-TRND',["obvData","adxData","maSlpData"],signal,s,row,type,isLastRow,f"({currTrend})")
         #logString = f"{row.symbol}:{row.i}:{{row.name if isLastRow else ''}}  => EXIT TREND({trend}) on fastMA crossover ADX:{row['ADX']} > {adxThresh} AND OBV:{row['OBV-OSC-PCT-CHNG']} > {obvOscThresh} AND MA20:{row['SLOPE-OSC']} > {maSlopeThresh}"
     else:
-        logSignal('CNT-TRND',["obvData","adxData","maSlpData"],signal,s,row,type,isLastRow,f"({currTrend}) cxOv:{fastMACrossedOverSlow} cxUn:{fastMACrossedUnderSlow} ",logWithNoSignalChange=True)
+        adxString = ""
+        maString = ""
+        obvString = ""
+        if adxIsGettingLower:
+            adxString = "adx L"
+        if maIsGettingHigher:
+            maString = "ma H"
+        elif maIsGettingLower:
+            maString = "ma L"
+        
+        if 'OBV-OSC-PCT-CHNG' in row:
+            if obvIsGettingHigher:
+                obvString = "obv H"
+            elif obvIsGettingLower:
+                obvString = "obv L"
+        else:
+            obvString = "obv N/A"
+            
+        logSignal('CNT-TRND',["obvData","adxData","maSlpData"],signal,s,row,type,isLastRow,
+                  f'({currTrend}) cx:{"Ov" if fastMACrossedOverSlow else "Un"} {adxString} {obvString} {maString} ',
+                  logWithNoSignalChange=True)
         #logString = f"{row.symbol}:{row.i}:{{row.name if isLastRow else ''}}  => DONT EXIT TREND YET ({trend}) cxOver:{fastMACrossedOverSlow} cxUndr:{fastMACrossedUnderSlow} ADX:{row['ADX']} > {adxThresh} AND OBV:{row['OBV-OSC-PCT-CHNG']} > {obvOscThresh} AND MA20:{row['SLOPE-OSC']} > {maSlopeThresh} "
     # if isLastRow:
     #     logging.info(logString)
