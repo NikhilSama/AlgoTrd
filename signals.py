@@ -17,6 +17,8 @@ import pytz
 import performance as perf
 import logging
 import pickle
+import tickerCfg
+
 #cfg has all the config parameters make them all globals here
 import cfg
 globals().update(vars(cfg))
@@ -31,21 +33,37 @@ def updateCFG(ma_slope_thresh, ma_slope_thresh_yellow_multiplier, \
                          obv_osc_thresh_yellow_multiplier, \
                          obv_ma_len):
     global maSlopeThresh,maSlopeThreshYellowMultiplier, \
-        obvOscThresh, obvOscThreshYellowMultiplier, overrideMultiplier
+        obvOscThresh, obvOscThreshYellowMultiplier, overrideMultiplier, \
+        cfgObvMaLen
     maSlopeThresh = ma_slope_thresh
     maSlopeThreshYellowMultiplier = ma_slope_thresh_yellow_multiplier
     obvOscThresh =  obv_osc_thresh
     obvOscThreshYellowMultiplier = obv_osc_thresh_yellow_multiplier
     cfgObvMaLen = obv_ma_len
-    
+
+def applyTickerSpecificCfg(ticker):
+
+    if ticker in tickerCfg.tickerCfg.keys():
+        tCfg = tickerCfg.tickerCfg[ticker]
+        for key, value in tCfg.items():
+            globals()[key] = value
+            #print(f"setting {key} to {value}")
+        
 def printCFG():
+    print(f"maLen: {maLen}")
+    print(f"bandWidth: {bandWidth}")
+    print(f"fastMALen: {fastMALen}")
+    print(f"atrLen: {atrLen}")
+    print(f"adxLen: {adxLen}")
+    print(f"adxThresh: {adxThresh}")
+    print(f"adxThreshYellowMultiplier: {adxThreshYellowMultiplier}")
+    print(f"numCandlesForSlopeProjection: {numCandlesForSlopeProjection}")
     print(f"maSlopeThresh: {maSlopeThresh}")
     print(f"maSlopeThreshYellowMultiplier: {maSlopeThreshYellowMultiplier}")
-    print(f"maSlopeSlopeThresh: {maSlopeSlopeThresh}")
     print(f"obvOscThresh: {obvOscThresh}")
     print(f"obvOscThreshYellowMultiplier: {obvOscThreshYellowMultiplier}")
-    print(f"obvOscSlopeThresh: {obvOscSlopeThresh}")
-    print(f"overrideMultiplier: {overrideMultiplier}")
+    print(f"cfgObvMaLen: {cfgObvMaLen}")
+    print(f"bet_size: {bet_size}")
     
 def MACD(DF,f=20,s=50):
     df = DF.copy()
@@ -882,7 +900,8 @@ def getSignal(row,signalGenerators, df):
     return s
 ## MAIN APPLY STRATEGY FUNCTION
 def applyIntraDayStrategy(df,analyticsGenerators=[populateBB], signalGenerators=[getSig_BB_CX],
-                        overrideSignalGenerators=[],tradingStartTime=None):
+                        overrideSignalGenerators=[],tradingStartTime=None, \
+                        applyTickerSpecificConfig=True):
     global startTime
     if tradingStartTime is not None:
         startTime = tradingStartTime
@@ -891,7 +910,11 @@ def applyIntraDayStrategy(df,analyticsGenerators=[populateBB], signalGenerators=
             if tradingStartTime is None:
                 startTime = datetime.datetime(2000,1,1,10,0,0) #Long ago :-)
                 startTime = ist.localize(startTime)
-            
+    
+    if applyTickerSpecificConfig:
+        applyTickerSpecificCfg(df['symbol'][0]) 
+        printCFG()
+    
     df['signal'] = float("nan")
     
     for analGen in analyticsGenerators:

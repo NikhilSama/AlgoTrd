@@ -123,7 +123,9 @@ def printTearsheet(tearsheet):
     for index,day in daily_returns.iteritems():
         print(f"\t {utils.timeToString(index,date=True,time=False)} Return:{day:.2%}")
     
-def backtest(t,i='minute',start = zgetFrom, end = zgetTo, exportCSV=False, tradingStartTime = firstTradeTime):
+def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
+            exportCSV=False, tradingStartTime = firstTradeTime, \
+            applyTickerSpecificConfig = True):
     #perfTIME = time.time()    
     #startingTime = perfTIME
     df = zget(t,start,end,i=i)
@@ -158,7 +160,9 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, exportCSV=False, tradi
     overrideSignalGenerators = []   
     
     signals.applyIntraDayStrategy(df,dataPopulators,signalGenerators,
-                                  overrideSignalGenerators, tradingStartTime=tradingStartTime)
+                                  overrideSignalGenerators, 
+                                  tradingStartTime=tradingStartTime,
+                                  applyTickerSpecificConfig=applyTickerSpecificConfig)
     #perfTIME = perfProfiler("SIGNAL GENERATION", perfTIME)
 
 
@@ -307,7 +311,7 @@ def backtestCombinator():
         signals.updateCFG(ma_slope_thresh, ma_slope_thresh_yellow_multiplier, \
                          obv_osc_thresh, \
                          obv_osc_thresh_yellow_multiplier, obv_ma_len)
-        tearsheetdf = backtest(cfgTicker,'minute')
+        tearsheetdf = backtest(cfgTicker,'minute',applyTickerSpecificConfig=False)
         
         # Add in config variables we are looping through to the tearsheetdf
         tearsheetdf['ma_slope_thresh'] = ma_slope_thresh
