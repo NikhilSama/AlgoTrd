@@ -58,7 +58,7 @@ perfTIME = time.time()
 
 cloud_args=''
 #if 'cloud' in sys.argv:
-cloud_args = 'cacheTickData:True zerodha_access_token:jwfl0et3mnJrafIL5OlzCGpNwWqiqIH3 dbhost:trading.ca6bwmzs39pr.ap-south-1.rds.amazonaws.com dbuser:trading dbpass:trading123 dbname:trading'
+cloud_args = 'cacheTickData:True zerodha_access_token:7U887TvMrAGWqed62SHqIJ7GdHfPO1DJ dbhost:trading.ca6bwmzs39pr.ap-south-1.rds.amazonaws.com dbuser:trading dbpass:trading123 dbname:trading'
 iter = 0
 
 def run_instance(args):
@@ -122,7 +122,7 @@ def argGenerator():
 def argGeneratorTest():
     ma_lens = [20, 25]
     band_widths = [2]
-    cfgTickers = ['NIFTY23APRFUT']
+    cfgTickers = ['HDFCBANK23APR1640CE','HDFCBANK23APR1640PE','NIFTY23APR17300PE','NIFTY23APR17300CE']
 
     for params in itertools.product(ma_lens, band_widths, cfgTickers):
         ma_len, band_width, cfgTicker = params
