@@ -5,7 +5,13 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 import time
+import tickerCfg
 
+#cfg has all the config parameters make them all globals here
+import cfg
+globals().update(vars(cfg))
+
+    
 def timeToString(t,date=False,time=True):
     if date and time:
         return t.strftime("%d-%m %I:%M %p")
@@ -35,15 +41,37 @@ def getUnderlyingTickerForFuture(t):
         return uderlying_ticker
     else:
         return None
-def optionTypeFromTicker(t):
-    pattern = r'^[A-Z]+\d+(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)?\d+(?:PE|CE)$'
+def explodeOptionTicker(t):
+    pattern = r'^([A-Z]+)\d+(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)?\d+((?:PE|CE))$'
     match = re.match(pattern, t)
     if match:
-        return t[-2:]
+        return (match.group(1), match.group(2))
     else:
         return False
+def optionTypeFromTicker(t):
+    if explodeOptionTicker(t):
+        return explodeOptionTicker(t)[1]
+def optionUnderlyingFromTicker(t):
+    if explodeOptionTicker(t):
+        return explodeOptionTicker(t)[0]
+def isPutOption(t):
+    return optionTypeFromTicker(t) == 'PE'
+def isCallOption(t):
+    return optionTypeFromTicker(t) == 'CE'
+def isOption(t):
+    return isPutOption(t) or isCallOption(t)
 def convertPEtoCEAndViceVersa(t):
     if optionTypeFromTicker(t):     
         return t[:-2] + ('CE' if t[-2] == 'P' else 'PE')
     else:
         return t
+def getTickerCfg(ticker):
+    if explodeOptionTicker(ticker):
+        ticker = explodeOptionTicker(ticker)[0]
+        
+    if ticker in tickerCfg.tickerCfg:
+        print(f"Applying CFG for {ticker}")
+        return tickerCfg.tickerCfg[ticker]
+    else:
+        print(f"No CFG for {ticker}. Reverting to default CFG")
+        return cfgDict

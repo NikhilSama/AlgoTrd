@@ -85,12 +85,12 @@ def initKiteTicker():
     kws = initKws(getAccessToken(kite))
     return kite,kws
 
-def logtrade(s='',ticker=0,position=0,q=0,p=0,ltp=0,lot_size=0,e='NSE'):
+def logtrade(s='',ticker=0,position=0,q=0,p=0,ltp=0,lot_size=0,tick_size=0,e='NSE'):
     time = datetime.now(ist).strftime("%I:%M:%S %p")
     p = round(p,2)
         
     if s == '':
-        s = f'{time} -> {position} {q} {e}:{ticker} @ {p} (ltp:{ltp}, lot:{lot_size})'
+        s = f'{time} -> {position} {q} {e}:{ticker} @ {p} (ltp:{ltp}, lot:{lot_size}, tick:{tick_size})'
     else:
         s = f'{time} -> {s}' 
     with open(tradelog, "a") as f:
@@ -104,6 +104,7 @@ def logtrade(s='',ticker=0,position=0,q=0,p=0,ltp=0,lot_size=0,e='NSE'):
     
 def getQ (lot_size,ltp,betsize, qToExit=0):
     if (lot_size > 1):
+        print(f"betsize: {betsize} lot_size: {lot_size}")
         q = max(round((betsize/ltp)/lot_size),1)*lot_size
         return q+qToExit if qToExit else q
         return 10*(lot_size+qToExit) if qToExit else (10*lot_size)
@@ -180,12 +181,11 @@ def get_ltp(kite,t,exchange):
         return 0
 
     return ltp
-
-def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,qToExit=0):
+    
+def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,qToExit=0,betsize=bet_size):
     if is_not_tradable(t):
         logging.info(f"{t} is not a tradable instrument.  {exchange} {tx_type} not executed")
         return
-
     if (ltp ==0):
         #Get ltp if not provided
         ltp = kite.ltp([f"{exchange}:{t}"])
@@ -196,7 +196,7 @@ def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,qToExi
             return
         
     if q==0:
-        q = getQ(lot_size,ltp,bet_size, qToExit)
+        q = getQ(lot_size,ltp,betsize, qToExit)
             
     delta = getDelta(exchange,tx_type)
     
@@ -206,7 +206,7 @@ def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,qToExi
 
     kite_tx_type = getTxType(kite,tx_type)
 
-    logtrade('',t,tx_type,q,p,ltp,lot_size,exchange)
+    logtrade('',t,tx_type,q,p,ltp,lot_size,tick_size,exchange)
         
     # logtrade(f'{tx_type} {t} Q:{q} P:{p} LTP:{ltp} Tick:{tick_size}',
     #          t,tx_type,q,p)
@@ -237,17 +237,17 @@ def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,qToExi
         return -1
     return order_id
 
-def nse_buy (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,exchange='NSE',qToExit=0):
-    return exec(kite,t,exchange,'BUY',lot_size,tick_size,q,ltp,sl,qToExit)
+def nse_buy (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,exchange='NSE',qToExit=0,betsize=bet_size):
+    return exec(kite,t,exchange,'BUY',lot_size,tick_size,q,ltp,sl,qToExit,betsize)
 
-def nse_sell (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,exchange='NSE',qToExit=0):
-    return exec(kite,t,exchange,'SELL',lot_size,tick_size,q,ltp,sl,qToExit)
+def nse_sell (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,exchange='NSE',qToExit=0,betsize=bet_size):
+    return exec(kite,t,exchange,'SELL',lot_size,tick_size,q,ltp,sl,qToExit,betsize)
 
-def nfo_buy (kite,t,lot_size=1,tick_size=0.5, q=1,ltp=0,sl=0,qToExit=0):
-    return exec(kite,t,'NFO', 'BUY', lot_size,tick_size,q,ltp,sl,qToExit)
+def nfo_buy (kite,t,lot_size=1,tick_size=0.5, q=1,ltp=0,sl=0,qToExit=0,betsize=bet_size):
+    return exec(kite,t,'NFO', 'BUY', lot_size,tick_size,q,ltp,sl,qToExit,betsize)
     
-def nfo_sell (kite, t, lot_size=1, tick_size=0.5, q=0,ltp=0,sl=0, qToExit=0):
-    return exec(kite,t,'NFO', 'SELL', lot_size,tick_size,q,ltp,sl,qToExit)
+def nfo_sell (kite, t, lot_size=1, tick_size=0.5, q=0,ltp=0,sl=0, qToExit=0,betsize=bet_size):
+    return exec(kite,t,'NFO', 'SELL', lot_size,tick_size,q,ltp,sl,qToExit,betsize)
 
 def gettFromOption (string):
     if 'NIFTY' in string:
@@ -313,13 +313,11 @@ def exit_positions (kite,t='day',lot_size=1,tick_size=0.5):
     logtrade(f'{datetime.now(ist).strftime("%I:%M %p")}-> EXIT {t} lot_size: {lot_size} tick_size{tick_size}')
 
     for position in positions['day']:
-        #print(position)
         symb = position['tradingsymbol']
         q = position['quantity']
         prod = position['product']
         
         if q != 0 and prod == 'MIS' and(t == 'day' or t == gettFromOption(symb)) :
-            #print ("has it")
             ltp = position['last_price']
             if (q>0):
                 #Long position, need to sell to exit
