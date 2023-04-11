@@ -99,7 +99,7 @@ def argGenerator():
     adx_thresh_yellow_multipliers = [0.7, 0.9, 1]
     num_candles_for_slope_proj = [2,6]
     atr_lens = [14,20]
-    cfgTickers = ['KOTAKBANK','RELIANCE']
+    cfgTickers = ['HDFCBANK23APR1640CE','HDFCBANK23APR1640PE','NIFTY23APR17300PE','NIFTY23APR17300CE']
     for params in itertools.product(ma_lens, band_widths, fast_ma_lens, adx_lens, adx_thresholds, adx_thresh_yellow_multipliers, num_candles_for_slope_proj,
                                     atr_lens, cfgTickers):
         ma_len, band_width, fast_ma_len, adx_len, adx_thresh, adx_thresh_yellow_multiplier, num_candles, atr_len, cfgTicker, \
