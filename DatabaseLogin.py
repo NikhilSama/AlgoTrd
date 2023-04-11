@@ -122,10 +122,15 @@ class DBBasic:
             return df.iloc[0,0],df.iloc[0,1],df.iloc[0,2]
         else:
             return -1
+    #This function takes a ticker, and returns the underlying option ticker
+    #closest to price and soonest expiry
+    #If given ticker is an option, then it returns the same ticker along with log and tick_size
+    #If given ticker is a future, then it returns the underlying option ticker
+    #IF it an put option and the request is call, then it returns the call option instead. 
     def get_option_ticker(self,ticker,price,type,kite,strike=0):
         #get rid of anything after a space in ticker NIFTY 50 => NIFTY
         ticker = ticker.split(' ',1)[0]
-                    
+
         #find the option for this ticker with strike closest to price, and soonest expiry
         tickerType = utils.optionTypeFromTicker(ticker)
         if not tickerType:
@@ -134,11 +139,12 @@ class DBBasic:
                 price = price -150 #TODO HACK - futures are 150 points off on avg; ideally get the ltp of the future and use that
         if not tickerType:
             q = f"SELECT tradingsymbol,lot_size,tick_size FROM trading.instruments_zerodha where instrument_type = '{type}' and underlying_ticker = '{ticker}' AND expiry > '{date.today()}' ORDER BY ABS( strike - {price} ) ASC, expiry ASC LIMIT 1"
-        elif tickerType == type:
-            q = f"SELECT tradingsymbol,lot_size,tick_size FROM trading.instruments_zerodha where instrument_type = '{type}' and tradingsymbol = '{ticker}' AND expiry > '{date.today()}' ORDER BY ABS( strike - {price} ) ASC, expiry ASC LIMIT 1"    
-        else:#Ticker is PE and request is CE or vice versa
-            inverseTicker = utils.convertPEtoCEAndViceVersa(ticker)
-            q = f"SELECT tradingsymbol,lot_size,tick_size FROM trading.instruments_zerodha where instrument_type = '{type}' and tradingsymbol = '{inverseTicker}' AND expiry > '{date.today()}' ORDER BY ABS( strike - {price} ) ASC, expiry ASC LIMIT 1"    
+        else:
+            #ticker is alreadu an option; just return the same ticker, with lot_size and tick_size
+            q = f"SELECT tradingsymbol,lot_size,tick_size FROM trading.instruments_zerodha where tradingsymbol = '{ticker}' AND expiry > '{date.today()}' ORDER BY ABS( strike - {price} ) ASC, expiry ASC LIMIT 1"    
+        # else:#Ticker is PE and request is CE or vice versa
+        #     inverseTicker = utils.convertPEtoCEAndViceVersa(ticker)
+        #     q = f"SELECT tradingsymbol,lot_size,tick_size FROM trading.instruments_zerodha where instrument_type = '{type}' and tradingsymbol = '{inverseTicker}' AND expiry > '{date.today()}' ORDER BY ABS( strike - {price} ) ASC, expiry ASC LIMIT 1"    
 
         df = pd.read_sql(q, con=self.engine)
         if len(df) > 0:
