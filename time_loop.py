@@ -31,6 +31,8 @@ import signal
 import sys
 import math
 import threading
+import tickerCfg
+import utils
 
 #cfg has all the config parameters make them all globals here
 import cfg
@@ -54,7 +56,7 @@ signal.signal(signal.SIGTERM, sigterm_handler)
 
 if cfgFreezeGun:
     from freezegun import freeze_time
-    freezeTime = "Apr 6th, 2023 13:58:00+0530"
+    freezeTime = "Apr 11th, 2023 10:58:00+0530"
     freezer = freeze_time(freezeTime, tick=True)
     freezer.start()
     print ("Freeze gun is on. Time is frozen at: ", freezeTime)
@@ -63,6 +65,13 @@ if cfgFreezeGun:
 # set timezone to IST
 ist = pytz.timezone('Asia/Kolkata')
 
+def applyTickerSpecificCfg(ticker):
+        
+    tCfg = utils.getTickerCfg(ticker)
+    
+    for key, value in tCfg.items():
+        globals()[key] = value
+        #print(f"setting {key} to {value}")
 
 def sleep_till_10am():
     global now
@@ -138,13 +147,18 @@ def exitCondition(df,net_position):
 
 def exitCurrentPosition(t,positions,net_position,nextPosition):
     qToExit = 0
+    optType = None
+    if utils.isOption(t):
+        (t,optType) = utils.explodeOptionTicker(t)
+        if optType == 'PE':
+            nextPosition = -1 * nextPosition
+                
     if t in positions: 
         #if multiple position exists, exit all
         if (len(positions[t]['positions']) > 1):
             logging.error("More than one position exists for {t}. Exiting all")
-            ki.exit_given_positions(kite,positions[t]['positions'])
+            ki.exit_given_positions(kite,positions[t]['positions'],nextPosition)
         else:
-
             if (net_position == -1 and nextPosition == 1) or \
                 (net_position == 1 and nextPosition == -1):
                 #Exit Options positions, because we always engage in options by selling
@@ -152,10 +166,19 @@ def exitCurrentPosition(t,positions,net_position,nextPosition):
                 #positions by buying 2 calls; instead we sell the call and then sell
                 #a put;  So we need to exit any options positions here if the 
                 #net position is not consistant with nextPosition
-                ki.exitNFOPositionsONLY(kite,positions[t]['positions'])
-                #For Equity positions we can reverse simply by doubling the buy when 
-                # we change direction; so we dont need to exit equity positions here
-                qToExit = positions[t]['positions'][0]['quantity']# We have a short position, so we need to exit both
+                if (optType is None):
+                    #ticker is not an option, exit any option positions we took
+                    #for this ticker; cant doubleQ to exit
+                    ki.exitNFOPositionsONLY(kite,positions[t]['positions'])
+                    #For Equity positions we can reverse simply by doubling the buy when 
+                    # we change direction; so we dont need to exit equity positions here
+                    qToExit = positions[t]['positions'][0]['quantity'] if \
+                        positions[t]['positions'][0]['exchange'] != 'NFO' else 0
+                else:
+                    #ticker is an  option, we can exit by just doubling the quantity
+                    qToExit = positions[t]['positions'][0]['quantity'] if \
+                        positions[t]['positions'][0]['exchange'] == 'NFO' else 0# We have a short position, so we need to exit both
+
     return qToExit
 
 
@@ -171,10 +194,54 @@ def tradeNotification(type, t,ltp,signal,position,net_position):
         liveTVThread.start()
             #liveCharts.loadChart(t)
 
+def checkPositionsForConsistency(positions,df):
+    ## DF Position can mismatch with kit positions for several reasons
+    # 1) We missed the previous tick -- Either softare was slow, or kite 
+    #  historical data api failed ephemerally, or in some cases it is is 
+    # even possible that kite api returns an incomplete final tick, with
+    # best OHLV data, and that tick data itself changes when fetched again 
+    # in future, as complete data is complied with acurate data
+    #
+    # Either way if df position is inconsistant w Kite, then change Kite
+    # position to become consistant
+    net_position = 0
+
+    t = df['symbol'][0]
+    signal = df['signal'][-1]
+    position = df['position'][-1]
+    optType = None
+    
+    if utils.isOption(t):
+        (t,optType) = utils.explodeOptionTicker(t)
+            
+    if t in positions:
+        net_position = positions[t]['net_position']
+        if optType == 'PE':
+            net_position = -1 * net_position#HACK: For Put Options, we need to reverse the net_position, since positions are based 
+        #HACK long or short of the underlying ticker.  So if we go long a put option, we are short the underlying ticker
+            
+        # net_position can be 1,-1 or 'inconsistent'
+        # if inconsistent, then we need to exit all positions
+        if (np.isnan(signal) and position != net_position):
+#                if (df['signal'][-1] != net_position):
+            logging.info(f"{t}: Exiting inconsistant Positions.  Live Kite positions({positions[t]['net_position']} inconsistant with DF pos:{position} signal: {signal} ")
+            ki.exit_given_positions(kite,positions[t]['positions'],signal)
+            net_position =0
+            del positions[t]
+#        elif (not math.isnan(df['signal'][-1])) and df['position'][-1] != 0:
+    elif position != 0:
+            logging.info(f"{t}: No Live Kite positions inconsistant with DF ({position})")
+    
+    return net_position
+
+
 def generateSignalsAndTrade(df,positions,stock,options,dfStartTime=None):
     # Stuff to hack if this function is called from KitTicker instaed of 
     # time_loop
     global now
+    
+    applyTickerSpecificCfg(df['symbol'][0]) 
+
     now = df.index[-1]
     if dfStartTime is not None:
         dfStartTime = df.index[0]
@@ -202,30 +269,9 @@ def generateSignalsAndTrade(df,positions,stock,options,dfStartTime=None):
     downloader.cache_df(df, t, dfStartTime, now)
         
     ltp = df['Adj Close'][-1]
-    ## DF Position can mismatch with kit positions for several reasons
-    # 1) We missed the previous tick -- Either softare was slow, or kite 
-    #  historical data api failed ephemerally, or in some cases it is is 
-    # even possible that kite api returns an incomplete final tick, with
-    # best OHLV data, and that tick data itself changes when fetched again 
-    # in future, as complete data is complied with acurate data
-    #
-    # Either way if df position is inconsistant w Kite, then change Kite
-    # position to become consistant
-    net_position = 0
-    if t in positions:
-        net_position = positions[t]['net_position']
-        # net_position can be 1,-1 or 'inconsistent'
-        # if inconsistent, then we need to exit all positions
-        if (np.isnan(df['signal'][-1]) and df['position'][-1] != net_position):
-#                if (df['signal'][-1] != net_position):
-            logging.info(f"{t}: Exiting inconsistant Positions.  Live Kite positions({positions[t]['net_position']} inconsistant with DF pos:{df['position'][-1]} signal: {df['signal'][-1]} ")
-            ki.exit_given_positions(kite,positions[t]['positions'],df['signal'][-1])
-            net_position =0
-            del positions[t]
-#        elif (not math.isnan(df['signal'][-1])) and df['position'][-1] != 0:
-    elif df['position'][-1] != 0:
-            logging.info(f"{t}: No Live Kite positions inconsistant with DF ({df['position'][-1]})")
-            
+
+    net_position = checkPositionsForConsistency(positions,df)
+                
     if ('signal' not in df.columns or 'position' not in df.columns):
         logging.error('signal or position does not exist in dataframe')
         logging.error(df)
@@ -239,7 +285,14 @@ def generateSignalsAndTrade(df,positions,stock,options,dfStartTime=None):
             ki.nse_buy(kite,t,qToExit=qToExit) 
         if options:
             tput,tput_lot_size,tput_tick_size = db.get_option_ticker(t, ltp, 'PE',kite)
-            ki.nfo_sell(kite,tput,tput_lot_size,tput_tick_size,qToExit=0) 
+            if utils.isOption(t):
+                #ticker is itself an option; just buy it
+                ki.nfo_buy(kite,tput,tput_lot_size,tput_tick_size,qToExit=qToExit,betsize=bet_size)                 
+            else:
+                #ticker is a stock or future, passed with options = True
+                #parameters; so we need to sell put option with this underlyting
+                #ticker
+                ki.nfo_sell(kite,tput,tput_lot_size,tput_tick_size,qToExit=qToExit,betsize=bet_size) 
         tradeNotification("GO LONG", t,ltp,df['signal'][-1],df['position'][-1],net_position)
 
     
@@ -250,8 +303,11 @@ def generateSignalsAndTrade(df,positions,stock,options,dfStartTime=None):
         if stock:
             ki.nse_sell(kite,t,qToExit=qToExit)
         if options:
+            # No need to check utils.isOption() here.  If it is an option, then 
+            #get_option_ticker() will return the same ticker and we need to sell it to 
+            #go short anyway
             tcall,tcall_lot_size,tcall_tick_size = db.get_option_ticker(t, ltp, 'CE',kite)
-            ki.nfo_sell(kite,tcall,tcall_lot_size,tcall_tick_size,qToExit=0)
+            ki.nfo_sell(kite,tcall,tcall_lot_size,tcall_tick_size,qToExit=qToExit,betsize=bet_size)
         
         tradeNotification("GO SHORT", t,ltp,df['signal'][-1],df['position'][-1],net_position)
         
@@ -296,7 +352,7 @@ if isTimeLoop:
         nxt_tick = now + timedelta(minutes=1) - timedelta(seconds=now.second)
 
         #Tick during market hours only
-        positions = Tick(stock=False, options=includeOptions)
+        positions = Tick(stock=False, options=True)
             
         now = datetime.datetime.now(ist)
         #Sleep for seconds until the next minute
