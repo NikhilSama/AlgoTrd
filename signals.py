@@ -18,6 +18,7 @@ import performance as perf
 import logging
 import pickle
 import tickerCfg
+import utils
 
 #cfg has all the config parameters make them all globals here
 import cfg
@@ -42,28 +43,26 @@ def updateCFG(ma_slope_thresh, ma_slope_thresh_yellow_multiplier, \
     cfgObvMaLen = obv_ma_len
 
 def applyTickerSpecificCfg(ticker):
-
-    if ticker in tickerCfg.tickerCfg.keys():
-        tCfg = tickerCfg.tickerCfg[ticker]
-        for key, value in tCfg.items():
-            globals()[key] = value
-            #print(f"setting {key} to {value}")
+    tCfg = utils.getTickerCfg(ticker)    
+    for key, value in tCfg.items():
+        globals()[key] = value
+        #print(f"setting {key} to {value}")
         
 def printCFG():
-    print(f"maLen: {maLen}")
-    print(f"bandWidth: {bandWidth}")
-    print(f"fastMALen: {fastMALen}")
-    print(f"atrLen: {atrLen}")
-    print(f"adxLen: {adxLen}")
-    print(f"adxThresh: {adxThresh}")
-    print(f"adxThreshYellowMultiplier: {adxThreshYellowMultiplier}")
-    print(f"numCandlesForSlopeProjection: {numCandlesForSlopeProjection}")
-    print(f"maSlopeThresh: {maSlopeThresh}")
-    print(f"maSlopeThreshYellowMultiplier: {maSlopeThreshYellowMultiplier}")
-    print(f"obvOscThresh: {obvOscThresh}")
-    print(f"obvOscThreshYellowMultiplier: {obvOscThreshYellowMultiplier}")
-    print(f"cfgObvMaLen: {cfgObvMaLen}")
-    print(f"bet_size: {bet_size}")
+    print(f"\tmaLen: {maLen}")
+    print(f"\tbandWidth: {bandWidth}")
+    print(f"\tfastMALen: {fastMALen}")
+    print(f"\tatrLen: {atrLen}")
+    print(f"\tadxLen: {adxLen}")
+    print(f"\tadxThresh: {adxThresh}")
+    print(f"\tadxThreshYellowMultiplier: {adxThreshYellowMultiplier}")
+    print(f"\tnumCandlesForSlopeProjection: {numCandlesForSlopeProjection}")
+    print(f"\tmaSlopeThresh: {maSlopeThresh}")
+    print(f"\tmaSlopeThreshYellowMultiplier: {maSlopeThreshYellowMultiplier}")
+    print(f"\tobvOscThresh: {obvOscThresh}")
+    print(f"\tobvOscThreshYellowMultiplier: {obvOscThreshYellowMultiplier}")
+    print(f"\tcfgObvMaLen: {cfgObvMaLen}")
+    print(f"\tbet_size: {bet_size}")
     
 def MACD(DF,f=20,s=50):
     df = DF.copy()
@@ -80,7 +79,7 @@ def OBV(df):
     df['change'] = df['Adj Close'] - df['Open']
     df['direction'] = df['change'].apply(lambda x: 1 if x > 0 else -1 if x < 0 else 0)
     df['obv'] = df['direction'] * df['Volume']
-    df['obv'] = df['obv'].rolling(window=round(cfgMaxLookbackCandles/2), min_periods=round(cfgMaxLookbackCandles/2)).sum() # instead of cumsum; this restricts it to historical candles spec in cfg
+    df['obv'] = df['obv'].rolling(window=round(cfgMaxLookbackCandles/3), min_periods=round(cfgMaxLookbackCandles/3)).sum() # instead of cumsum; this restricts it to historical candles spec in cfg
     df['ma_obv'] = df['obv'].rolling(window=cfgObvMaLen, min_periods=5).mean()
     df['ma_obv_diff'] = df['ma_obv'].diff(5)
     
@@ -88,8 +87,8 @@ def OBV(df):
     #Also restrict the lookback to cfgMaxLookbackCandles, to keep backtest results consistent
     #apples to apples with live trading
     
-    df['ma_obv_diff_max'] = df['ma_obv_diff'].rolling(window=round(cfgMaxLookbackCandles/2), min_periods=round(cfgMaxLookbackCandles/2)).max()
-    df['ma_obv_diff_min'] = df['ma_obv_diff'].rolling(window=round(cfgMaxLookbackCandles/2), min_periods=round(cfgMaxLookbackCandles/2)).min()
+    df['ma_obv_diff_max'] = df['ma_obv_diff'].rolling(window=round(cfgMaxLookbackCandles/3), min_periods=round(cfgMaxLookbackCandles/3)).max()
+    df['ma_obv_diff_min'] = df['ma_obv_diff'].rolling(window=round(cfgMaxLookbackCandles/3), min_periods=round(cfgMaxLookbackCandles/3)).min()
     df['obv_osc'] = df['ma_obv_diff'] / (df['ma_obv_diff_max'] - df['ma_obv_diff_min'])
     df['obv_osc_pct_change'] = df['obv_osc'].diff(2)/2
     df['obv_trend'] = np.where(df['obv_osc'] > obvOscThresh,1,0)
@@ -486,8 +485,9 @@ def getSig_BB_CX(type,signal, isLastRow, row, df):
             raise Exception(f'Invalid type {type}')
     
     if tickerIsTrending(row['symbol']) and signalChanged(s,signal):
-        logging.warning("BB CX reset trend before exit trend exiter")
-        #Ideally this should never happen, as trend exiter should exit before this, but if it does happen then 
+        if isLastRow:
+            logging.warning(f"{row.symbol}  signal:{signal} s:{s} trend:{getTickerTrend(row['symbol'])} BB CX reset trend before exit trend exiter")
+            #Ideally this should never happen, as trend exiter should exit before this, but if it does happen then 
         setTickerTrend(row.symbol, 0) #reset trend if we changed a trending ticker
     
     logSignal('BB-X-CX',["adxData"],signal,s,row,type,isLastRow)
@@ -677,7 +677,11 @@ def getSig_followAllExtremeADX_OBV_MA20_OVERRIDE (type, signal, isLastRow, row, 
         return signal
     s = signal 
     adxIsHigh = 1 if row['ADX'] >= adxThresh else 0
-    obvIsHigh = 1 if (('OBV-OSC' in row) and (abs(row['OBV-OSC']) >= obvOscThresh)) else 0
+    if 'OBV-OSC' in row:
+        obvIsHigh = 1 if (abs(row['OBV-OSC']) >= obvOscThresh) else 0
+    else:
+        obvIsHigh = 1 # if we dont have obv, then we assume its high
+        
     # if adx and obv are high, then maSlope needs to be just somewhat high (yello multiplier)
     # obv and adx are more telling of trends than ma which could be delayed or less extreme
     slopeIsHigh = 1 if abs(row['SLOPE-OSC']) >= maSlopeThresh*maSlopeThreshYellowMultiplier else 0
@@ -686,10 +690,7 @@ def getSig_followAllExtremeADX_OBV_MA20_OVERRIDE (type, signal, isLastRow, row, 
     obvIsPositive = True if ((obvOsc is None) or (obvOsc > 0)) else False
     obvIsNegative = True if ((obvOsc is None) or (obvOsc < 0)) else False
     
-    if obvOsc is None:
-        num_conditions = cfgNumConditionsForTrendFollow - 1
-    else:
-        num_conditions = cfgNumConditionsForTrendFollow
+    num_conditions = cfgNumConditionsForTrendFollow
     
     maSlopesUp = row['SLOPE-OSC'] > 0
     maSlopesDn = row['SLOPE-OSC'] < 0
@@ -903,6 +904,12 @@ def applyIntraDayStrategy(df,analyticsGenerators=[populateBB], signalGenerators=
                         overrideSignalGenerators=[],tradingStartTime=None, \
                         applyTickerSpecificConfig=True):
     global startTime
+    
+    
+    if applyTickerSpecificConfig:
+        applyTickerSpecificCfg(df['symbol'][0]) 
+        #printCFG()
+        
     if tradingStartTime is not None:
         startTime = tradingStartTime
     else:
@@ -911,9 +918,6 @@ def applyIntraDayStrategy(df,analyticsGenerators=[populateBB], signalGenerators=
                 startTime = datetime.datetime(2000,1,1,10,0,0) #Long ago :-)
                 startTime = ist.localize(startTime)
     
-    if applyTickerSpecificConfig:
-        applyTickerSpecificCfg(df['symbol'][0]) 
-        printCFG()
     
     df['signal'] = float("nan")
     
