@@ -76,14 +76,16 @@ ist = pytz.timezone('Asia/Kolkata')
 tickers = td.get_sp500_tickers()
 nifty = td.get_nifty_tickers()
 index_tickers = td.get_index_tickers()
-firstTradeTime = datetime.datetime(2023, 2,17, 9, 0, tzinfo=ist)
+firstTradeTime = datetime.datetime(2023, 3,31, 9, 0, tzinfo=ist)
 zgetFrom = firstTradeTime - timedelta(days=cfgHistoricalDaysToGet)
-zgetTo = datetime.datetime(2023, 4,7, 15, 30, tzinfo=ist)
+zgetTo = datetime.datetime(2023, 4,11, 15, 30, tzinfo=ist)
 
 def zget(t,s,e,i):
     #Get latest minute tick from zerodha
     df = downloader.zget(s,e,t,i,includeOptions=includeOptions)
     df = downloader.zColsToDbCols(df)
+    if utils.isOption(t):
+        df['Volume'] = 0
     return df
 def zgetNDays(t,n,e=datetime.datetime.now(ist),i="minute"):
     s = e - timedelta(days=n)
@@ -189,10 +191,10 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
         return tearsheetdf
     
     if 'options' in plot:
-        plot_stock_and_option(df)
+        plot_stock_and_option(df.loc[firstTradeTime:])
         
     if 'adjCloseGraph' in plot:
-        plot_backtest(df,tearsheet['trades'])
+        plot_backtest(df.loc[firstTradeTime:],tearsheet['trades'])
     
     # print (f"END Complete {datetime.datetime.now(ist)}")
     return tearsheetdf
@@ -285,16 +287,16 @@ def backtestCombinator():
     
     ma_slope_threshes = [0.5, 1, 1.5]
     ma_slope_thresh_yellow_multipliers = [0.5,0.7,0.9]
-    obv_osc_threshes = [0.1, 0.2, 0.4]
-    obv_osc_thresh_yellow_multipliers = [0.7, 0.9, 1]
-    obv_ma_lens = [10,20,30]
+    # obv_osc_threshes = [0.1, 0.2, 0.4]
+    # obv_osc_thresh_yellow_multipliers = [0.7, 0.9, 1]
+    # obv_ma_lens = [10,20,30]
 
     # ma_slope_threshes = [0.5]
     # ma_slope_thresh_yellow_multipliers = [0.5]
     # ma_slope_slope_threshes = [0.1]
-    # obv_osc_threshes = [0.1]
-    # obv_osc_thresh_yellow_multipliers = [0.7,0.9]
-    # obv_ma_lens = [20]
+    obv_osc_threshes = [0.1]
+    obv_osc_thresh_yellow_multipliers = [0.9]
+    obv_ma_lens = [20]
 
     # This loop will run 3^4 = 89 times; each run will be about 
     # 3 second, so total 267 seconds = 4.5 minutes
@@ -340,13 +342,13 @@ def backtestCombinator():
     # create a database connection (performance to CSV adds the 
     # argv variables as well to the performance df)
     engine = create_engine('mysql+pymysql://trading:trading123@trading.ca6bwmzs39pr.ap-south-1.rds.amazonaws.com/trading')
-    performance.to_sql('performancev3', engine, if_exists='append')
+    performance.to_sql('performancev4', engine, if_exists='append')
     engine.dispose()
 
 if isMain:
     #backtestCombinator()       
     #plot_options(['ASIANPAINT'],10,'minute')
-    backtest('RELIANCE','minute')
+    backtest('NIFTY23APR17300CE','minute')
     #backtest(cfgTicker,'minute')
     #backtest_daybyday('NIFTY23APRFUT','minute')
 
@@ -361,3 +363,4 @@ if isMain:
     # print hello
     # print hello
 
+#NIFTY2341317500PE
