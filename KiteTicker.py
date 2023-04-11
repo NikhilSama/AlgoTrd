@@ -122,6 +122,7 @@ def subscribeToTickerData():
 
 def addTicksToTickDF(ticks):
     global nifty_ltp
+    #tickerlog(f"{ticks}")
     #add the tick to the tick df
     for tick in ticks:
         token = tick['instrument_token']
@@ -130,7 +131,6 @@ def addTicksToTickDF(ticks):
             # we subscribe just to get the ltp
             nifty_ltp = tick['last_price']
             continue
-        
         #Insert this tick into the tick df
         tick_time = tick['exchange_timestamp']
         tick_time = ist.localize(tick_time)
@@ -141,7 +141,7 @@ def addTicksToTickDF(ticks):
             'Adj Close': tick['last_price'],
             'Volume': tick['volume_traded'] if 'volume_traded' in tick else 0
         }
-        tickersToTrack[token]['ticks'].loc[tick_time] = tick_df_row    
+        tickersToTrack[token]['ticks'].loc[tick_time] = tick_df_row  
         
 def resampleToMinDF():
     resampled_tokens = []
@@ -223,7 +223,8 @@ def tick(tokens):
     positions = tl.get_positions()
     for token in tokens:
         tickerlog(f"tickThread generating signals for: token {token} {tickersToTrack[token]['ticker']}")
-        tl.generateSignalsAndTrade(tickersToTrack[token]['df'].copy(),positions,False,True)
+        tl.generateSignalsAndTrade(tickersToTrack[token]['df'].copy(),positions,
+                                   False,True,dfStartTime=signals.tenAMToday(now))
 
 def processTicks(ticks):
     #add the tick to the tick df
@@ -268,6 +269,32 @@ def on_ticks(ws, ticks):
     
     # print(ctime(time()),">>>Bid=",bid," ASK=",ask, " Last Trade: ", ticks[0]["last_trade_time"])
 
+def on_message(ws, payload, is_binary):
+    # Callback to receive all messages.
+    if is_binary:
+        tickerlog("Binary message received: {}".format(len(payload)))
+    else:
+        tickerlog("Message: {}".format(payload))
+    
+def on_order_update(ws, data):
+    # Callback to receive order updates.
+    ticker = data['tradingsymbol']
+    status = data['status']
+    tx = data['transaction_type']
+    q = data['quantity']
+    p = data['price']
+    filled = data['filled_quantity']
+    
+    tickerlog("Order update: {}".format(data))  
+    tickerlog(f"Order update: {tx} {q} {ticker}@{q} {status} filledQ:{filled}")
+    # { #NOTE:SAMPLE DATA
+    # 'account_id': 'ZT1533', 'unfilled_quantity': 0, 'checksum': '', 'placed_by': 'ZT1533', 'order_id': '230411401989627', 'exchange_order_id': '2500000086137901', 'parent_order_id': None, 'status': 'OPEN', 'status_message': None, 'status_message_raw': None, 'order_timestamp': '2023-04-11 14:21:05', 'exchange_update_timestamp': '2023-04-11 14:21:05', 'exchange_timestamp': '2023-04-11 14:21:05', 'variety': 'regular', 'exchange': 'NFO', 'tradingsymbol': 'RELIANCE23APR2340PE', 'instrument_token': 36528898, 'order_type': 'LIMIT', 'transaction_type': 'BUY', 'validity': 'TTL', 'product': 'MIS', 'quantity': 250, 'disclosed_quantity': 0, 'price': 38, 'trigger_price': 0, 'average_price': 0, 'filled_quantity': 0, 'pending_quantity': 250, 'cancelled_quantity': 0, 'market_protection': 0, 'meta': {}, 'tag': None, 'guid': '71318X4ytREEwqnRDj'
+    # }
+
+
+    # {
+    # 'account_id': 'ZT1533', 'unfilled_quantity': 0, 'checksum': '', 'placed_by': 'ZT1533', 'order_id': '230411401989627', 'exchange_order_id': '2500000086137901', 'parent_order_id': None, 'status': 'COMPLETE', 'status_message': None, 'status_message_raw': None, 'order_timestamp': '2023-04-11 14:21:05', 'exchange_update_timestamp': '2023-04-11 14:21:05', 'exchange_timestamp': '2023-04-11 14:21:05', 'variety': 'regular', 'exchange': 'NFO', 'tradingsymbol': 'RELIANCE23APR2340PE', 'instrument_token': 36528898, 'order_type': 'LIMIT', 'transaction_type': 'BUY', 'validity': 'TTL', 'product': 'MIS', 'quantity': 250, 'disclosed_quantity': 0, 'price': 38, 'trigger_price': 0, 'average_price': 37.25, 'filled_quantity': 250, 'pending_quantity': 0, 'cancelled_quantity': 0, 'market_protection': 0, 'meta': {}, 'tag': None, 'guid': '71318X4ytREEwqnRDj'
+    # }
 
 def on_connect(ws, response):
     tickerlog("connect called {}".format(response))
@@ -293,6 +320,8 @@ def on_close(ws, code, reason):
 kws.on_ticks = on_ticks
 kws.on_connect = on_connect
 kws.on_close = on_close
+kws.on_order_update = on_order_update
+kws.on_message = on_message
 
 # Infinite loop on the main thread. Nothing after this will run.
 # You have to use the pre-defined callbacks to manage subscriptions.
