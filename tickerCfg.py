@@ -39,3 +39,4 @@ tickerCfg = {
         'bet_size': 10000          
         }
 }
+tickerCfg['NIFTY'] = tickerCfg['HDFCBANK']
