@@ -54,12 +54,16 @@ def optionTypeFromTicker(t):
 def optionUnderlyingFromTicker(t):
     if explodeOptionTicker(t):
         return explodeOptionTicker(t)[0]
+    else:
+        return t
 def isPutOption(t):
     return optionTypeFromTicker(t) == 'PE'
 def isCallOption(t):
     return optionTypeFromTicker(t) == 'CE'
 def isOption(t):
     return isPutOption(t) or isCallOption(t)
+def isNotAnOption(t):
+    return not isOption(t)
 def convertPEtoCEAndViceVersa(t):
     if optionTypeFromTicker(t):     
         return t[:-2] + ('CE' if t[-2] == 'P' else 'PE')
