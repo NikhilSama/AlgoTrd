@@ -140,8 +140,8 @@ def zget_basic(from_date, to_date, symbol,interval='minute',
     df = df.between_time('09:15:00+05:30', '15:29:00+05:30')    
     
     # Remove Volume data for options (not relavent)
-    # if utils.isOption(symbol):
-    #     df['Volume'] = 0
+    if utils.isOption(symbol) and (not cfgUseVolumeDataForOptions):
+        df['Volume'] = 0
 
     if cacheTickData:
         loadTickerCache(df,symbol,from_date,to_date,interval)
