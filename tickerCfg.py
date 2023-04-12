@@ -23,20 +23,44 @@ tickerCfg = {
         'bet_size': 10000
         },
     'HDFCBANK' : {
-        'maLen': 20,
-        'bandWidth': 1,
-        'fastMALen': 7,
-        'atrLen': 20    ,
-        'adxLen': 20,
-        'adxThresh': 30,
+        'includeOptions': True,
+        'maLen': 10,
+        'bandWidth': 6,
+        'fastMALen': 9,
+        'atrLen': 14,
+        'adxLen': 14,
+        'adxThresh': 20,
         'adxThreshYellowMultiplier': 1,
-        'numCandlesForSlopeProjection':6,
-        'maSlopeThresh': 1.5,
-        'maSlopeThreshYellowMultiplier': 0.9,
-        'cfgObvMaLen': 20,
-        'obvOscThresh': 0.4,
-        'obvOscThreshYellowMultiplier': 1,
+        'numCandlesForSlopeProjection':2,
+        'maSlopeThresh': 1,
+        'maSlopeThreshYellowMultiplier': 0.5,
         'bet_size': 10000          
+        },
+    
+    'NIFTY' : {
+        'maLen': 10,
+        'bandWidth': 1.5,
+        'fastMALen': 7,
+        'atrLen': 20,
+        'adxLen': 20,
+        'adxThresh': 20,
+        'adxThreshYellowMultiplier': 0.7,
+        'numCandlesForSlopeProjection':2,
+        'maSlopeThresh': 1,
+        'maSlopeThreshYellowMultiplier': 0.5,
+        }, 
+    
+    'BANKNIFTY' : {
+        'maLen': 10,
+        'bandWidth': 3,
+        'fastMALen': 7,
+        'atrLen': 20,
+        'adxLen': 20,
+        'adxThresh': 35,
+        'adxThreshYellowMultiplier': 0.7,
+        'numCandlesForSlopeProjection':2,
+        'maSlopeThresh': 1,
+        'maSlopeThreshYellowMultiplier': 0.5,
         }
+
 }
-tickerCfg['NIFTY'] = tickerCfg['HDFCBANK']

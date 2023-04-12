@@ -12,12 +12,23 @@ import numpy as np
 import pandas as pd
 import pytz
 import scipy.stats as stats
+import tickerCfg
+import utils
 
 # set timezone to IST
 ist = pytz.timezone('Asia/Kolkata')
 
 import cfg
 globals().update(vars(cfg))
+
+
+def applyTickerSpecificCfg(ticker):
+        
+    tCfg = utils.getTickerCfg(ticker)
+    
+    for key, value in tCfg.items():
+        globals()[key] = value
+        #print(f"setting {key} to {value}")
 
 def plot_trades(df):
     # create 20 bins based on the range of return values
@@ -51,6 +62,7 @@ def plot_stock_and_option(df):
     plt.show()
     
 def plot_backtest(df,trades=None):
+    applyTickerSpecificCfg(df['symbol'][0])
     # Plot trades 
     if 'trade_returns' in plot:
         plot_trades(trades)

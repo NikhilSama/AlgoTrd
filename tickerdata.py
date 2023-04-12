@@ -89,6 +89,8 @@ def get_sp500_tickers():
     return tickers
 
 def get_fo_active_nifty_tickers():
+    return ['HDFCBANK','BANKNIFTY2341341500CE','NIFTY2341317750CE']
+    return ['HDFCBANK', 'ICICIBANK', 'RELIANCE', 'KOTAKBANK']
     return ['NIFTY 50','NIFTY23APRFUT','RELIANCE','INFY','BAJFINANCE','SBIN', 'TCS', 'KOTAKBANK', 'ICICIBANK', 'HDFCBANK', 'MARUTI' ]
 
 def get_nifty_tickers():

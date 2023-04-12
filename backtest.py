@@ -76,16 +76,14 @@ ist = pytz.timezone('Asia/Kolkata')
 tickers = td.get_sp500_tickers()
 nifty = td.get_nifty_tickers()
 index_tickers = td.get_index_tickers()
-firstTradeTime = datetime.datetime(2023, 3,31, 9, 0, tzinfo=ist)
+firstTradeTime = datetime.datetime(2023, 4,10, 9, 0, tzinfo=ist)
 zgetFrom = firstTradeTime - timedelta(days=cfgHistoricalDaysToGet)
-zgetTo = datetime.datetime(2023, 4,11, 15, 30, tzinfo=ist)
+zgetTo = datetime.datetime(2023, 4,12, 15, 30, tzinfo=ist)
 
 def zget(t,s,e,i):
     #Get latest minute tick from zerodha
     df = downloader.zget(s,e,t,i,includeOptions=includeOptions)
     df = downloader.zColsToDbCols(df)
-    if utils.isOption(t):
-        df['Volume'] = 0
     return df
 def zgetNDays(t,n,e=datetime.datetime.now(ist),i="minute"):
     s = e - timedelta(days=n)
@@ -109,6 +107,9 @@ def perfProfiler(name,t):
     return time.time()
 
 def printTearsheet(tearsheet):
+    if tearsheet is None or tearsheet['num_trades'] == 0:
+        print("No trades")
+        return
     print(f"Total Return: {tearsheet['return']:.2%}")
     print("Sharpe: ", tearsheet['sharpe_ratio'])
     print("Num Trades: ", tearsheet['num_trades'])
@@ -348,7 +349,9 @@ def backtestCombinator():
 if isMain:
     #backtestCombinator()       
     #plot_options(['ASIANPAINT'],10,'minute')
-    backtest('NIFTY23APR17300CE','minute')
+    backtest('NIFTY2341317750CE','minute')
+ 
+#    backtest('NIFTY23APR17750CE','minute')
     #backtest(cfgTicker,'minute')
     #backtest_daybyday('NIFTY23APRFUT','minute')
 

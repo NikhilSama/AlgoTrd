@@ -179,7 +179,7 @@ def exitCurrentPosition(t,positions,net_position,nextPosition):
                     qToExit = positions[t]['positions'][0]['quantity'] if \
                         positions[t]['positions'][0]['exchange'] == 'NFO' else 0# We have a short position, so we need to exit both
 
-    return qToExit
+    return abs(qToExit)
 
 
 def tradeNotification(type, t,ltp,signal,position,net_position):
@@ -213,7 +213,9 @@ def checkPositionsForConsistency(positions,df):
     
     if utils.isOption(t):
         (t,optType) = utils.explodeOptionTicker(t)
-            
+    
+    print(f"Checking {t} pos: {position} signal: {signal} for consistency")
+    print(f"Kite Positions: {positions}")
     if t in positions:
         net_position = positions[t]['net_position']
         if optType == 'PE':
@@ -233,9 +235,67 @@ def checkPositionsForConsistency(positions,df):
             logging.info(f"{t}: No Live Kite positions inconsistant with DF ({position})")
     
     return net_position
+def getExitOrder(df,positions):
+   #return (None,None,None,None,None)
 
+    optType = None
+    t = df['symbol'][0]
+    if utils.isOption(t):
+        (t,optType) = utils.explodeOptionTicker(t)
 
-def generateSignalsAndTrade(df,positions,stock,options,dfStartTime=None):
+    if t in positions:
+        if len(positions[t]['positions']) > 1:
+            logging.error("More than one position exists for {t}. No Exit order")
+            return (None,None,None,None,None)
+       
+        pos = positions[t]['positions'][0]
+       
+        ticker = pos['tradingsymbol']
+        qt = abs(pos['quantity'])   
+        exch = pos['exchange']
+        oType = 'SELL' if pos['quantity'] > 0 else 'BUY'
+        if (optType is not None) or (exch != 'NFO'):
+            #If ticker is an option, or if ticker is an option then df has the exit price            
+            price = df['upper_band'][-1] if pos['quantity'] > 0 \
+                else df['lower_band'][-1]
+        else: #ticker is equity underlying, and we are trading its option
+            # df does not have the bb exit price, so we can skip for now
+            #TODO: Calculate exit price
+            (ticker,price, oType,exch,qt) = (None,None,None,None)
+        return (ticker,price,oType,exch,qt)
+    else:
+        return (None,None,None,None,None)
+         
+def checkAndUpdateTargetExits(df,positions, \
+            targetClosedPositions,tickerIsTrending):
+    return df
+    #Check if ticker has already exited and hit target within candle,
+    #before Adj Close hit the exit band
+    #Mark it as such so that our kite positions are
+    #consistent with df
+    #df.loc[df.index.isin(targetClosedPositions), 'signal'] = 0
+
+    for closedPositionTime in targetClosedPositions:
+        # if closedPositionTime == df.index[-1]:
+        #     logging.info(f"Target Exit for {df['symbol'][0]} hit within candle")
+        #logging.info(f"Adding exit for {df['symbol'][0]} at {closedPositionTime}")
+        if closedPositionTime in df.index and pd.isna(df.loc[closedPositionTime, 'signal']):
+            df.at[closedPositionTime, 'signal'] = 0
+            logging.info(f"{df['symbol'][0]}: Target Exit hit at {closedPositionTime}")
+        # else:
+        #     logging.info(f"Did not add Target Exit order. signal is {df.loc[closedPositionTime, 'signal']} => not nan")
+    if not tickerIsTrending:
+        #Add Target exit order at BB
+        (t,price,oType,exch,oQty) = getExitOrder(df,positions)
+        if t is None:
+            return df
+        else:
+            logging.info(f"Adding Target Exit Order {oType} for {oQty} of {t} at {price}")
+            ki.exec(kite,t,exch,oType,q=oQty,p=price,tag="TargetExit")
+    return df
+
+def generateSignalsAndTrade(df,positions,stock,options,dfStartTime=None,
+                            targetClosedPositions=None):
     # Stuff to hack if this function is called from KitTicker instaed of 
     # time_loop
     global now
@@ -262,8 +322,11 @@ def generateSignalsAndTrade(df,positions,stock,options,dfStartTime=None):
                         ,signals.exitTrendFollowing
                         ]
     overrideSignalGenerators = []   
-    signals.applyIntraDayStrategy(df,dataPopulators,signalGenerators,
+    tickerIsTrending = \
+        signals.applyIntraDayStrategy(df,dataPopulators,signalGenerators, \
                                 overrideSignalGenerators)
+
+    df = checkAndUpdateTargetExits(df,positions,targetClosedPositions,tickerIsTrending)
     df = perf.calculate_positions(df,close_at_end=False)
     
     downloader.cache_df(df, t, dfStartTime, now)
@@ -287,12 +350,17 @@ def generateSignalsAndTrade(df,positions,stock,options,dfStartTime=None):
             tput,tput_lot_size,tput_tick_size = db.get_option_ticker(t, ltp, 'PE',kite)
             if utils.isOption(t):
                 #ticker is itself an option; just buy it
-                ki.nfo_buy(kite,tput,tput_lot_size,tput_tick_size,qToExit=qToExit,betsize=bet_size)                 
+                print(f"Buying {t} with {qToExit} lots")
+                ki.nfo_buy(kite,tput,lot_size=tput_lot_size,
+                           tick_size=tput_tick_size,qToExit=qToExit,
+                           betsize=bet_size)                 
             else:
                 #ticker is a stock or future, passed with options = True
                 #parameters; so we need to sell put option with this underlyting
                 #ticker
-                ki.nfo_sell(kite,tput,tput_lot_size,tput_tick_size,qToExit=qToExit,betsize=bet_size) 
+                ki.nfo_sell(kite,tput,lot_size=tput_lot_size,
+                            tick_size=tput_tick_size,
+                            qToExit=qToExit,betsize=bet_size) 
         tradeNotification("GO LONG", t,ltp,df['signal'][-1],df['position'][-1],net_position)
 
     
@@ -307,14 +375,16 @@ def generateSignalsAndTrade(df,positions,stock,options,dfStartTime=None):
             #get_option_ticker() will return the same ticker and we need to sell it to 
             #go short anyway
             tcall,tcall_lot_size,tcall_tick_size = db.get_option_ticker(t, ltp, 'CE',kite)
-            ki.nfo_sell(kite,tcall,tcall_lot_size,tcall_tick_size,qToExit=qToExit,betsize=bet_size)
+            ki.nfo_sell(kite,tcall,lot_size=tcall_lot_size,
+                        tick_size=tcall_tick_size,qToExit=qToExit,betsize=bet_size)
         
         tradeNotification("GO SHORT", t,ltp,df['signal'][-1],df['position'][-1],net_position)
         
 
     if(exitCondition(df,net_position)):
-        tradeNotification("EXIT", t,ltp,df['signal'][-1],df['position'][-1],net_position)
-        ki.exit_given_positions(kite,positions[t]['positions'])
+        posTicker = utils.optionUnderlyingFromTicker(t)
+        tradeNotification("EXIT", f"{t}({posTicker})",ltp,df['signal'][-1],df['position'][-1],net_position)
+        ki.exit_given_positions(kite,positions[posTicker]['positions'])
 
 def Tick(stock,options):
 
