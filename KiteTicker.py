@@ -23,6 +23,7 @@ from freezegun import freeze_time
 import math
 import threading
 import signals 
+import utils
 
 import time_loop as tl
 import DownloadHistorical as downloader
@@ -92,7 +93,7 @@ def getTickersToTrack():
         index = pd.date_range('2023-01-01', periods=0, freq='D')
         tickersToTrack[token]['df'] = pd.DataFrame(columns=columns, index=index)
         tickersToTrack[token]['ticks'] = pd.DataFrame(columns=columns, index=index)
-
+        tickersToTrack[token]['targetExitAchieved'] = []
 def trimMinuteDF(t):
     #trim the minute df to last cfgMaxLookbackCandles minutes
     tickersToTrack[t]['df'] = tickersToTrack[t]['df'].iloc[-cfgMaxLookbackCandles:]
@@ -134,12 +135,19 @@ def addTicksToTickDF(ticks):
         #Insert this tick into the tick df
         tick_time = tick['exchange_timestamp']
         tick_time = ist.localize(tick_time)
+        #Filter out volume for options (irrelevant) and for
+        #indexes (vol not available)
+        tick_volume = tick['volume_traded'] \
+            if (('volume_traded' in tick) and \
+                (utils.isNotAnOption(tickersToTrack[token]['ticker']) or \
+                    cfgUseVolumeDataForOptions)) \
+                    else 0
         tick_df_row = {
             'Open': tick['last_price'],
             'High': tick['last_price'],
             'Low': tick['last_price'],
             'Adj Close': tick['last_price'],
-            'Volume': tick['volume_traded'] if 'volume_traded' in tick else 0
+            'Volume': tick_volume
         }
         tickersToTrack[token]['ticks'].loc[tick_time] = tick_df_row  
         
@@ -222,9 +230,11 @@ def resampleToMinDF():
 def tick(tokens):
     positions = tl.get_positions()
     for token in tokens:
+        targetExitAchieved = tickersToTrack[token]['targetExitAchieved']
         tickerlog(f"tickThread generating signals for: token {token} {tickersToTrack[token]['ticker']}")
         tl.generateSignalsAndTrade(tickersToTrack[token]['df'].copy(),positions,
-                                   False,True,dfStartTime=signals.tenAMToday(now))
+                                   False,True,dfStartTime=signals.tenAMToday(now),
+                                   targetClosedPositions=targetExitAchieved)
 
 def processTicks(ticks):
     #add the tick to the tick df
@@ -272,21 +282,36 @@ def on_ticks(ws, ticks):
 def on_message(ws, payload, is_binary):
     # Callback to receive all messages.
     if is_binary:
-        tickerlog("Binary message received: {}".format(len(payload)))
+        # VERY Chatty ? what are we getting ? 
+        #tickerlog("Binary message received: {}".format(len(payload)))
+        x = 1
     else:
         tickerlog("Message: {}".format(payload))
     
 def on_order_update(ws, data):
     # Callback to receive order updates.
+    timestamp_str = data['exchange_update_timestamp']
+    format_str = '%Y-%m-%d %H:%M:%S'
+    timestamp = datetime.datetime.strptime(timestamp_str, format_str)
+    rounded_timestamp = datetime.datetime(timestamp.year, timestamp.month, timestamp.day, timestamp.hour, timestamp.minute)
+    localized_timestamp = ist.localize(rounded_timestamp)
+
     ticker = data['tradingsymbol']
+    token = data['instrument_token']
     status = data['status']
     tx = data['transaction_type']
     q = data['quantity']
     p = data['price']
+    tag = data['tag']
     filled = data['filled_quantity']
     
-    tickerlog("Order update: {}".format(data))  
-    tickerlog(f"Order update: {tx} {q} {ticker}@{q} {status} filledQ:{filled}")
+#    tickerlog("Order update: {}".format(data))  
+    #tickerlog(f"Order update: {tx} {q} {ticker}@{q} {status} filledQ:{filled}")
+    
+    if tag == 'TargetExit' and status == 'COMPLETE':
+        tickerlog(f"TargetExit order complete. Adding {localized_timestamp} to targetExitAchieved")
+        tickersToTrack[token]['targetExitAchieved'].append(localized_timestamp)
+
     # { #NOTE:SAMPLE DATA
     # 'account_id': 'ZT1533', 'unfilled_quantity': 0, 'checksum': '', 'placed_by': 'ZT1533', 'order_id': '230411401989627', 'exchange_order_id': '2500000086137901', 'parent_order_id': None, 'status': 'OPEN', 'status_message': None, 'status_message_raw': None, 'order_timestamp': '2023-04-11 14:21:05', 'exchange_update_timestamp': '2023-04-11 14:21:05', 'exchange_timestamp': '2023-04-11 14:21:05', 'variety': 'regular', 'exchange': 'NFO', 'tradingsymbol': 'RELIANCE23APR2340PE', 'instrument_token': 36528898, 'order_type': 'LIMIT', 'transaction_type': 'BUY', 'validity': 'TTL', 'product': 'MIS', 'quantity': 250, 'disclosed_quantity': 0, 'price': 38, 'trigger_price': 0, 'average_price': 0, 'filled_quantity': 0, 'pending_quantity': 250, 'cancelled_quantity': 0, 'market_protection': 0, 'meta': {}, 'tag': None, 'guid': '71318X4ytREEwqnRDj'
     # }
