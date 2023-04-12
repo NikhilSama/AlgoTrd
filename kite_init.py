@@ -104,7 +104,6 @@ def logtrade(s='',ticker=0,position=0,q=0,p=0,ltp=0,lot_size=0,tick_size=0,e='NS
     
 def getQ (lot_size,ltp,betsize, qToExit=0):
     if (lot_size > 1):
-        print(f"betsize: {betsize} lot_size: {lot_size}")
         q = max(round((betsize/ltp)/lot_size),1)*lot_size
         return q+qToExit if qToExit else q
         return 10*(lot_size+qToExit) if qToExit else (10*lot_size)
@@ -182,7 +181,8 @@ def get_ltp(kite,t,exchange):
 
     return ltp
     
-def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,qToExit=0,betsize=bet_size):
+def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,qToExit=0,betsize=bet_size,p=0,tag=None):
+    # print(f"exec {t} {exchange} {tx_type} Lot:{lot_size} tick:{tick_size} q:{q} ltp:{ltp} {sl} toExit:{qToExit} betsize:{betsize} {p} {tag}")
     if is_not_tradable(t):
         logging.info(f"{t} is not a tradable instrument.  {exchange} {tx_type} not executed")
         return
@@ -194,13 +194,11 @@ def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,qToExi
         else:
             logging.warning(f"No ltp found for {exchange}:{t}. {ltp} Skipping")
             return
-        
-    if q==0:
-        q = getQ(lot_size,ltp,betsize, qToExit)
-            
+    qToExit = abs(qToExit) #Make sure qToExit is positive, for short positions it may be negative
+    q = getQ(lot_size,ltp,betsize, qToExit) if q == 0 else q
     delta = getDelta(exchange,tx_type)
     
-    p = getP(ltp,tick_size,delta)
+    p = getP(ltp,tick_size,delta) if p == 0 else getP(p,tick_size,1)
 
     exch = getExchange(kite,exchange)
 
@@ -219,7 +217,8 @@ def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,qToExi
                      quantity=q,
                      order_type=kite.ORDER_TYPE_LIMIT,
                      product=kite.PRODUCT_MIS,
-                     validity=kite.VALIDITY_TTL, price = p, validity_ttl = 1)
+                     validity=kite.VALIDITY_TTL, price = p, validity_ttl = 1,
+                     tag=tag)
         #SL to accompany 
         ### UNTESTED CODE -- need to get teh right tx type etc in there 
         if (sl):
@@ -234,6 +233,7 @@ def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,qToExi
     except Exception as e:
         print(f'{exchange} {tx_type} Failed for {t}')
         print(e.args[0])
+        print(f"exec {t} {exchange} {tx_type} Lot:{lot_size} tick:{tick_size} q:{q} ltp:{ltp} {sl} toExit:{qToExit} betsize:{betsize} {p} {tag}")
         return -1
     return order_id
 
@@ -243,13 +243,14 @@ def nse_buy (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,exchange='NSE',qToE
 def nse_sell (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,exchange='NSE',qToExit=0,betsize=bet_size):
     return exec(kite,t,exchange,'SELL',lot_size,tick_size,q,ltp,sl,qToExit,betsize)
 
-def nfo_buy (kite,t,lot_size=1,tick_size=0.5, q=1,ltp=0,sl=0,qToExit=0,betsize=bet_size):
+def nfo_buy (kite,t,lot_size=1,tick_size=0.5, q=0,ltp=0,sl=0,qToExit=0,betsize=bet_size):
     return exec(kite,t,'NFO', 'BUY', lot_size,tick_size,q,ltp,sl,qToExit,betsize)
     
 def nfo_sell (kite, t, lot_size=1, tick_size=0.5, q=0,ltp=0,sl=0, qToExit=0,betsize=bet_size):
     return exec(kite,t,'NFO', 'SELL', lot_size,tick_size,q,ltp,sl,qToExit,betsize)
 
 def gettFromOption (string):
+    return utils.optionUnderlyingFromTicker(string)
     if 'NIFTY' in string:
         return 'NIFTY23APRFUT' #hack, dont return the index, return the fugure
     #index is not tradable and does not have volume information, this better
@@ -317,7 +318,8 @@ def exit_positions (kite,t='day',lot_size=1,tick_size=0.5):
         q = position['quantity']
         prod = position['product']
         
-        if q != 0 and prod == 'MIS' and(t == 'day' or t == gettFromOption(symb)) :
+        if q != 0 and prod == 'MIS' and (t == 'day' 
+                or t == gettFromOption(symb)) :
             ltp = position['last_price']
             if (q>0):
                 #Long position, need to sell to exit
@@ -340,6 +342,20 @@ def exit_positions (kite,t='day',lot_size=1,tick_size=0.5):
 
 def exit_given_position(kite,p):
     logging.info(f"EXIT: {p['tradingsymbol']}")
+    exch = p['exchange']
+    t = p['tradingsymbol']
+    ltp = p['last_price']
+    
+    if exch not in ['NSE','BSE','NFO']:
+        logging.error(f"Unhandled Exchange type ({p['exchange']}) in positions")
+        print(f"Unhandled Exchange type ({p['exchange']})in positions")
+        return -1
+
+    txType = 'BUY' if p['quantity'] < 0 else 'SELL'
+    q = abs(p['quantity'])
+
+    return exec(kite,t,exch,txType,q=q,ltp=ltp)
+    
     if p['exchange'] == 'NFO':
         if p['quantity'] > 0:
             nfo_sell(kite,p['tradingsymbol'], q=p['quantity'],ltp=p['last_price'])
