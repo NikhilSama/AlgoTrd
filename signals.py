@@ -666,7 +666,7 @@ def getSig_exitAnyExtremeADX_OBV_MA20_OVERRIDE (type, signal, isLastRow, row, df
     elif positionToAnalyse == -1 and breach == 'H':
         s = 0
         
-    logSignal('EXIT-EXTRME-COND',["obvData","adxData","maSlpData"],signal,s,row,type,isLastRow)
+    logSignal(f'EXIT-EXTRME-COND pToAnal({positionToAnalyse})',["obvData","adxData","maSlpData"],signal,s,row,type,isLastRow)
                 
     return s
 
@@ -689,12 +689,10 @@ def getSig_followAllExtremeADX_OBV_MA20_OVERRIDE (type, signal, isLastRow, row, 
     obvOsc = None if (not 'OBV-OSC' in row) else row['OBV-OSC']
     obvIsPositive = True if ((obvOsc is None) or (obvOsc > 0)) else False
     obvIsNegative = True if ((obvOsc is None) or (obvOsc < 0)) else False
-    
-    num_conditions = cfgNumConditionsForTrendFollow
-    
+        
     maSlopesUp = row['SLOPE-OSC'] > 0
     maSlopesDn = row['SLOPE-OSC'] < 0
-    if (adxIsHigh + obvIsHigh + slopeIsHigh) >= num_conditions:
+    if (adxIsHigh + obvIsHigh + slopeIsHigh) >= cfgNumConditionsForTrendFollow:
         #We are breaking out Ride the trend
         #print(f"Extreme ADX/OBV/MA20 OVERRIDE FOLLOW TREND: {row.symbol}@{row.name}")
         if obvIsPositive and maSlopesUp and signal != 1:
@@ -745,16 +743,18 @@ def exitTrendFollowing(type, signal, isLastRow, row, df,
     #This ticker is trending, lets see if its time to exit
     trend = getTickerTrend(row.symbol)
     if trend == 1:
-        if fastMACrossedUnderSlow and \
-            (adxIsGettingLower) and \
-            (maIsGettingLower) and \
-            (obvIsGettingLower):
+        if fastMACrossedUnderSlow:
+            # and \
+            # (adxIsGettingLower) and \
+            # (maIsGettingLower) and \
+            # (obvIsGettingLower):
             s = 0
     elif trend == -1:   
-        if fastMACrossedOverSlow and \
-            (adxIsGettingLower) and \
-            (maIsGettingHigher) and \
-            (obvIsGettingHigher):
+        if fastMACrossedOverSlow:
+            # and \
+            # (adxIsGettingLower) and \
+            # (maIsGettingHigher) and \
+            # (obvIsGettingHigher):
             s = 0
     else:
         logging.error("Wierd ! trend should always be 1 or -1")
@@ -952,3 +952,4 @@ def applyIntraDayStrategy(df,analyticsGenerators=[populateBB], signalGenerators=
             args=(overrideSignalGenerators, df), axis=1)
     startTime = startTime
 
+    return tickerIsTrending(df['symbol'][0])
