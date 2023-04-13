@@ -42,6 +42,8 @@ def download_instruments(exch):
     df.drop('exchange', inplace=True, axis=1)
     return df
 
+
+db.clearInstruments()
 df = download_instruments('NSE')
 db.toDB('instruments_zerodha',df)
 df = download_instruments('NFO')
