@@ -19,6 +19,7 @@ import logging
 import pickle
 import tickerCfg
 import utils
+import random
 
 #cfg has all the config parameters make them all globals here
 import cfg
@@ -666,7 +667,7 @@ def getSig_exitAnyExtremeADX_OBV_MA20_OVERRIDE (type, signal, isLastRow, row, df
     elif positionToAnalyse == -1 and breach == 'H':
         s = 0
         
-    logSignal(f'EXIT-EXTRME-COND pToAnal({positionToAnalyse})',["obvData","adxData","maSlpData"],signal,s,row,type,isLastRow)
+    logSignal(f'EXIT-EXTRME-COND pToAnal({positionToAnalyse}) obv:{obvBreached} adx{adxBreached} sl{slopebreached}',["obvData","adxData","maSlpData"],signal,s,row,type,isLastRow)
                 
     return s
 
@@ -833,26 +834,43 @@ def followTrendReversal (type, signal, isLastRow, row, df,
         else:
             logging.debug(f"{row.symbol}:{row.i}:{row.name}  => FOLLOW TREND-REVERSAL => Extreme ADX/OBV/MA20 OVERRIDE signal ({signal})  s={s} / last_signal ({last_signal}) TO FOLLOW TREND.ADX:{row['ADX']} > {adxThresh} AND OBV:{obvOsc} > {obvOscThresh} AND MA20:{row['SLOPE-OSC']} > {maSlopeThresh}")
     return s 
-
+def justFollowMA(type, signal, isLastRow, row, df, 
+                        last_signal=float('nan')):
+    if row['SLOPE-OSC'] > maSlopeThresh:
+        s = 1
+    elif row['SLOPE-OSC'] < -maSlopeThresh:
+        s = -1
+    else:
+        s = 0
+    setTickerTrend(row.symbol, s)
+    return s
+def randomSignalGenerator(type, signal, isLastRow, row, df, 
+                        last_signal=float('nan')):
+    if random.randint(0,100) > 90:
+        s = random.randint(-1,1)
+        setTickerTrend(row.symbol, s)
+    else:
+        s = signal
+    return s
 ######### END OF SIGNAL GENERATION FUNCTIONS #########
 def getOverrideSignal(row,ovSignalGenerators, df):
     
     s = row['signal'] #the signal that non-override sig generators generated
     #Could be nan, diff rom getLastSignal, which returns last valid, non-nan,
     #signal in df
-    
+
     #Return nan if its not within trading hours
-    if(row.name >= startTime) & \
-        (row.name.hour >= startHour):
-            
-            if row.name.hour < endHour:
+    if(row.name >= tradingStartTime) & \
+        (row.name.time() >= cfgStartTimeOfDay):
+            if row.name.time() < cfgEndNewTradesTimeOfDay:
                 type = 1 # Entry or Exit
-            elif row.name.hour < exitHour:
+            elif row.name.time() < cfgEndExitTradesOnlyTimeOfDay:
                 # Last time period before intraday exit; only exit positions
                 # No new psitions will be entered
                 type = 0 
             else:
-                return s # Outside of trading hours
+                return 0 # Outside of trading hours EXIT ALL POSITIONS
+
             isLastRow = row.name == df.index[-1]
             last_signal = getLastSignal(df['signal'])
             for sigGen in ovSignalGenerators:
@@ -871,12 +889,14 @@ def getOverrideSignal(row,ovSignalGenerators, df):
 def getSignal(row,signalGenerators, df):
     s = float("nan")
     isLastRow = row.name == df.index[-1]
+    row_time = row.name.time()
+
     #Return nan if its not within trading hours
-    if(row.name >= startTime) & \
-        (row.name.hour >= startHour):
-            if row.name.hour < endHour:
+    if(row.name >= tradingStartTime) & \
+        (row.name.time() >= cfgStartTimeOfDay):
+            if row.name.time() < cfgEndNewTradesTimeOfDay:
                 type = 1 # Entry or Exit
-            elif row.name.hour < exitHour:
+            elif row.name.time() < cfgEndExitTradesOnlyTimeOfDay:
                 # Last time period before intraday exit; only exit positions
                 # No new psitions will be entered
                 type = 0 
@@ -901,22 +921,18 @@ def getSignal(row,signalGenerators, df):
     return s
 ## MAIN APPLY STRATEGY FUNCTION
 def applyIntraDayStrategy(df,analyticsGenerators=[populateBB], signalGenerators=[getSig_BB_CX],
-                        overrideSignalGenerators=[],tradingStartTime=None, \
+                        overrideSignalGenerators=[],tradeStartTime=None, \
                         applyTickerSpecificConfig=True):
-    global startTime
-    
+    global tradingStartTime
     
     if applyTickerSpecificConfig:
         applyTickerSpecificCfg(df['symbol'][0]) 
         #printCFG()
-        
-    if tradingStartTime is not None:
-        startTime = tradingStartTime
-    else:
-        if startTime == 0:
-            if tradingStartTime is None:
-                startTime = datetime.datetime(2000,1,1,10,0,0) #Long ago :-)
-                startTime = ist.localize(startTime)
+    
+    tradingStartTime = tradeStartTime
+    if tradingStartTime is None:
+        tradingStartTime = datetime.datetime(2000,1,1,10,0,0) #Long ago :-)
+        tradingStartTime = ist.localize(tradingStartTime)
     
     
     df['signal'] = float("nan")
@@ -950,6 +966,5 @@ def applyIntraDayStrategy(df,analyticsGenerators=[populateBB], signalGenerators=
     if len(overrideSignalGenerators):
         df['signal'] = df.apply(getOverrideSignal, 
             args=(overrideSignalGenerators, df), axis=1)
-    startTime = startTime
 
     return tickerIsTrending(df['symbol'][0])

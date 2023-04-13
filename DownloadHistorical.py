@@ -35,7 +35,7 @@ db = DBBasic()
 kite = ki.initKite()
 
 
-def cache_df(df,t,frm,to):
+def cache_df(df,t,to):
     #create directory if none exists
     path = "Data/td_cache/"+to.strftime('%d-%m-%y')
     if not os.path.exists(path):

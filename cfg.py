@@ -6,15 +6,15 @@ Created on Sun Feb  5 14:26:36 2023
 @author: nikhilsama
 """
 import sys
+import datetime
 cfgDict = {
-    'cfgTicker': 'ICICIBANK',
+    'cfgTicker': 'NIFTY23APR17750CE',
     'cfgHistoricalDaysToGet': 10,
     'cfgFreezeGun': False,
     'cfgUseVolumeDataForOptions': True,
-    'startTime': 0,
-    'startHour': 10,
-    'endHour': 14,
-    'exitHour': 15,
+    'cfgStartTimeOfDay': datetime.datetime.strptime("10:00+05:30", "%H:%M%z").time(),
+    'cfgEndNewTradesTimeOfDay': datetime.datetime.strptime("14:00+05:30", "%H:%M%z").time(),
+    'cfgEndExitTradesOnlyTimeOfDay': datetime.datetime.strptime("15:00+05:30", "%H:%M%z").time(),
     'days': 60,
     'superLen': 200,
     'maLen': 20,

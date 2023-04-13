@@ -51,7 +51,7 @@ tickerCfg = {
         }, 
     
     'BANKNIFTY' : {
-        'maLen': 10,
+        'maLen': 15,
         'bandWidth': 3,
         'fastMALen': 7,
         'atrLen': 20,

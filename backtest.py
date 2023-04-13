@@ -110,10 +110,6 @@ def printTearsheet(tearsheet):
     if tearsheet is None or tearsheet['num_trades'] == 0:
         print("No trades")
         return
-    print(f"Total Return: {tearsheet['return']:.2%}")
-    print("Sharpe: ", tearsheet['sharpe_ratio'])
-    print("Num Trades: ", tearsheet['num_trades'])
-    print(f"Avg Return per day: {tearsheet['avg_daily_return']:.2%}")
     print("TRADES: ")
     for index,trade in tearsheet['trades'].iterrows():
         if trade['position'] == 0:
@@ -125,17 +121,26 @@ def printTearsheet(tearsheet):
     print("Days: ")
     daily_returns = tearsheet['trades']['return'].resample('D').sum()
     for index,day in daily_returns.iteritems():
-        print(f"\t {utils.timeToString(index,date=True,time=False)} Return:{day:.2%}")
+        print(f"\t {utils.timeToString(index,date=True,time=False)} Return:{day:.2%}") if day != 0 else None
+    
+    print(f"Total Return: {tearsheet['return']:.2%}")
+    print(f"Drawdown: {tearsheet['max_drawdown_from_0_sum']:.2%}")
+    print("Sharpe: ", tearsheet['sharpe_ratio'])
+    print("Num Trades: ", tearsheet['num_trades'])
+    print(f"Avg Return per day: {tearsheet['avg_daily_return']:.2%}")
+    print(f"Worst Day ({tearsheet['worst_daily_return_date']}): {tearsheet['worst_daily_return']:.2%}")
+    print(f"Best Day ({tearsheet['best_daily_return_date']}): {tearsheet['best_daily_return']:.2%}")
     
 def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
             exportCSV=False, tradingStartTime = firstTradeTime, \
-            applyTickerSpecificConfig = True):
+            applyTickerSpecificConfig = True, signalGenerators = None):
     #perfTIME = time.time()    
     #startingTime = perfTIME
     df = zget(t,start,end,i=i)
     if df.empty:
-        print(f"No data foc {t}")
+        print(f"No data for {t} start:{start} end:{end} i:{i}")
         return
+
     if len(df) < cfgMaxLookbackCandles:
         print(f"Skipping {t} as it has {len(df)} less than {cfgMaxLookbackCandles} candles at {tradingStartTime}")
         print(df)
@@ -150,17 +155,23 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
     # exit(0)
     #df = zgetNDays(t,days,i=i)
     #perfTime = perfProfiler("ZGET", perfTIME)
-    dataPopulators = [signals.populateBB, signals.populateADX, signals.populateOBV]
+    dataPopulators = [
+        signals.populateBB, 
+        signals.populateADX, 
+        signals.populateOBV
+        ]
     signalGenerators = [
-                        signals.getSig_BB_CX
+                    #    signals.randomSignalGenerator
+                    #    signals.justFollowMA
+                         signals.getSig_BB_CX
                         ,signals.getSig_ADX_FILTER
-                        ,signals.getSig_MASLOPE_FILTER
+                         ,signals.getSig_MASLOPE_FILTER
                         ,signals.getSig_OBV_FILTER
                         ,signals.getSig_exitAnyExtremeADX_OBV_MA20_OVERRIDE
                         ,signals.getSig_followAllExtremeADX_OBV_MA20_OVERRIDE
-                        #,signals.followTrendReversal
+                    #     #,signals.followTrendReversal
                         ,signals.exitTrendFollowing
-                        ]
+                        ] if signalGenerators is None else signalGenerators
     overrideSignalGenerators = []   
     
     signals.applyIntraDayStrategy(df,dataPopulators,signalGenerators,
@@ -200,6 +211,18 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
     # print (f"END Complete {datetime.datetime.now(ist)}")
     return tearsheetdf
 
+def oneThousandRandomTests():
+#     Mean: -11.99%
+#     std dev: 95.73%
+    signalGenerators = [signals.randomSignalGenerator]
+    results = []
+    for i in range(1000):
+        ts = backtest('NIFTY2341317700CE', signalGenerators=signalGenerators)
+        if ts is not None and 'return' in ts.keys():
+            results.append(ts['return'])
+    print(f"Mean: {np.mean(results):.2%}")
+    print(f"std dev: {np.std(results):.2%}")
+    
 def backtest_daybyday(t,i='minute',exportCSV=False):
     startingTime = time.time()  
 
@@ -286,15 +309,15 @@ def backtestCombinator():
         
     performance = pd.DataFrame()
     
-    ma_slope_threshes = [0.5, 1, 1.5]
-    ma_slope_thresh_yellow_multipliers = [0.5,0.7,0.9]
+    ma_slope_threshes = [0.5, 0.7, 0.8, 0.9, 1]
+    # ma_slope_thresh_yellow_multipliers = [0.5,0.7,0.9]
     # obv_osc_threshes = [0.1, 0.2, 0.4]
     # obv_osc_thresh_yellow_multipliers = [0.7, 0.9, 1]
     # obv_ma_lens = [10,20,30]
 
     # ma_slope_threshes = [0.5]
-    # ma_slope_thresh_yellow_multipliers = [0.5]
-    # ma_slope_slope_threshes = [0.1]
+    ma_slope_thresh_yellow_multipliers = [0.5]
+    #ma_slope_slope_threshes = [0.1]
     obv_osc_threshes = [0.1]
     obv_osc_thresh_yellow_multipliers = [0.9]
     obv_ma_lens = [20]
@@ -319,14 +342,16 @@ def backtestCombinator():
                          obv_osc_thresh_yellow_multiplier, obv_ma_len)
         tearsheetdf = backtest(cfgTicker,'minute',exportCSV=False,
                                applyTickerSpecificConfig=False)
-        
+        if tearsheetdf is None:
+            print("No data for this ticker")
+            return
         # Add in config variables we are looping through to the tearsheetdf
         tearsheetdf['ma_slope_thresh'] = ma_slope_thresh
         tearsheetdf['ma_slope_thresh_yellow_multiplier'] = ma_slope_thresh_yellow_multiplier
         tearsheetdf['obv_osc_thresh'] = obv_osc_thresh
         tearsheetdf['obv_osc_thresh_yellow_multiplier'] = obv_osc_thresh_yellow_multiplier
         tearsheetdf['obv_ma_len'] = obv_ma_len
-        tearsheetdf['ticker'] = 'NIFTY23APRFUT'
+        #tearsheetdf['ticker'] = 'NIFTY23APRFUT'
         tearsheetdf['interval'] = 'minute'
         tearsheetdf['startTime'] = firstTradeTime
         tearsheetdf['endTime'] = zgetTo
@@ -343,14 +368,17 @@ def backtestCombinator():
     # create a database connection (performance to CSV adds the 
     # argv variables as well to the performance df)
     engine = create_engine('mysql+pymysql://trading:trading123@trading.ca6bwmzs39pr.ap-south-1.rds.amazonaws.com/trading')
-    performance.to_sql('performancev4', engine, if_exists='append')
+    performance.to_sql('performancev5', engine, if_exists='append')
     engine.dispose()
 
 if isMain:
     #backtestCombinator()       
     #plot_options(['ASIANPAINT'],10,'minute')
-    backtest('NIFTY2341317750CE','minute')
- 
+    #backtest('NIFTY23APRFUT','minute')
+    backtest('NIFTY2341317700CE','minute')
+
+    #oneThousandRandomTests()
+
 #    backtest('NIFTY23APR17750CE','minute')
     #backtest(cfgTicker,'minute')
     #backtest_daybyday('NIFTY23APRFUT','minute')

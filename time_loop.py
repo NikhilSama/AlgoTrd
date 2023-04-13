@@ -88,10 +88,9 @@ def sleep_till_10am():
     return
     
 # get current datetime in IST
-startTime = datetime.datetime.now(ist)
-# startTime = datetime.datetime(2000,1,1,10,0,0) #Long ago :-)
-# startTime = ist.localize(startTime)
-now = startTime
+global tradingStartTime
+tradingStartTime = datetime.datetime.now(ist)
+now = tradingStartTime
 #sleep_till_10am()
 
 #sleep a few seconds to ensure we kick off on a rounded minute
@@ -235,46 +234,48 @@ def checkPositionsForConsistency(positions,df):
             logging.info(f"{t}: No Live Kite positions inconsistant with DF ({position})")
     
     return net_position
-def getExitOrder(df,positions):
-   #return (None,None,None,None,None)
-
+def placeExitOrder(df,positions,tickerIsTrending):
     optType = None
     t = df['symbol'][0]
     if utils.isOption(t):
         (t,optType) = utils.explodeOptionTicker(t)
 
-    if t in positions:
-        if len(positions[t]['positions']) > 1:
-            logging.error("More than one position exists for {t}. No Exit order")
-            return (None,None,None,None,None)
-       
-        pos = positions[t]['positions'][0]
-       
-        ticker = pos['tradingsymbol']
-        qt = abs(pos['quantity'])   
-        exch = pos['exchange']
-        oType = 'SELL' if pos['quantity'] > 0 else 'BUY'
-        if (optType is not None) or (exch != 'NFO'):
-            #If ticker is an option, or if ticker is an option then df has the exit price            
-            price = df['upper_band'][-1] if pos['quantity'] > 0 \
-                else df['lower_band'][-1]
-        else: #ticker is equity underlying, and we are trading its option
-            # df does not have the bb exit price, so we can skip for now
-            #TODO: Calculate exit price
-            (ticker,price, oType,exch,qt) = (None,None,None,None)
-        return (ticker,price,oType,exch,qt)
-    else:
-        return (None,None,None,None,None)
-         
-def checkAndUpdateTargetExits(df,positions, \
-            targetClosedPositions,tickerIsTrending):
-    return df
+    if df['position'][-1] == 0 or tickerIsTrending \
+        or t not in positions:
+        return # no target order if there is no position, or if ticker is trending
+        # or if we dont have a position for this ticker(we should exit later anyway)
+
+
+    if len(positions[t]['positions']) > 1:
+        logging.error("More than one position exists for {t}. No Exit order")
+        return
+    
+    pos = positions[t]['positions'][0]
+    
+    ticker = pos['tradingsymbol']
+    qt = abs(pos['quantity'])   
+    exch = pos['exchange']
+    oType = 'SELL' if pos['quantity'] > 0 else 'BUY'
+    if (optType is not None) or (exch != 'NFO'):
+        #If ticker is an option, or if ticker is an option then df has the exit price            
+        price = df['upper_band'][-1] if pos['quantity'] > 0 \
+            else df['lower_band'][-1]
+        logging.debug(f"Adding Target Exit Order {oType} for {qt} of {t} at {price}")
+        ki.exec(kite,ticker,exch,oType,q=qt,p=price,tag="TargetExit")
+    else: #ticker is equity underlying, and we are trading its option
+        # df does not have the bb exit price, so we can skip for now
+        #TODO: Calculate exit price
+        return
+
+def checkAndUpdateTargetExits(df, targetClosedPositions):
+    #return df
     #Check if ticker has already exited and hit target within candle,
     #before Adj Close hit the exit band
     #Mark it as such so that our kite positions are
     #consistent with df
     #df.loc[df.index.isin(targetClosedPositions), 'signal'] = 0
-
+    if targetClosedPositions is None:
+        return df
     for closedPositionTime in targetClosedPositions:
         # if closedPositionTime == df.index[-1]:
         #     logging.info(f"Target Exit for {df['symbol'][0]} hit within candle")
@@ -284,18 +285,15 @@ def checkAndUpdateTargetExits(df,positions, \
             logging.info(f"{df['symbol'][0]}: Target Exit hit at {closedPositionTime}")
         # else:
         #     logging.info(f"Did not add Target Exit order. signal is {df.loc[closedPositionTime, 'signal']} => not nan")
-    if not tickerIsTrending:
-        #Add Target exit order at BB
-        (t,price,oType,exch,oQty) = getExitOrder(df,positions)
-        if t is None:
-            return df
-        else:
-            logging.info(f"Adding Target Exit Order {oType} for {oQty} of {t} at {price}")
-            ki.exec(kite,t,exch,oType,q=oQty,p=price,tag="TargetExit")
     return df
 
-def generateSignalsAndTrade(df,positions,stock,options,dfStartTime=None,
+def generateSignalsAndTrade(df,positions,stock,options,tradeStartTime=None,
                             targetClosedPositions=None):
+    global tradingStartTime
+    
+    if df.empty:
+        return
+
     # Stuff to hack if this function is called from KitTicker instaed of 
     # time_loop
     global now
@@ -303,12 +301,11 @@ def generateSignalsAndTrade(df,positions,stock,options,dfStartTime=None,
     applyTickerSpecificCfg(df['symbol'][0]) 
 
     now = df.index[-1]
-    if dfStartTime is not None:
-        dfStartTime = df.index[0]
-    
-    if df.empty:
-        return
-    
+    if tradeStartTime is not None:
+        tradingStartTime = tradeStartTime
+    else: 
+        tradingStartTime = df.index[0]
+        
     t = df['symbol'][0]
     
     #update moving averages and get signals
@@ -324,12 +321,14 @@ def generateSignalsAndTrade(df,positions,stock,options,dfStartTime=None,
     overrideSignalGenerators = []   
     tickerIsTrending = \
         signals.applyIntraDayStrategy(df,dataPopulators,signalGenerators, \
-                                overrideSignalGenerators)
-
-    df = checkAndUpdateTargetExits(df,positions,targetClosedPositions,tickerIsTrending)
+                                overrideSignalGenerators, tradeStartTime=tradingStartTime)
+    # update df for any target exits that happened within candle
+    df = checkAndUpdateTargetExits(df,targetClosedPositions)
     df = perf.calculate_positions(df,close_at_end=False)
+    # place target exit order if needed
+    placeExitOrder(df,positions,tickerIsTrending)
     
-    downloader.cache_df(df, t, dfStartTime, now)
+    downloader.cache_df(df, t, now)
         
     ltp = df['Adj Close'][-1]
 
@@ -418,7 +417,7 @@ def Tick(stock,options):
 ### MAIN LOOP RUNS 9:15 AM to 3:00 @ 3 PM MIS orders will be auto closed anyway (bad pricing)###
 
 if isTimeLoop:
-    while (now.hour >= startHour and now.hour < exitHour):
+    while (now.time() >= cfgStartTimeOfDay and now.time() < cfgEndExitTradesOnlyTimeOfDay):
         nxt_tick = now + timedelta(minutes=1) - timedelta(seconds=now.second)
 
         #Tick during market hours only
@@ -428,7 +427,7 @@ if isTimeLoop:
         #Sleep for seconds until the next minute
         slp_time = (nxt_tick - now).total_seconds()
         
-        if (now.hour == endHour):
+        if (now.time() > cfgEndNewTradesTimeOfDay):
             if len(positions) == 0:
                 logging.info('In exit window and no more positions to exit. Quitting')
                 break

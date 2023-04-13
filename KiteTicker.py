@@ -60,6 +60,8 @@ kws = ki.initKws(tl.get_kite_access_token())
 buy_order_id,sell_order_id = 0,0
 tickersToTrack = {}
 now = datetime.datetime.now(ist)
+tradingStartTime = now.replace(hour=cfgStartTimeOfDay.hour, minute=cfgStartTimeOfDay.minute, 
+                               second=0, microsecond=0)
 
 def getNiftyLTP():
     return nifty_ltp
@@ -241,7 +243,7 @@ def tick(tokens):
         targetExitAchieved = tickersToTrack[token]['targetExitAchieved']
         tickerlog(f"tickThread generating signals for: token {token} {tickersToTrack[token]['ticker']}")
         tl.generateSignalsAndTrade(tickersToTrack[token]['df'].copy(),positions,
-                                   False,True,dfStartTime=signals.tenAMToday(now),
+                                   False,True,tradingStartTime=tradingStartTime,
                                    targetClosedPositions=targetExitAchieved)
 
 def processTicks(ticks):
