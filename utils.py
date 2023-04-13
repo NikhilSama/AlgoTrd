@@ -72,10 +72,39 @@ def convertPEtoCEAndViceVersa(t):
 def getTickerCfg(ticker):
     if explodeOptionTicker(ticker):
         ticker = explodeOptionTicker(ticker)[0]
-        
+    else:
+        futTicker = getUnderlyingTickerForFuture(ticker)
+        if futTicker is not None:
+            ticker = futTicker
     if ticker in tickerCfg.tickerCfg:
         print(f"Applying CFG for {ticker}")
         return tickerCfg.tickerCfg[ticker]
     else:
         print(f"No CFG for {ticker}. Reverting to default CFG")
         return cfgDict
+    
+    
+def getNSEHolidays():
+    nse_holidays = [
+        "January 26, 2022", "March 01, 2022", "March 18, 2022", "April 14, 2022", "April 15, 2022",
+        "May 03, 2022", "August 09, 2022", "August 15, 2022", "August 31, 2022", "October 05, 2022", 
+        "October 24, 2022", "October 24, 2022", "November 08, 2022",
+        "26-Jan-2023","07-Mar-2023","30-Mar-2023","04-Apr-2023","07-Apr-2023","14-Apr-2023",
+        "01-May-2023","28-Jun-2023", "15-Aug-2023", "19-Sep-2023", "02-Oct-2023", "24-Oct-2023",
+        "14-Nov-2023", "27-Nov-2023", "25-Dec-2023"
+    ]
+    nse_holidays = pd.to_datetime(nse_holidays)
+    return nse_holidays
+
+def cleanDF(df):
+    # Kite can sometimes return junk data before 915 or 1530, wich very 
+    # low or zero volume.  These set the min/max values for OBV and 
+    # affect our analytics and signals for a long time.  So we filter
+    # fileter out these junk values
+
+    df = df.between_time('09:15:00+05:30', '15:29:00+05:30')    
+    df = df[df.index.weekday<5] # remove weekends
+    
+    # Remove holiday data from the DataFrame
+    df = df[~df.index.isin(getNSEHolidays())]
+    return df
