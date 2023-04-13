@@ -64,6 +64,14 @@ now = datetime.datetime.now(ist)
 def getNiftyLTP():
     return nifty_ltp
 
+def ltp(t=None,ticker=None):
+    if t is None:
+        t = db.get_instrument_token(ticker)
+    if (t in tickersToTrack.keys()) and (len(tickersToTrack[t]['ticks'])>0):
+        return tickersToTrack[t]['ticks']['Adj Close'].iloc[-1]
+    else:
+        return False 
+    
 def tickerlog(s):
     logtime = datetime.datetime.now(ist).strftime("%I:%M:%S %p")
     s = f'{logtime} {s}'
@@ -291,6 +299,9 @@ def on_message(ws, payload, is_binary):
 def on_order_update(ws, data):
     # Callback to receive order updates.
     timestamp_str = data['exchange_update_timestamp']
+    if timestamp_str is None:
+        tickerlog(f"Got order with None stimestamp. Ignoring. {data}")
+        return
     format_str = '%Y-%m-%d %H:%M:%S'
     timestamp = datetime.datetime.strptime(timestamp_str, format_str)
     rounded_timestamp = datetime.datetime(timestamp.year, timestamp.month, timestamp.day, timestamp.hour, timestamp.minute)

@@ -8,7 +8,7 @@ Created on Thu Mar  2 11:28:46 2023
 
 from kiteconnect import KiteConnect
 from kiteconnect import KiteTicker
-from datetime import datetime
+import datetime
 import os
 import requests
 import time
@@ -29,8 +29,8 @@ ist = pytz.timezone('Asia/Kolkata')
 api_key = "ctyl079egk5jwfai"
 apisecret = "skrapb33nfgsrnivz9ms20w0x6odhr3t"
 zacceccess_file = "Data/zerodha_kite_accesstoken.txt"
-tradelog = f"Data/trades/{datetime.now().strftime('%d-%m-%y')}.trades"
-tradelogcsv = f"Data/trades/{datetime.now().strftime('%d-%m-%y')}-trades.csv"
+tradelog = f"Data/trades/{datetime.datetime.now().strftime('%d-%m-%y')}.trades"
+tradelogcsv = f"Data/trades/{datetime.datetime.now().strftime('%d-%m-%y')}-trades.csv"
 
 
 def getNewAccessToken(kite): 
@@ -86,7 +86,7 @@ def initKiteTicker():
     return kite,kws
 
 def logtrade(s='',ticker=0,position=0,q=0,p=0,ltp=0,lot_size=0,tick_size=0,e='NSE'):
-    time = datetime.now(ist).strftime("%I:%M:%S %p")
+    time = datetime.datetime.now(ist).strftime("%I:%M:%S %p")
     p = round(p,2)
         
     if s == '':
@@ -311,7 +311,7 @@ def exit_positions (kite,t='day',lot_size=1,tick_size=0.5):
          print(e.args[0])
          return -1
        
-    logtrade(f'{datetime.now(ist).strftime("%I:%M %p")}-> EXIT {t} lot_size: {lot_size} tick_size{tick_size}')
+    logtrade(f'{datetime.datetime.now(ist).strftime("%I:%M %p")}-> EXIT {t} lot_size: {lot_size} tick_size{tick_size}')
 
     for position in positions['day']:
         symb = position['tradingsymbol']
@@ -344,7 +344,7 @@ def exit_given_position(kite,p):
     logging.info(f"EXIT: {p['tradingsymbol']}")
     exch = p['exchange']
     t = p['tradingsymbol']
-    ltp = p['last_price']
+    #ltp = p['last_price'] # SEems to be very inacurate and laggy, let exec get a updated value
     
     if exch not in ['NSE','BSE','NFO']:
         logging.error(f"Unhandled Exchange type ({p['exchange']}) in positions")
@@ -354,7 +354,7 @@ def exit_given_position(kite,p):
     txType = 'BUY' if p['quantity'] < 0 else 'SELL'
     q = abs(p['quantity'])
 
-    return exec(kite,t,exch,txType,q=q,ltp=ltp)
+    return exec(kite,t,exch,txType,q=q)
     
     if p['exchange'] == 'NFO':
         if p['quantity'] > 0:
