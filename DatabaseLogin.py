@@ -111,6 +111,11 @@ class DBBasic:
             logging.info('frmDB Unable to read sql')
             logging.info(e.args[0])
             return 0
+    def clearInstruments(self):
+        cursor = self.con.cursor()
+        q = 'delete from instruments_zerodha'
+        cursor.execute(q)
+        self.con.commit()
     def get_futures_ticker(self,ticker):
         #get rid of anything after a space in ticker NIFTY 50 => NIFTY
         ticker = ticker.split(' ',1)[0]
@@ -138,14 +143,13 @@ class DBBasic:
                 ticker = utils.getUnderlyingTickerForFuture(ticker)
                 price = price -150 #TODO HACK - futures are 150 points off on avg; ideally get the ltp of the future and use that
         if not tickerType:
-            q = f"SELECT tradingsymbol,lot_size,tick_size FROM trading.instruments_zerodha where instrument_type = '{type}' and underlying_ticker = '{ticker}' AND expiry > '{date.today()}' ORDER BY ABS( strike - {price} ) ASC, expiry ASC LIMIT 1"
+            q = f"SELECT tradingsymbol,lot_size,tick_size FROM trading.instruments_zerodha where instrument_type = '{type}' and underlying_ticker = '{ticker}' AND expiry >= '{date.today()}' ORDER BY ABS( strike - {price} ) ASC, expiry ASC LIMIT 1"
         else:
             #ticker is alreadu an option; just return the same ticker, with lot_size and tick_size
-            q = f"SELECT tradingsymbol,lot_size,tick_size FROM trading.instruments_zerodha where tradingsymbol = '{ticker}' AND expiry > '{date.today()}' ORDER BY ABS( strike - {price} ) ASC, expiry ASC LIMIT 1"    
+            q = f"SELECT tradingsymbol,lot_size,tick_size FROM trading.instruments_zerodha where tradingsymbol = '{ticker}' AND expiry >= '{date.today()}' ORDER BY ABS( strike - {price} ) ASC, expiry ASC LIMIT 1"    
         # else:#Ticker is PE and request is CE or vice versa
         #     inverseTicker = utils.convertPEtoCEAndViceVersa(ticker)
         #     q = f"SELECT tradingsymbol,lot_size,tick_size FROM trading.instruments_zerodha where instrument_type = '{type}' and tradingsymbol = '{inverseTicker}' AND expiry > '{date.today()}' ORDER BY ABS( strike - {price} ) ASC, expiry ASC LIMIT 1"    
-
         df = pd.read_sql(q, con=self.engine)
         if len(df) > 0:
             return df.iloc[0,0],df.iloc[0,1],df.iloc[0,2]
