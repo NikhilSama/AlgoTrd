@@ -85,9 +85,14 @@ zgetTo = datetime.datetime(2023, 3,31, 15, 30)
 zgetTo = ist.localize(zgetTo)
 
 def dbget(t,s,e):
+    df = downloader.getCachedTikerData('NIFTYITMCALL',s,e,'minute')
+    if not df.empty:
+        return df
+    print("getting from db")
     db = DBBasic()
     q = 'select * from niftyITMCall where date between "'+s.strftime('%Y-%m-%d %H:%M:%S')+'" and "'+e.strftime('%Y-%m-%d %H:%M:%S')+'"'
     df = db.frmDB(q)
+    downloader.loadTickerCache(df,'NIFTYITMCALL',s,e,'minute')
     return df
     
 def zget(t,s,e,i):
@@ -468,7 +473,7 @@ if isMain:
     #plot_options(['ASIANPAINT'],10,'minute')
     #backtest('NIFTY23APRFUT','minute')
     # isMain = False
-    backtest('NIFTYWEEKLYOPTION','minute',src='z')
+    backtest('NIFTYWEEKLYOPTION','minute',src='db')
 
     #oneThousandRandomTests()
 
