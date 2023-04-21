@@ -243,7 +243,7 @@ def tick(tokens):
         targetExitAchieved = tickersToTrack[token]['targetExitAchieved']
         tickerlog(f"tickThread generating signals for: token {token} {tickersToTrack[token]['ticker']}")
         tl.generateSignalsAndTrade(tickersToTrack[token]['df'].copy(),positions,
-                                   False,True,tradingStartTime=tradingStartTime,
+                                   False,True,tradeStartTime=tradingStartTime,
                                    targetClosedPositions=targetExitAchieved)
 
 def processTicks(ticks):

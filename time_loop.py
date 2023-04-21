@@ -310,13 +310,16 @@ def generateSignalsAndTrade(df,positions,stock,options,tradeStartTime=None,
     
     #update moving averages and get signals
     dataPopulators = [signals.populateBB, signals.populateADX, signals.populateOBV]
-    signalGenerators = [signals.getSig_BB_CX
-                        ,signals.getSig_ADX_FILTER
-                        ,signals.getSig_MASLOPE_FILTER
-                        ,signals.getSig_OBV_FILTER
-                        ,signals.getSig_exitAnyExtremeADX_OBV_MA20_OVERRIDE
-                        ,signals.getSig_followAllExtremeADX_OBV_MA20_OVERRIDE
-                        ,signals.exitTrendFollowing
+    signalGenerators = [
+                        signals.justFollowFastMA
+
+                        # signals.getSig_BB_CX
+                        # ,signals.getSig_ADX_FILTER
+                        # ,signals.getSig_MASLOPE_FILTER
+                        # ,signals.getSig_OBV_FILTER
+                        # ,signals.getSig_exitAnyExtremeADX_OBV_MA20_OVERRIDE
+                        # ,signals.getSig_followAllExtremeADX_OBV_MA20_OVERRIDE
+                        # ,signals.exitTrendFollowing
                         ]
     overrideSignalGenerators = []   
     tickerIsTrending = \

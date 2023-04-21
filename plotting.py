@@ -109,7 +109,9 @@ def plot_backtest(df,trades=None):
     ax3.plot(df['i'], df['position'], color='green', linewidth=2)
     ax3.set_title('Position↓', loc='right')
     df['ADX'] .fillna(0, inplace=True)
-    ax4.plot(df['i'], df['ADX'], color='green', linewidth=2)
+    ax4.plot(df['i'], df['ADX'], color='black', linewidth=2)
+    # ax4.plot(df['i'], df['+di'], color='green', linewidth=2)
+    # ax4.plot(df['i'], df['-di'], color='red', linewidth=2)
     # draw a threshold line at y=0.5
     ax4.axhline(y=adxThresh, color='red', linestyle='--')
     ax4.axhline(y=-adxThresh, color='red', linestyle='--')
@@ -132,12 +134,19 @@ def plot_backtest(df,trades=None):
     # ax7.axhline(y=maSlopeSlopeThresh, color='red', linestyle='--')
     # ax7.axhline(y=-maSlopeSlopeThresh, color='red', linestyle='--')
 
-    ax8.plot(df['i'], df['OBV-OSC'], color='green', linewidth=2)
-    ax8.set_title('OBV OSC↓', loc='right')
-    ax8.axhline(y=obvOscThresh, color='red', linestyle='--')
-    ax8.axhline(y=-obvOscThresh, color='red', linestyle='--')
-    ax8.axhline(y=obvOscThresh*obvOscThreshYellowMultiplier, color='blue', linestyle='--')
-    ax8.axhline(y=-obvOscThresh*obvOscThreshYellowMultiplier, color='blue', linestyle='--')
+    if 'OBV-OSC' in df.columns and df['OBV-OSC'][-1] != 0:
+        ax8.plot(df['i'], df['OBV-OSC'], color='green', linewidth=2)
+        ax8.set_title('OBV OSC↓', loc='right')
+        ax8.axhline(y=obvOscThresh, color='red', linestyle='--')
+        ax8.axhline(y=-obvOscThresh, color='red', linestyle='--')
+        ax8.axhline(y=obvOscThresh*obvOscThreshYellowMultiplier, color='blue', linestyle='--')
+        ax8.axhline(y=-obvOscThresh*obvOscThreshYellowMultiplier, color='blue', linestyle='--')
+    else:
+        ax8.plot(df['i'], df['MA-FAST-SLP'], color='green', linewidth=2)
+        ax8.set_title('MA-FAST-SLP↓', loc='right')
+        ax8.axhline(y=cfgFastMASlpThresh, color='red', linestyle='--')
+        ax8.axhline(y=-cfgFastMASlpThresh, color='red', linestyle='--')
+
 
     ax9.plot(df['i'], df['OBV-OSC-PCT-CHNG'], color='green', linewidth=2)
     ax9.set_title('OBV-OSC-PCT-CHNG OSC↓', loc='right')
@@ -149,7 +158,7 @@ def plot_backtest(df,trades=None):
         return # dont plot the shaded region if there are too many rows
     
     xticks = []
-    
+    # print(df)
     # Loop over each day in the DataFrame
     for day in np.unique(df.index.date):
         day_rows = df.loc[df.index.date == day]
@@ -165,7 +174,7 @@ def plot_backtest(df,trades=None):
             start_index=day_rows.loc[day_rows.index[0],'i']
             end_index=df['i'][end_time]
         except:
-            print("cant find start or end index(Likely cause data started or ended mid-day) for {start_time} or {end_time}")
+            print(f"cant find start or end index(Likely cause data started or ended mid-day) for {start_time} to {end_time}")
         # Add a shaded rectangle for the time period between start_time and end_time
         xticks.extend([start_index,end_index])
         ax1.axvspan(start_index, end_index, alpha=0.2, color='gray')

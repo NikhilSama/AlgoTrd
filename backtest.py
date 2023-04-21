@@ -22,13 +22,13 @@ import DownloadHistorical as downloader
 import pytz
 import strategies15m as strat15m
 import ppprint
-from plotting import plot_backtest,plot_stock_and_option
+from plotting import plot_backtest,plot_stock_and_option,plot_trades
 import itertools 
 from sqlalchemy import create_engine
 import mysql.connector
 import backtest_log_setup
-
-
+import os
+import pickle
 
 import utils
 import sys
@@ -70,20 +70,53 @@ def mark_task_complete():
 import cfg
 globals().update(vars(cfg))
 
+
 # set timezone to IST
 ist = pytz.timezone('Asia/Kolkata')
 
 tickers = td.get_sp500_tickers()
 nifty = td.get_nifty_tickers()
 index_tickers = td.get_index_tickers()
-firstTradeTime = datetime.datetime(2023, 4,10, 9, 0, tzinfo=ist)
+firstTradeTime = datetime.datetime(2022, 5,1, 9, 0)
+firstTradeTime = ist.localize(firstTradeTime)
 zgetFrom = firstTradeTime - timedelta(days=cfgHistoricalDaysToGet)
-zgetTo = datetime.datetime(2023, 4,12, 15, 30, tzinfo=ist)
-
+zgetTo = datetime.datetime(2023, 3,31, 15, 30)
+zgetTo = ist.localize(zgetTo)
 def zget(t,s,e,i):
+    if t == 'NIFTYWEEKLYOPTION': 
+        pfname = 'Data/NIFTYOPTIONSDATA/contNiftyWeeklyOptionDF.pickle'
+        # if os.path.isfile(pfname):
+        #     with open(pfname, "rb") as f:
+        #         df = pickle.load(f)
+        #         return df
+
+        fname = 'Data/NIFTYOPTIONSDATA/contNiftyWeeklyOptionDF.csv'
+        df = pd.read_csv(fname)
+        # Combine the Date and Time columns into a single column
+        df['DateTime'] = df['Date'] + ' ' + df['Time']
+
+        # Convert the 'DateTime' column to a datetime object and set it as the index
+        df['DateTime'] = pd.to_datetime(df['DateTime'], format='%d/%m/%Y %H:%M:%S')
+        df.set_index('DateTime', inplace=True)
+        df.index = df.index.tz_localize(ist)
+        # Set the seconds values to 0 in the DateTimeIndex
+        df.index = df.index.floor('T')
+        df.rename(columns={"Ticker":"symbol"},inplace=True)
+        df.rename(columns={"Close":"Adj Close"},inplace=True)
+        # Drop the original Date and Time columns
+        df.drop(columns=['Date', 'Time', 'id', 'Open Interest'], inplace=True)
+        df.insert(0, 'i', range(1, 1 + len(df)))
+        # Filter the DataFrame between start_date and end_date
+        # print(df)
+
+        df = df[(df.index >= s) & (df.index <= e)]
+        with open(pfname,"wb") as f:
+            pickle.dump(df,f)
+        return df
     #Get latest minute tick from zerodha
     df = downloader.zget(s,e,t,i,includeOptions=includeOptions)
     df = downloader.zColsToDbCols(df)
+    
     return df
 def zgetNDays(t,n,e=datetime.datetime.now(ist),i="minute"):
     s = e - timedelta(days=n)
@@ -117,7 +150,7 @@ def printTearsheet(tearsheet):
             print(f"\t\t{utils.timeToString(index,date=False,time=True)}: EXIT @ {trade['Open']:.2f}({diff} or {diff/entry_price:.2%})")
         else:
             entry_price = trade['Open']
-            print(f"\t{utils.timeToString(index,date=True)} Position: {trade['position']} @ {trade['Open']} Return:{trade['return']:.2%} \tCUM=>{trade['sum_return']:.2%}")
+            print(f"\t{utils.timeToString(index,date=True)} Position: {trade['position']} @ {trade['Open']} \tReturn:{trade['return']:.2%} \tCUM=>{trade['sum_return']:.2%}")
     print("Days: ")
     daily_returns = tearsheet['trades']['return'].resample('D').sum()
     for index,day in daily_returns.iteritems():
@@ -130,7 +163,7 @@ def printTearsheet(tearsheet):
     print(f"Avg Return per day: {tearsheet['avg_daily_return']:.2%}")
     print(f"Worst Day ({tearsheet['worst_daily_return_date']}): {tearsheet['worst_daily_return']:.2%}")
     print(f"Best Day ({tearsheet['best_daily_return_date']}): {tearsheet['best_daily_return']:.2%}")
-    
+
 def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
             exportCSV=False, tradingStartTime = firstTradeTime, \
             applyTickerSpecificConfig = True, signalGenerators = None):
@@ -148,7 +181,7 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
         df_head = df.loc[:firstTradeTime].iloc[-cfgMaxLookbackCandles:]
         df_tail = df.loc[firstTradeTime:]
         df = pd.concat([df_head, df_tail])
-
+    df['Volume']=0
     # print (len(df))
     # print(len(df_head))
     # print(len(df_tail))
@@ -157,26 +190,30 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
     #perfTime = perfProfiler("ZGET", perfTIME)
     dataPopulators = [
         signals.populateBB, 
-        signals.populateADX, 
-        signals.populateOBV
+        signals.populateADX
+        #signals.populateOBV
         ]
+    
     signalGenerators = [
                     #    signals.randomSignalGenerator
-                    #    signals.justFollowMA
-                         signals.getSig_BB_CX
-                        ,signals.getSig_ADX_FILTER
+                        #signals.justFollowMA
+                     #   signals.justFollowFastMA
+                          signals.getSig_BB_CX
+                         ,signals.getSig_ADX_FILTER
                          ,signals.getSig_MASLOPE_FILTER
-                        ,signals.getSig_OBV_FILTER
-                        ,signals.getSig_exitAnyExtremeADX_OBV_MA20_OVERRIDE
-                        ,signals.getSig_followAllExtremeADX_OBV_MA20_OVERRIDE
-                    #     #,signals.followTrendReversal
-                        ,signals.exitTrendFollowing
+                    #      ,signals.getSig_OBV_FILTER
+                    #     ,signals.getSig_exitAnyExtremeADX_OBV_MA20_OVERRIDE
+                          ,signals.getSig_followAllExtremeADX_OBV_MA20_OVERRIDE
+                    # # #     #,signals.followTrendReversal
+                          ,signals.exitTrendFollowing
+                           # signals.fastSlowMACX
+
                         ] if signalGenerators is None else signalGenerators
     overrideSignalGenerators = []   
     
     signals.applyIntraDayStrategy(df,dataPopulators,signalGenerators,
                                   overrideSignalGenerators, 
-                                  tradingStartTime=tradingStartTime,
+                                  tradeStartTime=tradingStartTime,
                                   applyTickerSpecificConfig=applyTickerSpecificConfig)
     #perfTIME = perfProfiler("SIGNAL GENERATION", perfTIME)
 
@@ -208,6 +245,8 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
     if 'adjCloseGraph' in plot:
         plot_backtest(df.loc[firstTradeTime:],tearsheet['trades'])
     
+    if 'trade_returns' in plot:
+        plot_trades(tearsheet['trades'])
     # print (f"END Complete {datetime.datetime.now(ist)}")
     return tearsheetdf
 
@@ -304,23 +343,60 @@ def performanceToCSV(performance):
     #perfFileName = utils.fileNameFromArgs('Data/backtest/combo/niftyPerf-')
     #performance.to_csv(perfFileName)
     return performance
+def backtestCombinator2():
+    performance = pd.DataFrame()
+    ma20lens = [10]
+    fastMALens  = [2,5,7,10,15,20,25,30]
+    adxLens = [10,14,20]
+    adxThresholds = [10,15,20,25,30,35,40,45,90]
+    fastMAThreshs = [0,0.005,0.01,0.02,0.03,0.04,.05,0.1]
+    for ma20len in ma20lens:
+        for fastMALen in fastMALens:
+            for adxLen in adxLens:
+                for adxThreshold in adxThresholds:
+                    for fastMaThresh in fastMAThreshs:
+                        cfg = {'maLen':ma20len, 'fastMALen':fastMALen,
+                            'adxLen':adxLen, 'adxThresh':adxThreshold,
+                            'cfgFastMASlpThresh': fastMaThresh}
+                        signals.updateCFG2(cfg)
+                        tearsheetdf = backtest(cfgTicker,'minute',exportCSV=False,
+                                        applyTickerSpecificConfig=False)
+                        tearsheetdf['fastMALen'] = fastMALen
+                        tearsheetdf['cfgFastMASlpThresh'] = fastMaThresh
+                        tearsheetdf['adxLen'] = adxLen
+                        tearsheetdf['adxThresh'] = adxThresh
+                        performance = pd.concat([performance, tearsheetdf])
+    engine = create_engine('mysql+pymysql://trading:trading123@trading.ca6bwmzs39pr.ap-south-1.rds.amazonaws.com/trading')
+    performance.to_sql('PerfNiftyFollowFast2', engine, if_exists='append')
+    engine.dispose()
 
 def backtestCombinator():
         
-    performance = pd.DataFrame()
-    
-    ma_slope_threshes = [0.5, 0.7, 0.8, 0.9, 1]
+    performance = pd.DataFrame()    
+    ma_slope_threshes = [0,0.005,0.01,0.02,0.03,0.04,.05,0.1]
     # ma_slope_thresh_yellow_multipliers = [0.5,0.7,0.9]
     # obv_osc_threshes = [0.1, 0.2, 0.4]
     # obv_osc_thresh_yellow_multipliers = [0.7, 0.9, 1]
     # obv_ma_lens = [10,20,30]
 
     # ma_slope_threshes = [0.5]
-    ma_slope_thresh_yellow_multipliers = [0.5]
+    ma_slope_thresh_yellow_multipliers = [0]
     #ma_slope_slope_threshes = [0.1]
     obv_osc_threshes = [0.1]
-    obv_osc_thresh_yellow_multipliers = [0.9]
+    obv_osc_thresh_yellow_multipliers = [0,1]
     obv_ma_lens = [20]
+    signal_generators = [
+                        [signals.getSig_BB_CX
+                         ,signals.getSig_ADX_FILTER
+                         ,signals.getSig_MASLOPE_FILTER],
+                        [signals.getSig_followAllExtremeADX_OBV_MA20_OVERRIDE
+                          ,signals.exitTrendFollowing]
+                        [signals.getSig_BB_CX
+                         ,signals.getSig_ADX_FILTER
+                         ,signals.getSig_MASLOPE_FILTER
+                         ,signals.getSig_followAllExtremeADX_OBV_MA20_OVERRIDE
+                         ,signals.exitTrendFollowing]
+                        ]
 
     # This loop will run 3^4 = 89 times; each run will be about 
     # 3 second, so total 267 seconds = 4.5 minutes
@@ -333,20 +409,21 @@ def backtestCombinator():
     # start and end times, symbol, and all the parameters
         
     for params in itertools.product(ma_slope_threshes, ma_slope_thresh_yellow_multipliers,
-                                 obv_osc_threshes, obv_osc_thresh_yellow_multipliers,obv_ma_lens):
-        ma_slope_thresh, ma_slope_thresh_yellow_multiplier, obv_osc_thresh, obv_osc_thresh_yellow_multiplier, obv_ma_len \
+                                 obv_osc_threshes, obv_osc_thresh_yellow_multipliers,obv_ma_lens,signal_generators):
+        ma_slope_thresh, ma_slope_thresh_yellow_multiplier, obv_osc_thresh, obv_osc_thresh_yellow_multiplier, obv_ma_len, sigGen \
              = params
 
         signals.updateCFG(ma_slope_thresh, ma_slope_thresh_yellow_multiplier, \
                          obv_osc_thresh, \
                          obv_osc_thresh_yellow_multiplier, obv_ma_len)
         tearsheetdf = backtest(cfgTicker,'minute',exportCSV=False,
-                               applyTickerSpecificConfig=False)
+                               applyTickerSpecificConfig=False, signalGenerators=sigGen)
         if tearsheetdf is None:
             print("No data for this ticker")
             return
         # Add in config variables we are looping through to the tearsheetdf
         tearsheetdf['ma_slope_thresh'] = ma_slope_thresh
+        print(f"Doing for ma_slope_thresh: {ma_slope_thresh} ma_slope_thresh_yellow_multiplier: {ma_slope_thresh_yellow_multiplier} obv_osc_thresh: {obv_osc_thresh} obv_osc_thresh_yellow_multiplier: {obv_osc_thresh_yellow_multiplier} obv_ma_len: {obv_ma_len}")
         tearsheetdf['ma_slope_thresh_yellow_multiplier'] = ma_slope_thresh_yellow_multiplier
         tearsheetdf['obv_osc_thresh'] = obv_osc_thresh
         tearsheetdf['obv_osc_thresh_yellow_multiplier'] = obv_osc_thresh_yellow_multiplier
@@ -354,10 +431,18 @@ def backtestCombinator():
         #tearsheetdf['ticker'] = 'NIFTY23APRFUT'
         tearsheetdf['interval'] = 'minute'
         tearsheetdf['startTime'] = firstTradeTime
-        tearsheetdf['endTime'] = zgetTo
+        tearsheetdf ['endTime'] = zgetTo
         tearsheetdf['duration_in_days'] = (zgetTo - zgetFrom).days
-        
-        performance = pd.concat([performance, tearsheetdf])
+        if len(sigGen) == 2:
+            tearsheetdf['signalGenerators'] = 'TrendingOnly'
+        elif len(sigGen) == 3:
+            tearsheetdf['signalGenerators'] = 'BBOnly'
+        elif len(sigGen) == 5:
+            tearsheetdf['signalGenerators'] = 'TrendPlusBB'
+        else:
+            print("WIERD NUMBER OF SIGNAL GENERATORS")
+            exit(0)
+        performance = pd.concat([performance, tearsheetdf]) if tearsheetdf['num_trades'][0] > 0 else performance
 
     
     # write the DataFrame to a SQL table
@@ -367,19 +452,23 @@ def backtestCombinator():
     mark_task_complete()
     # create a database connection (performance to CSV adds the 
     # argv variables as well to the performance df)
+    if performance is None or performance.empty:
+        print("No trades to write to DB")
+        return
     engine = create_engine('mysql+pymysql://trading:trading123@trading.ca6bwmzs39pr.ap-south-1.rds.amazonaws.com/trading')
-    performance.to_sql('performancev5', engine, if_exists='append')
+    performance.to_sql('PerfNiftyFollowFast4', engine, if_exists='append')
     engine.dispose()
 
 if isMain:
     #backtestCombinator()       
+    #backtestCombinator()       
     #plot_options(['ASIANPAINT'],10,'minute')
     #backtest('NIFTY23APRFUT','minute')
-    backtest('NIFTY2341317700CE','minute')
+    backtest('NIFTYWEEKLYOPTION','minute')
 
     #oneThousandRandomTests()
 
-#    backtest('NIFTY23APR17750CE','minute')
+#    backtest('NIFTY23APR17750CE','minute') 
     #backtest(cfgTicker,'minute')
     #backtest_daybyday('NIFTY23APRFUT','minute')
 

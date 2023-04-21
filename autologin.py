@@ -8,9 +8,9 @@ import os
 from pyotp import TOTP
 import sys 
 
-chrome_driver_path = '/Users/nikhilsama/Dropbox/Coding/AlgoTrading/Data/chromedriver' # Replace with the path to your ChromeDriver executable
+chrome_driver_path = './Data/chromedriver' # Replace with the path to your ChromeDriver executable
 
-file = open("/Users/nikhilsama/Dropbox/Coding/AlgoTrading/Data/cred.txt", "r")
+file = open("./Data/cred.txt", "r")
 keys = file.read().split()  # Get a List of keys
 
 api_key = keys[0]
