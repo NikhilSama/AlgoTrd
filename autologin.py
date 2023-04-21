@@ -59,6 +59,6 @@ data = kite.generate_session(temp_token, api_secret=key_secret)
 access_token = data["access_token"]
 print("got access_token", access_token)
 
-with open('/Users/nikhilsama/Dropbox/Coding/AlgoTrading/Data/zerodha_kite_accesstoken.txt', "w") as f:
+with open('./Data/zerodha_kite_accesstoken.txt', "w") as f:
     f.write(access_token)
 browser.quit()
