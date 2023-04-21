@@ -381,7 +381,7 @@ def backtestCombinator2():
 def backtestCombinator(src='z'):
         
     performance = pd.DataFrame()    
-    ma_slope_threshes = [0,0.005,0.01,0.02,0.03,0.04,.05,0.1]
+    ma_slope_threshes = [0.01,0.05,0.1,0.3,0.7,1]
     # ma_slope_thresh_yellow_multipliers = [0.5,0.7,0.9]
     # obv_osc_threshes = [0.1, 0.2, 0.4]
     # obv_osc_thresh_yellow_multipliers = [0.7, 0.9, 1]
@@ -474,9 +474,7 @@ if isMain:
     #backtest('NIFTY23APRFUT','minute')
     # isMain = False
     t = perfProfiler("Start", time.time())
-    backtestCombinator(src='db')       
-
-#    backtest('NIFTYWEEKLYOPTION','minute',src='db')
+    backtest('NIFTYWEEKLYOPTION','minute',src='db')
     t = perfProfiler("End", t)
 
     #oneThousandRandomTests()
