@@ -459,7 +459,7 @@ def backtestCombinator(src='z'):
         print("No trades to write to DB")
         return
     engine = create_engine('mysql+pymysql://trading:trading123@trading.ca6bwmzs39pr.ap-south-1.rds.amazonaws.com/trading')
-    performance.to_sql('PerfNiftyFollowFast4', engine, if_exists='append')
+    performance.to_sql('PerfNiftyAllStrat', engine, if_exists='append')
     engine.dispose()
 
 if isMain:
