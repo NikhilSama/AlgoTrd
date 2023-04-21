@@ -78,7 +78,7 @@ ist = pytz.timezone('Asia/Kolkata')
 tickers = td.get_sp500_tickers()
 nifty = td.get_nifty_tickers()
 index_tickers = td.get_index_tickers()
-firstTradeTime = datetime.datetime(2023, 3,31, 9, 0)
+firstTradeTime = datetime.datetime(2023, 1,1, 9, 0)
 firstTradeTime = ist.localize(firstTradeTime)
 zgetFrom = firstTradeTime - timedelta(days=cfgHistoricalDaysToGet)
 zgetTo = datetime.datetime(2023, 3,31, 15, 30)
@@ -473,7 +473,11 @@ if isMain:
     #plot_options(['ASIANPAINT'],10,'minute')
     #backtest('NIFTY23APRFUT','minute')
     # isMain = False
-    backtest('NIFTYWEEKLYOPTION','minute',src='db')
+    t = perfProfiler("Start", time.time())
+    backtestCombinator(src='db')       
+
+#    backtest('NIFTYWEEKLYOPTION','minute',src='db')
+    t = perfProfiler("End", t)
 
     #oneThousandRandomTests()
 

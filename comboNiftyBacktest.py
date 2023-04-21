@@ -92,15 +92,15 @@ def run_instance(args):
 def argGenerator():
 
     ma_lens = [5,10,15,20,50]
-    band_widths = [1,1.5,2,2.5,3,3.5,4]
+    band_widths = [1,1.5,2,2.5]
     cfgMiniBandWidthMults = [0.5,0.75,1]
     cfgSuperBandWidthMults = [1,1.25,1.5]
-    fast_ma_lens = [5,7,10]
-    adx_lens = [10,15,20,25,30]
-    adx_thresholds = [10,15,20,25,30,40,50,80]
+    fast_ma_lens = [5,7]
+    adx_lens = [10,15,20,25]
+    adx_thresholds = [10,15,20,25,30,40,80]
     adx_thresh_yellow_multipliers = [0.5,0.7,0.9]
-    num_candles_for_slope_proj = [2,5,7]
-    atr_lens = [10,14,20]
+    num_candles_for_slope_proj = [2,5]
+    atr_lens = [14]
     cfgTickers = ['NIFTYWEEKLYOPTION']
     for params in itertools.product(ma_lens, band_widths, fast_ma_lens, adx_lens, adx_thresholds, adx_thresh_yellow_multipliers, num_candles_for_slope_proj,
                                     atr_lens, cfgMiniBandWidthMults, cfgSuperBandWidthMults, cfgTickers):
