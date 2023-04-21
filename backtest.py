@@ -29,6 +29,7 @@ import mysql.connector
 import backtest_log_setup
 import os
 import pickle
+from DatabaseLogin import DBBasic
 
 import utils
 import sys
@@ -77,11 +78,18 @@ ist = pytz.timezone('Asia/Kolkata')
 tickers = td.get_sp500_tickers()
 nifty = td.get_nifty_tickers()
 index_tickers = td.get_index_tickers()
-firstTradeTime = datetime.datetime(2022, 5,1, 9, 0)
+firstTradeTime = datetime.datetime(2023, 3,31, 9, 0)
 firstTradeTime = ist.localize(firstTradeTime)
 zgetFrom = firstTradeTime - timedelta(days=cfgHistoricalDaysToGet)
 zgetTo = datetime.datetime(2023, 3,31, 15, 30)
 zgetTo = ist.localize(zgetTo)
+
+def dbget(t,s,e):
+    db = DBBasic()
+    q = 'select * from niftyITMCall where date between "'+s.strftime('%Y-%m-%d %H:%M:%S')+'" and "'+e.strftime('%Y-%m-%d %H:%M:%S')+'"'
+    df = db.frmDB(q)
+    return df
+    
 def zget(t,s,e,i):
     if t == 'NIFTYWEEKLYOPTION': 
         pfname = 'Data/NIFTYOPTIONSDATA/contNiftyWeeklyOptionDF.pickle'
@@ -92,19 +100,10 @@ def zget(t,s,e,i):
 
         fname = 'Data/NIFTYOPTIONSDATA/contNiftyWeeklyOptionDF.csv'
         df = pd.read_csv(fname)
-        # Combine the Date and Time columns into a single column
-        df['DateTime'] = df['Date'] + ' ' + df['Time']
-
-        # Convert the 'DateTime' column to a datetime object and set it as the index
-        df['DateTime'] = pd.to_datetime(df['DateTime'], format='%d/%m/%Y %H:%M:%S')
-        df.set_index('DateTime', inplace=True)
-        df.index = df.index.tz_localize(ist)
+        df.set_index('date', inplace=True)
+        df.index = pd.to_datetime(df.index)
         # Set the seconds values to 0 in the DateTimeIndex
         df.index = df.index.floor('T')
-        df.rename(columns={"Ticker":"symbol"},inplace=True)
-        df.rename(columns={"Close":"Adj Close"},inplace=True)
-        # Drop the original Date and Time columns
-        df.drop(columns=['Date', 'Time', 'id', 'Open Interest'], inplace=True)
         df.insert(0, 'i', range(1, 1 + len(df)))
         # Filter the DataFrame between start_date and end_date
         # print(df)
@@ -166,10 +165,14 @@ def printTearsheet(tearsheet):
 
 def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
             exportCSV=False, tradingStartTime = firstTradeTime, \
-            applyTickerSpecificConfig = True, signalGenerators = None):
+            applyTickerSpecificConfig = True, signalGenerators = None,
+            src = 'z'):
     #perfTIME = time.time()    
     #startingTime = perfTIME
-    df = zget(t,start,end,i=i)
+    if src == 'db':
+        df = dbget(t,start,end)
+    else:
+        df = zget(t,start,end,i=i)
     if df.empty:
         print(f"No data for {t} start:{start} end:{end} i:{i}")
         return
@@ -370,7 +373,7 @@ def backtestCombinator2():
     performance.to_sql('PerfNiftyFollowFast2', engine, if_exists='append')
     engine.dispose()
 
-def backtestCombinator():
+def backtestCombinator(src='z'):
         
     performance = pd.DataFrame()    
     ma_slope_threshes = [0,0.005,0.01,0.02,0.03,0.04,.05,0.1]
@@ -390,7 +393,7 @@ def backtestCombinator():
                          ,signals.getSig_ADX_FILTER
                          ,signals.getSig_MASLOPE_FILTER],
                         [signals.getSig_followAllExtremeADX_OBV_MA20_OVERRIDE
-                          ,signals.exitTrendFollowing]
+                          ,signals.exitTrendFollowing],
                         [signals.getSig_BB_CX
                          ,signals.getSig_ADX_FILTER
                          ,signals.getSig_MASLOPE_FILTER
@@ -417,7 +420,7 @@ def backtestCombinator():
                          obv_osc_thresh, \
                          obv_osc_thresh_yellow_multiplier, obv_ma_len)
         tearsheetdf = backtest(cfgTicker,'minute',exportCSV=False,
-                               applyTickerSpecificConfig=False, signalGenerators=sigGen)
+                               applyTickerSpecificConfig=False, signalGenerators=sigGen, src=src)
         if tearsheetdf is None:
             print("No data for this ticker")
             return
@@ -464,7 +467,8 @@ if isMain:
     #backtestCombinator()       
     #plot_options(['ASIANPAINT'],10,'minute')
     #backtest('NIFTY23APRFUT','minute')
-    backtest('NIFTYWEEKLYOPTION','minute')
+    # isMain = False
+    backtest('NIFTYWEEKLYOPTION','minute',src='z')
 
     #oneThousandRandomTests()
 

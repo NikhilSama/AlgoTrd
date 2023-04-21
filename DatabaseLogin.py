@@ -96,8 +96,10 @@ class DBBasic:
             #self.toDB_row_by_row(table,df)
         try:
             df.to_sql(table, con=self.engine, if_exists = 'append', chunksize = 1000)
-            #print('Saved to Database')
+            print('Saved to Database')
         except Exception as e:
+            print('toDB Unable to save')
+            print(e.args[0])
             logging.info('toDB Unable to save')
             logging.info(e.args[0])
 
@@ -105,7 +107,12 @@ class DBBasic:
         try:
             df = pd.read_sql(q, con=self.engine)
             df = df.set_index('date')
-            df.rename(columns = {'open' : 'Open', 'close' : 'Adj Close', 'high': 'High', 'low': 'Low', 'volume' : 'Volume'}, inplace=True)
+            df.index = pd.to_datetime(df.index)
+            df.index = df.index.tz_localize(ist, ambiguous='infer', nonexistent='shift_forward')
+
+            df.insert(0, 'i', range(1, 1 + len(df)))
+
+            #df.rename(columns = {'open' : 'Open', 'close' : 'Adj Close', 'high': 'High', 'low': 'Low', 'volume' : 'Volume'}, inplace=True)
             return df
         except Exception as e:
             logging.info('frmDB Unable to read sql')
