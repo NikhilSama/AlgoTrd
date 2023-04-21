@@ -143,7 +143,10 @@ class DBBasic:
                 ticker = utils.getUnderlyingTickerForFuture(ticker)
                 price = price -150 #TODO HACK - futures are 150 points off on avg; ideally get the ltp of the future and use that
         if not tickerType:
-            q = f"SELECT tradingsymbol,lot_size,tick_size FROM trading.instruments_zerodha where instrument_type = '{type}' and underlying_ticker = '{ticker}' AND expiry >= '{date.today()}' ORDER BY ABS( strike - {price} ) ASC, expiry ASC LIMIT 1"
+            if strike == 0:
+                q = f"SELECT tradingsymbol,lot_size,tick_size FROM trading.instruments_zerodha where instrument_type = '{type}' and underlying_ticker = '{ticker}' AND expiry >= '{date.today()}' ORDER BY ABS( strike - {price} ) ASC, expiry ASC LIMIT 1"
+            else: # strike is provided, find the option with this strike only
+                q = f"SELECT tradingsymbol,lot_size,tick_size FROM trading.instruments_zerodha where instrument_type = '{type}' and underlying_ticker = '{ticker}' AND expiry >= '{date.today()}' AND strike = {strike} ORDER BY ABS( strike - {price} ) ASC, expiry ASC LIMIT 1"
         else:
             #ticker is alreadu an option; just return the same ticker, with lot_size and tick_size
             q = f"SELECT tradingsymbol,lot_size,tick_size FROM trading.instruments_zerodha where tradingsymbol = '{ticker}' AND expiry >= '{date.today()}' ORDER BY ABS( strike - {price} ) ASC, expiry ASC LIMIT 1"    

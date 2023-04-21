@@ -58,7 +58,7 @@ perfTIME = time.time()
 
 cloud_args=''
 #if 'cloud' in sys.argv:
-cloud_args = 'cacheTickData:True zerodha_access_token:7U887TvMrAGWqed62SHqIJ7GdHfPO1DJ dbhost:trading.ca6bwmzs39pr.ap-south-1.rds.amazonaws.com dbuser:trading dbpass:trading123 dbname:trading'
+cloud_args = 'cacheTickData:True zerodha_access_token:uzifIMYFPPnuRFLWVe3vM89jYKDHMM4V dbhost:trading.ca6bwmzs39pr.ap-south-1.rds.amazonaws.com dbuser:trading dbpass:trading123 dbname:trading'
 iter = 0
 
 def run_instance(args):
@@ -91,28 +91,30 @@ def run_instance(args):
         
 def argGenerator():
 
-    ma_lens = [10, 20, 30]
-    band_widths = [1, 2, 3]
-    fast_ma_lens = [5,7,9]
-    adx_lens = [14,20]
-    adx_thresholds = [20, 25, 30]
-    adx_thresh_yellow_multipliers = [0.7, 0.9, 1]
-    num_candles_for_slope_proj = [2,6]
-    atr_lens = [14,20]
-    cfgTickers = ['HDFCBANK23APR1640CE','HDFCBANK23APR1640PE','NIFTY23APR17300PE','NIFTY23APR17300CE']
+    ma_lens = [5,10,20,30,40,50]
+    band_widths = [1,1.5,2,2.5,3,3.5,4]
+    cfgMiniBandWidthMults = [0.5,0.75,1]
+    cfgSuperBandWidthMults = [1,1.25,1.5]
+    fast_ma_lens = [5,7,10]
+    adx_lens = [10,15,20,25,30]
+    adx_thresholds = [10,15,20,25,30,40,50,80]
+    adx_thresh_yellow_multipliers = [0.5,0.7,0.9
+    num_candles_for_slope_proj = [2,5,7]
+    atr_lens = [10,14,20]
+    cfgTickers = ['NIFTYWEEKLYOPTION']
     for params in itertools.product(ma_lens, band_widths, fast_ma_lens, adx_lens, adx_thresholds, adx_thresh_yellow_multipliers, num_candles_for_slope_proj,
-                                    atr_lens, cfgTickers):
-        ma_len, band_width, fast_ma_len, adx_len, adx_thresh, adx_thresh_yellow_multiplier, num_candles, atr_len, cfgTicker, \
+                                    atr_lens, cfgMiniBandWidthMults, cfgSuperBandWidthMults, cfgTickers):
+        ma_len, band_width, fast_ma_len, adx_len, adx_thresh, adx_thresh_yellow_multiplier, num_candles, atr_len, cfgMiniBandWidthMult, cfgSuperBandWidthMult, cfgTicker, \
         = params
         #check w db to see if this combination has been run before or is currently running
         # if not then mark it as running
         # do it
         # check that csv exists and mark it as done in db 
         
-        argString = f"maLen:{ma_len} bandWidth:{band_width} fastMALen:{fast_ma_len} adxLen:{adx_len} adxThresh:{adx_thresh} adxThreshYellowMultiplier:{adx_thresh_yellow_multiplier} numCandlesForSlopeProjection:{num_candles} atrLen:{atr_len} cfgTicker:{cfgTicker}"
+        argString = f"maLen:{ma_len} bandWidth:{band_width} fastMALen:{fast_ma_len} adxLen:{adx_len} adxThresh:{adx_thresh} adxThreshYellowMultiplier:{adx_thresh_yellow_multiplier} numCandlesForSlopeProjection:{num_candles} atrLen:{atr_len} cfgMiniBandWidthMult:{cfgMiniBandWidthMult} cfgSuperBandWidthMults:{cfgSuperBandWidthMultscfg} Ticker:{cfgTicker}"
                 
         # will run 3^5=243 * 2^3=8 = 1944 times == approx 20K min @ 10 min per run 
-        # 100 parallel cpu = 200 min = 3.2 hrs * $7/hr = $12.8
+        # 100 paraaZllel cpu = 200 min = 3.2 hrs * $7/hr = $12.8
         # 64 cpu 20000/64 = 312.5 min = 5.2 hrs * $4/hr = $20.8
         # create view top_performers as select num_trades,FORMAT(max_drawdown_from_peak*100,2) as percentage,FORMAT(`return`*100,2) as percentage,round(sharpe_ratio,2),maLen,bandWidth,fastMALen,adxLen,adxThresh,adxThreshYellowMultiplier,numCandlesForSlopeProjection,atrLen,ma_slope_thresh,ma_slope_thresh_yellow_multiplier,obv_osc_thresh,obv_osc_thresh_yellow_multiplier from performance order by sharpe_ratio desc limit 10;
 
@@ -120,9 +122,9 @@ def argGenerator():
     
 
 def argGeneratorTest():
-    ma_lens = [20, 25]
+    ma_lens = [5, 10, 15, 16, 17,18,19,20, 25]
     band_widths = [2]
-    cfgTickers = ['HDFCBANK23APR1640CE','HDFCBANK23APR1640PE','NIFTY23APR17300PE','NIFTY23APR17300CE']
+    cfgTickers = ['NIFTY2341317700CE','BANKNIFTY2341341500CE', 'NIFTY23APRFUT']
 
     for params in itertools.product(ma_lens, band_widths, cfgTickers):
         ma_len, band_width, cfgTicker = params
@@ -211,3 +213,4 @@ if __name__ == '__main__':
 #        obv_osc_thresh as obvThres,
 #        obv_osc_thresh_yellow_multiplier as obvMult
 # FROM performancev2
+

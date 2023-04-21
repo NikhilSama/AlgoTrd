@@ -18,6 +18,7 @@ import re
 import pandas as pd
 import numpy as np
 import utils
+import math 
 
 #cfg has all the config parameters make them all globals here
 import cfg
@@ -180,8 +181,17 @@ def get_ltp(kite,t,exchange):
         return 0
 
     return ltp
-    
-def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,qToExit=0,betsize=bet_size,p=0,tag=None):
+def getOrderVariety(q,lot_size) : 
+    v = VARIETY_REGULAR if q <= (lot_size*cfgMaxLotsForTrade) else VARIETY_ICEBERG
+    iceberg_legs = math.ceil(q/(lot_size*cfgMaxLotsForTrade)) if v == VARIETY_ICEBERG else 0
+    iceberg_q = round(q/iceberg_legs) if v == VARIETY_ICEBERG else 0
+    return (v,iceberg_legs,iceberg_q)
+
+def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05
+         
+         
+         
+         ,q=0,ltp=0,sl=0,qToExit=0,betsize=bet_size,p=0,tag=None):
     # print(f"exec {t} {exchange} {tx_type} Lot:{lot_size} tick:{tick_size} q:{q} ltp:{ltp} {sl} toExit:{qToExit} betsize:{betsize} {p} {tag}")
     if is_not_tradable(t):
         logging.info(f"{t} is not a tradable instrument.  {exchange} {tx_type} not executed")
@@ -196,6 +206,9 @@ def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,qToExi
             return
     qToExit = abs(qToExit) #Make sure qToExit is positive, for short positions it may be negative
     q = getQ(lot_size,ltp,betsize, qToExit) if q == 0 else q
+
+    (variety,iceberg_legs,iceberg_quantity) = getOrderVariety(q,lot_size)
+    
     delta = getDelta(exchange,tx_type)
     
     p = getP(ltp,tick_size,delta) if p == 0 else getP(p,tick_size,1)
@@ -211,12 +224,13 @@ def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,qToExi
 
     #1 Min TTL LIMIT ORDER priced really as a market order (10% above market)
     try:
-        order_id = kite.place_order(variety=kite.VARIETY_REGULAR,tradingsymbol=t,
+        order_id = kite.place_order(variety=kite.variety,tradingsymbol=t,
                      exchange=exch,
                      transaction_type=kite_tx_type,
                      quantity=q,
                      order_type=kite.ORDER_TYPE_LIMIT,
                      product=kite.PRODUCT_MIS,
+                     iceberg_legs=iceberg_legs, iceberg_quantity=iceberg_quantity,
                      validity=kite.VALIDITY_TTL, price = p, validity_ttl = 1,
                      tag=tag)
         #SL to accompany 

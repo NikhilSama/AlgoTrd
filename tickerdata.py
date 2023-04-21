@@ -19,6 +19,10 @@ import datetime as dt
 import warnings
 from DatabaseLogin import DBBasic
 import logging
+import math 
+import DownloadHistorical as downloader
+import datetime
+
 
 db = DBBasic() 
 
@@ -88,8 +92,30 @@ def get_sp500_tickers():
 
     return tickers
 
+def getTickerPrice(t,zgetTO):
+    zgetFROM = zgetTO - datetime.timedelta(minutes=1)
+    df = downloader.zget(zgetFROM,zgetTO,'NIFTY 50','minute',includeOptions=False)
+    return df.iloc[0]['Adj Close'] # 10 am price
+
+def getStrike(t):
+    niftyOpen = getTickerPrice(t,datetime.datetime.combine(datetime.date.today(), datetime.time(10)))
+    strikeFloor = math.floor(niftyOpen/100)*100
+    strikeCiel = math.ceil(niftyOpen/100)*100
+    #print(f"Strike Floor: {strikeFloor}, Strike Ciel: {strikeCiel}")
+    return (strikeFloor,strikeCiel)
+    
+def getActiveOptionTickers(t):
+    (strikeFloor,strikeCiel) = getStrike(t)
+    (itmCall,lot,tick) = db.get_option_ticker(t,0,'CE',None,strike=strikeFloor)
+    (otmCall,lot,tick) = db.get_option_ticker(t,0,'CE',None,strike=strikeCiel)
+    (otmPut,lot,tick) = db.get_option_ticker(t,0,'PE',None,strike=strikeFloor)
+    (itmPut,lot,tick) = db.get_option_ticker(t,0,'PE',None,strike=strikeCiel)
+#    print(f"ITM Call: {itmCall}, OTM Call: {otmCall}, OTM Put: {otmPut}, ITM Put: {itmPut}")
+    return(itmCall,otmCall,otmPut,itmPut)
+
 def get_fo_active_nifty_tickers():
-    return ['HDFCBANK','BANKNIFTY2341341500CE','NIFTY2341317700CE']
+    (itmCall,otmCall,otmPut,itmPut) = getActiveOptionTickers('NIFTY 50')
+    return [itmCall]
     return ['HDFCBANK', 'ICICIBANK', 'RELIANCE', 'KOTAKBANK']
     return ['NIFTY 50','NIFTY23APRFUT','RELIANCE','INFY','BAJFINANCE','SBIN', 'TCS', 'KOTAKBANK', 'ICICIBANK', 'HDFCBANK', 'MARUTI' ]
 

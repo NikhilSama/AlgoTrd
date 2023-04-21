@@ -8,42 +8,47 @@ Created on Sun Feb  5 14:26:36 2023
 import sys
 import datetime
 cfgDict = {
-    'cfgTicker': 'NIFTY23APR17750CE',
+    'cfgMaxLotsForTrade' : 36,
+    'cfgTicker': 'NIFTYWEEKLYOPTION',
     'cfgHistoricalDaysToGet': 10,
     'cfgFreezeGun': False,
-    'cfgUseVolumeDataForOptions': True,
+    'cfgUseVolumeDataForOptions': False,
     'cfgStartTimeOfDay': datetime.datetime.strptime("10:00+05:30", "%H:%M%z").time(),
     'cfgEndNewTradesTimeOfDay': datetime.datetime.strptime("14:00+05:30", "%H:%M%z").time(),
     'cfgEndExitTradesOnlyTimeOfDay': datetime.datetime.strptime("15:00+05:30", "%H:%M%z").time(),
+    'cfgMinCandlesForMA': 5,
+    'cfgStopLoss': 0.05,
     'days': 60,
     'superLen': 200,
     'maLen': 20,
+    'cfgMiniBandWidthMult': 0.75, 
     'bandWidth': 2,
-    'superBandWidth': 2.5,
+    'cfgSuperBandWidthMult': 1.25,
     'fastMALen': 7,
+    'cfgFastMASlpThresh': 0.01,
     'atrLen': 14,
     'adxLen': 14,
     'adxThresh': 25,
     'adxThreshYellowMultiplier': 0.7,
     'numCandlesForSlopeProjection':2,
-    'maSlopeThresh': 1,
+    'maSlopeThresh': 0,
     'maSlopeThreshYellowMultiplier': 0.7,
     'cfgObvMaLen': 20,
     'obvOscThresh': 0.2,
     'obvOscThreshYellowMultiplier': 0.7,
-    'cfgMaxLookbackCandles': 1000,
+    'cfgMaxLookbackCandles': 200,
     'cfgNumConditionsForTrendFollow': 3,
     'includeOptions': False,
     'plot': [
         
         #'trade_returns'
         #,
-        #'adjCloseGraph'
+          'adjCloseGraph'
         # ,
         # 'options'
         ],
 # google cloud specific stuff 
-    'dbhost' : 'localhost',
+    'dbhost' : 'localhost', 
     #'dbhost' : 'algotrade.cck6cwihhy4y.ap-southeast-1.rds.amazonaws.com',
     'dbname' : 'trading',
     'zerodha_access_token': False,
@@ -55,7 +60,6 @@ cfgDict = {
     'bet_size': 10000
 }
 
-  
 args = sys.argv[1:]
 arg_dict = {}
 for arg in args:

@@ -42,6 +42,9 @@ def updateCFG(ma_slope_thresh, ma_slope_thresh_yellow_multiplier, \
     obvOscThresh =  obv_osc_thresh
     obvOscThreshYellowMultiplier = obv_osc_thresh_yellow_multiplier
     cfgObvMaLen = obv_ma_len
+def updateCFG2(cfg={}):
+    for key, value in cfg.items():
+        globals()[key] = value
 
 def applyTickerSpecificCfg(ticker):
     tCfg = utils.getTickerCfg(ticker)    
@@ -119,7 +122,7 @@ def ATR(DF,n=atrLen):
     df['L-PC'] = df['Low'] - df['Adj Close'].shift(1)
 
     df['TR'] = df[['H-L','H-PC','L-PC']].max(axis=1)
-    df['ATR'] = df['TR'].ewm(com=n,min_periods=n).mean()
+    df['ATR'] = df['TR'].ewm(com=n,min_periods=cfgMinCandlesForMA).mean()
     return df['ATR']
 
 def ADX(DF, n=adxLen):
@@ -130,13 +133,13 @@ def ADX(DF, n=adxLen):
     df["downmove"] = df["Low"].shift(1) - df["Low"]
     df["+dm"] = np.where((df["upmove"]>df["downmove"]) & (df["upmove"] >0), df["upmove"], 0)
     df["-dm"] = np.where((df["downmove"]>df["upmove"]) & (df["downmove"] >0), df["downmove"], 0)
-    df["+di"] = 100 * (df["+dm"]/df["ATR"]).ewm(alpha=1/n, min_periods=n).mean()
-    df["-di"] = 100 * (df["-dm"]/df["ATR"]).ewm(alpha=1/n, min_periods=n).mean()
+    df["+di"] = 100 * (df["+dm"]/df["ATR"]).ewm(alpha=1/n, min_periods=cfgMinCandlesForMA).mean()
+    df["-di"] = 100 * (df["-dm"]/df["ATR"]).ewm(alpha=1/n, min_periods=cfgMinCandlesForMA).mean()
     df["ADX"] = 100* abs((df["+di"] - df["-di"])/(df["+di"] + df["-di"])).ewm(alpha=1/n, min_periods=n).mean()
     df['ADX-PCT-CHNG'] = df['ADX'].diff(2)/2
     df['ADX-PCT-CHNG'] = df['ADX-PCT-CHNG'].clip(lower=-1, upper=1)
 
-    return (df["ADX"],df['ADX-PCT-CHNG'],df['ATR'])
+    return (df["ADX"],df['ADX-PCT-CHNG'],df['ATR'],df["+di"],df["-di"])
 
 
 def RSI(DF, n=14):
@@ -168,10 +171,12 @@ def addSMA(df,fast=8,slow=26,superTrend=200):
 
 def addBBStats(df):
     # creating bollinger band indicators
-    df['ma_superTrend'] = df['Adj Close'].ewm(com=superLen, min_periods=superLen).mean()
+    df['ma_superTrend'] = df['Adj Close'].ewm(com=superLen, min_periods=cfgMinCandlesForMA).mean()
     df['ma_superTrend_pct_change'] = 10000*df['ma_superTrend'].pct_change(periods=1)
     df['ma20'] = df['Adj Close'].rolling(window=maLen).mean()
     df['MA-FAST'] = df['Adj Close'].rolling(window=fastMALen).mean()
+    df['MA-FAST-SLP'] = df['MA-FAST'].pct_change(periods=3)
+    df['MA-FAST-SLP'] = df['MA-FAST-SLP'].clip(lower=-0.1, upper=0.1)
     df['ma20_pct_change'] = df['ma20'].pct_change(periods=1)
     df['ma20_pct_change_ma'] = df['ma20_pct_change'].ewm(com=5, min_periods=1).mean()
     df['ma20_pct_change_ma_sq'] = df['ma20_pct_change_ma'].pct_change()
@@ -180,8 +185,10 @@ def addBBStats(df):
     df['std'] = df['Adj Close'].rolling(window=maLen).std()
     df['upper_band'] = df['ma20'] + (bandWidth * df['std'])
     df['lower_band'] = df['ma20'] - (bandWidth * df['std'])
-    df['super_upper_band'] = df['ma20'] + (superBandWidth * df['std'])
-    df['super_lower_band'] = df['ma20'] - (superBandWidth * df['std'])
+    df['mini_upper_band'] = df['ma20'] + (cfgMiniBandWidthMult*bandWidth * df['std'])
+    df['mini_lower_band'] = df['ma20'] - (cfgMiniBandWidthMult*bandWidth * df['std'])
+    df['super_upper_band'] = df['ma20'] + (cfgSuperBandWidthMult*bandWidth * df['std'])
+    df['super_lower_band'] = df['ma20'] - (cfgSuperBandWidthMult*bandWidth * df['std'])
     #df.drop(['Open','High','Low'],axis=1,inplace=True,errors='ignore')
     #df.tail(5)
     slopeStdDev = df['ma20_pct_change_ma'].rolling(window=cfgMaxLookbackCandles,min_periods=maLen).std()
@@ -223,7 +230,14 @@ def isAlmostLow(value,threshold,multiplier):
     return (not (isLow(value,threshold,multiplier) 
                  or isSuperLow(value,threshold,multiplier))) and \
         (value <= -threshold*multiplier)
-
+def adxIsBullish(row):
+    return row['+di'] >= row['-di']
+def adxIsBearish(row):
+    return row['-di'] >= row['+di']
+def adxIsHigh(row):
+    return True if row['ADX'] >= adxThresh else False
+def adxIsLow(row):
+    return not adxIsHigh(row)
 def valueBreachedThreshold (value,threshold,type='H'):
     if type == 'H':
         return value >= threshold
@@ -314,10 +328,12 @@ def reversalWillComplete(value,threshold,slope,
         (value <= -threshold*multiplier)
     
     
-def crossOver(fast,slow,lastFast,lastSlow):
-    return fast > slow and lastFast <= lastSlow
-def crossUnder(fast,slow,lastFast,lastSlow):
-    return fast < slow and lastFast >= lastSlow
+def crossOver(fast,slow,lastFast=None,lastSlow=None):
+    return fast > slow and \
+        (lastFast is None or (lastFast <= lastSlow))
+def crossUnder(fast,slow,lastFast=None,lastSlow=None):
+    return fast < slow and \
+        (lastFast is None or (lastFast >= lastSlow))
 
 def getLastSignal(signal):
     last_signal_index = signal.last_valid_index()
@@ -329,7 +345,9 @@ def getLastSignal(signal):
 def initTickerStatus(ticker):
 #    if ticker not in tickerStatus.keys():
     tickerStatus[ticker] = {'position':float("nan"), 
-                                        'trendSignal':float("nan")}     
+                            'trendSignal':float("nan"),
+                            'entry_price':float("nan")
+                            }     
 def getTickerPosition(ticker):
     if ticker not in tickerStatus:
         return float ('nan')
@@ -340,12 +358,17 @@ def getTickerPosition(ticker):
 def tickerHasPosition(ticker):
     return (not np.isnan(getTickerPosition(ticker))
                 and getTickerPosition(ticker) != 0)
-def setTickerPosition(ticker,signal):
+def tickerHasLongPosition(ticker):
+    return getTickerPosition(ticker) == 1
+def tickerHasShortPosition(ticker):
+    return getTickerPosition(ticker) == -1
+def setTickerPosition(ticker,signal, entry_price):
     if np.isnan(signal):
         return # nan signal does not change position
     if ticker not in tickerStatus:
         tickerStatus[ticker] = {}
     tickerStatus[ticker]['position'] = signal
+    tickerStatus[ticker]['entry_price'] = entry_price
     
 def logTickerStatus(ticker):
     if tickerStatus[ticker]['trendSignal'] == 1:
@@ -446,7 +469,7 @@ def populateBB (df):
     addBBStats(df)
 
 def populateADX (df):
-    (df['ADX'],df['ADX-PCT-CHNG'],df['ATR']) = ADX(df,maLen)
+    (df['ADX'],df['ADX-PCT-CHNG'],df['ATR'],df["+di"],df["-di"]) = ADX(df,adxLen)
 
 def populateOBV (df):
     if (df['Volume'].max() == 0):
@@ -461,29 +484,39 @@ def populateOBV (df):
 def getSig_BB_CX(type,signal, isLastRow, row, df):
     # First get the original signal
     s = signal
-
+    
+    superUpperBandBreached = row['Adj Close'] >= row['super_upper_band']
+    superLowerBandBreached = row['Adj Close'] <= row['super_lower_band']
+    superBandsbreached = superUpperBandBreached or superLowerBandBreached
+    
     lowerBandBreached = row['Adj Close'] <= row['lower_band']
     upperBandBreached = row['Adj Close'] >= row['upper_band']
     
-    if lowerBandBreached and \
-        (not tickerIsTrendingDn(row['symbol'])): #Dn trending tickers dance around the lower band, dont use that as an exit signal:
-        if type == 0: # EXIT timeframe
-            if tickerPositionIsShort(row['symbol']):
-                s = 0 # Only Exit short positions on lower band breach; long positions will wait for better exit opportunities - or Filters 
-        elif type == 1:
-            s = 1
-        else:
-            raise Exception(f'Invalid type {type}')
-        
-    if upperBandBreached and \
-        (not tickerIsTrendingUp(row['symbol'])): #Up trending tickers dance around the upper band, dont use that as an exit signal
-        if type == 0: # EXIT timeframe
-            if tickerPositionIsLong(row['symbol']):
-                s = 0 # Only Exit long positions on upper band breach; short positions will wait for better exit opportunities - or Filters
-        elif type == 1:
-            s = -1
-        else:
-            raise Exception(f'Invalid type {type}')
+    lowerMiniBandBreached =  row['Adj Close'] <= row['mini_lower_band']
+    upperMiniBandBreached = row['Adj Close'] >= row['mini_upper_band']
+    
+    if superBandsbreached and (not tickerIsTrending(row['symbol'])):
+        s = 0 # Exit if super bands are breached; we are no longer mean reverting within the BB range
+    else:
+        if lowerMiniBandBreached and \
+            (not tickerIsTrendingDn(row['symbol'])): #Dn trending tickers dance around the lower band, dont use that as an exit signal:
+            if type == 0: # EXIT timeframe
+                if tickerPositionIsShort(row['symbol']):
+                    s = 0 # Only Exit short positions on lower band breach; long positions will wait for better exit opportunities - or Filters 
+            elif type == 1:
+                s = 1 if lowerBandBreached else 0 # Only type=1; only enter positions on lower bandbreach, lowermini is for exits
+            else:
+                raise Exception(f'Invalid type {type}')
+            
+        if upperMiniBandBreached and \
+            (not tickerIsTrendingUp(row['symbol'])): #Up trending tickers dance around the upper band, dont use that as an exit signal
+            if type == 0: # EXIT timeframe
+                if tickerPositionIsLong(row['symbol']):
+                    s = 0 # Only Exit long positions on upper band breach; short positions will wait for better exit opportunities - or Filters
+            elif type == 1:
+                s = -1 if upperBandBreached else 0 # Only type=1; only enter positions on upper bandbreach, uppermini is for exits
+            else:
+                raise Exception(f'Invalid type {type}')
     
     if tickerIsTrending(row['symbol']) and signalChanged(s,signal):
         if isLastRow:
@@ -520,9 +553,9 @@ def getSig_ADX_FILTER (type,signal, isLastRow,row,df):
         # old slops to relate it to ADX value
         oldSlope = df.iloc[i - rollbackCandles,
                           df.columns.get_loc('SLOPE-OSC')]  
-        if s == 1 and oldSlope < 0:
+        if s == 1 and oldSlope < 0 and adxIsBearish(row):
             s = 0
-        elif s == -1 and oldSlope > 0:
+        elif s == -1 and oldSlope > 0 and adxIsBullish(row):
             s = 0
     
     logSignal('ADX-FLTR',["adxData","maSlpData"],signal,s,row,type,isLastRow)
@@ -844,6 +877,34 @@ def justFollowMA(type, signal, isLastRow, row, df,
         s = 0
     setTickerTrend(row.symbol, s)
     return s
+def justFollowFastMA(type, signal, isLastRow, row, df, 
+                        last_signal=float('nan')):
+    s = signal
+    if (adxIsLow(row)):
+        return s
+
+    if row['MA-FAST-SLP'] > maSlopeThresh:
+        s = 1
+    elif row['MA-FAST-SLP'] < -maSlopeThresh:
+        s = -1
+#    else: No need to exit if ADX is High, and trend has not yet fully reversed; no new entry, but no exit either in hte mid zone
+
+    setTickerTrend(row.symbol, s)
+    return s
+def fastSlowMACX(type, signal, isLastRow, row, df, 
+                        last_signal=float('nan')):
+    s = signal
+    if (adxIsLow(row)):
+        return s
+    if crossOver(row['MA-FAST'], row['ma20']):
+        s = 1
+    elif crossUnder(row['MA-FAST'], row['ma20']):
+        s = -1
+    else:
+        s = 0
+    setTickerTrend(row.symbol, s)
+    return s
+
 def randomSignalGenerator(type, signal, isLastRow, row, df, 
                         last_signal=float('nan')):
     if random.randint(0,100) > 90:
@@ -851,6 +912,34 @@ def randomSignalGenerator(type, signal, isLastRow, row, df,
         setTickerTrend(row.symbol, s)
     else:
         s = signal
+    return s
+def exitStopLoss(type, signal, isLastRow, row, df):
+    if not (tickerHasPosition(row.symbol) and \
+            cfgStopLoss and np.isnan(signal)):
+        # return if ticker has no position
+        # or if stop loss not configured
+        # or if current signal is 1 or -1 or 0
+        return
+    
+    s = signal
+    entryPrice = getTickerEntryPrice(row.symbol)
+    # We proceed only if tickerHasPosition, and stop loss is configured
+    # and current signal is nan 
+    
+    if tickerHasLongPosition(row.symbol):
+        if ((1-cfgStopLoss)*entryPrice) <= row.Low:
+            s = 0
+    else:
+        if ((1+cfgStopLoss)*entryPrice) >= row.High:
+            s = 0
+    if signalChanged(s,signal):
+        #print("entering trend following", row.i)
+        setTickerTrend(row.symbol, s) if tickerIsTrending(row.symbol) else None
+        logSignal('STOP-LOSS',["obvData","adxData","maSlpData"],signal,s,row,type,isLastRow,
+                  f'(E:{entryPrice}, L:{row.Low}, H:{row.High} sl:{cfgStopLoss}) ',
+                  logWithNoSignalChange=True)
+    return s 
+
     return s
 ######### END OF SIGNAL GENERATION FUNCTIONS #########
 def getOverrideSignal(row,ovSignalGenerators, df):
@@ -911,7 +1000,7 @@ def getSignal(row,signalGenerators, df):
                 # argument
 
                 s = sigGen(type,s, isLastRow, row, df)
-            setTickerPosition(row.symbol, s)
+            setTickerPosition(row.symbol, s, row['Adj Close'])
     else:
         #reset at start of day
         initTickerStatus(row.symbol)
