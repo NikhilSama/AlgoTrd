@@ -111,7 +111,7 @@ def argGenerator():
         # do it
         # check that csv exists and mark it as done in db 
         
-        argString = f"maLen:{ma_len} bandWidth:{band_width} fastMALen:{fast_ma_len} adxLen:{adx_len} adxThresh:{adx_thresh} adxThreshYellowMultiplier:{adx_thresh_yellow_multiplier} numCandlesForSlopeProjection:{num_candles} atrLen:{atr_len} cfgMiniBandWidthMult:{cfgMiniBandWidthMult} cfgSuperBandWidthMults:{cfgSuperBandWidthMult} Ticker:{cfgTicker}"
+        argString = f"maLen:{ma_len} bandWidth:{band_width} fastMALen:{fast_ma_len} adxLen:{adx_len} adxThresh:{adx_thresh} adxThreshYellowMultiplier:{adx_thresh_yellow_multiplier} numCandlesForSlopeProjection:{num_candles} atrLen:{atr_len} cfgMiniBandWidthMult:{cfgMiniBandWidthMult} cfgSuperBandWidthMult:{cfgSuperBandWidthMult} cfgTicker:{cfgTicker}"
                 
         # will run 3^5=243 * 2^3=8 = 1944 times == approx 20K min @ 10 min per run 
         # 100 paraaZllel cpu = 200 min = 3.2 hrs * $7/hr = $12.8
