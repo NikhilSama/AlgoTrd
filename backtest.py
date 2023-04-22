@@ -382,7 +382,12 @@ def backtestCombinator2():
 def backtestCombinator(src='z'):
         
     performance = pd.DataFrame()    
-    ma_slope_threshes = [0.01,0.05,0.1,0.3,0.7,1]
+    #ma slopes threshold overloaded and used as fastma slope threshold
+    #for justFOllwoFastMA strategy
+    ma_slope_threshes = [0,0.01,0.02,0.03,0.04,0.05,0.1,0.2]
+
+#ma slopes for bb + trending normal strategy 
+#    ma_slope_threshes = [0.01,0.05,0.1,0.3,0.7,1] #for MA 15 0.3 seems the best, with 0.1 a close second; For MA go with 1 (experiment with higher values)
     ma_slope_thresh_yellow_multipliers = [0.6]
     # obv_osc_threshes = [0.1, 0.2, 0.4]
     # obv_osc_thresh_yellow_multipliers = [0.7, 0.9, 1]
@@ -394,17 +399,18 @@ def backtestCombinator(src='z'):
     obv_osc_threshes = [0.1]
     obv_osc_thresh_yellow_multipliers = [0]
     obv_ma_lens = [20]
-    signal_generators = [
-                        [signals.getSig_BB_CX
-                         ,signals.getSig_ADX_FILTER
-                         ,signals.getSig_MASLOPE_FILTER],
-                        [signals.getSig_followAllExtremeADX_OBV_MA20_OVERRIDE
-                          ,signals.exitTrendFollowing],
-                        [signals.getSig_BB_CX
-                         ,signals.getSig_ADX_FILTER
-                         ,signals.getSig_MASLOPE_FILTER
-                         ,signals.getSig_followAllExtremeADX_OBV_MA20_OVERRIDE
-                         ,signals.exitTrendFollowing]
+    signal_generators = [ # Most returns come from trending only; although bb can add some cherry on top for some cases
+                        [signals.justFollowMA]
+                        # [signals.getSig_BB_CX
+                        #  ,signals.getSig_ADX_FILTER
+                        #  ,signals.getSig_MASLOPE_FILTER],
+                        # [signals.getSig_followAllExtremeADX_OBV_MA20_OVERRIDE
+                        #   ,signals.exitTrendFollowing],
+                        # [signals.getSig_BB_CX
+                        #  ,signals.getSig_ADX_FILTER
+                        #  ,signals.getSig_MASLOPE_FILTER
+                        #  ,signals.getSig_followAllExtremeADX_OBV_MA20_OVERRIDE
+                        #  ,signals.exitTrendFollowing]
                         ]
 
     # This loop will run 3^4 = 89 times; each run will be about 
@@ -448,6 +454,8 @@ def backtestCombinator(src='z'):
             tearsheetdf['signalGenerators'] = 'BBOnly'
         elif len(sigGen) == 5:
             tearsheetdf['signalGenerators'] = 'TrendPlusBB'
+        elif len(sigGen) == 1:
+            tearsheetdf['signalGenerators'] = 'JustFollowMA'
         else:
             print("WIERD NUMBER OF SIGNAL GENERATORS")
             exit(0)

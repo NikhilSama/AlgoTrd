@@ -278,7 +278,7 @@ def tearsheet (df):
         tearsheet["kurtosis_pertrade_return"] = 0
         tearsheetdf = pd.DataFrame(tearsheet,index=[0])
         
-    trades.to_csv('trades.csv')
-    df.to_csv('df.csv')
+    # trades.to_csv('trades.csv')
+    # df.to_csv('df.csv')
     return tearsheet,tearsheetdf
     

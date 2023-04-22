@@ -235,9 +235,22 @@ def adxIsBullish(row):
 def adxIsBearish(row):
     return row['-di'] >= row['+di']
 def adxIsHigh(row):
+    return valueOrProjectedValueBreachedThreshold(row['ADX'],adxThresh,
+                row['ADX-PCT-CHNG'], adxThreshYellowMultiplier,'H')
     return True if row['ADX'] >= adxThresh else False
 def adxIsLow(row):
     return not adxIsHigh(row)
+def maSteepSlopeUp(row):
+    return valueOrProjectedValueBreachedThreshold(row['SLOPE-OSC'],
+                maSlopeThresh,row['SLOPE-OSC-SLOPE'], maSlopeThreshYellowMultiplier, "H")
+def maSteepSlopeDn(row):
+    return valueOrProjectedValueBreachedThreshold(row['SLOPE-OSC'],
+                maSlopeThresh,row['SLOPE-OSC-SLOPE'], maSlopeThreshYellowMultiplier, "L")
+def maSlopeFlattish(row):
+    return valueOrProjectedValueBreachedThreshold(row['SLOPE-OSC'], \
+                maSlopeThresh,row['SLOPE-OSC-SLOPE'], maSlopeThreshYellowMultiplier, "H_OR_L") \
+            == False
+
 def valueBreachedThreshold (value,threshold,type='H'):
     if type == 'H':
         return value >= threshold
@@ -540,8 +553,7 @@ def getSig_ADX_FILTER (type,signal, isLastRow,row,df):
     
     s = signal
     
-    if valueOrProjectedValueBreachedThreshold(row['ADX'],adxThresh,row['ADX-PCT-CHNG'],
-                                            adxThreshYellowMultiplier,"H"):
+    if adxIsHigh(row):
         
         i = df.index.get_loc(row.name) # get index of current row
         rollbackCandles = round(adxLen*.6) # how many candles to look back
@@ -869,37 +881,35 @@ def followTrendReversal (type, signal, isLastRow, row, df,
     return s 
 def justFollowMA(type, signal, isLastRow, row, df, 
                         last_signal=float('nan')):
-    if row['SLOPE-OSC'] > maSlopeThresh:
-        s = 1
-    elif row['SLOPE-OSC'] < -maSlopeThresh:
-        s = -1
-    else:
-        s = 0
+    s = signal
+    if adxIsHigh(row):
+        if maSteepSlopeUp(row):
+            s = 1
+        elif maSteepSlopeDn(row):
+            s = -1
     setTickerTrend(row.symbol, s)
     return s
 def justFollowFastMA(type, signal, isLastRow, row, df, 
                         last_signal=float('nan')):
     s = signal
-    if (adxIsLow(row)):
-        return s
-
-    if row['MA-FAST-SLP'] > maSlopeThresh:
-        s = 1
-    elif row['MA-FAST-SLP'] < -maSlopeThresh:
-        s = -1
-#    else: No need to exit if ADX is High, and trend has not yet fully reversed; no new entry, but no exit either in hte mid zone
-
+    if adxIsHigh(row):
+        if row['MA-FAST-SLP'] > maSlopeThresh:
+            s = 1
+        elif row['MA-FAST-SLP'] < -maSlopeThresh:
+            s = -1
+    #    else: No need to exit if ADX is High, and trend has not yet fully reversed; no new entry, but no exit either in hte mid zone
     setTickerTrend(row.symbol, s)
     return s
 def fastSlowMACX(type, signal, isLastRow, row, df, 
                         last_signal=float('nan')):
     s = signal
-    if (adxIsLow(row)):
-        return s
-    if crossOver(row['MA-FAST'], row['ma20']):
-        s = 1
-    elif crossUnder(row['MA-FAST'], row['ma20']):
-        s = -1
+    if adxIsHigh(row):
+        if crossOver(row['MA-FAST'], row['ma20']):
+            s = 1
+        elif crossUnder(row['MA-FAST'], row['ma20']):
+            s = -1
+        else:
+            s = 0
     else:
         s = 0
     setTickerTrend(row.symbol, s)

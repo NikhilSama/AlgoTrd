@@ -23,6 +23,31 @@ def connect_to_db():
 def close_db():
     mydb.close()
 
+def getFnameForLastTask():
+    connect_to_db()
+    q = "SELECT task_name FROM tasks ORDER BY created_time DESC LIMIT 1"
+    mycursor = mydb.cursor(buffered=True)
+    mycursor.execute(q)
+    (fname,) = mycursor.fetchone()
+    mycursor.close()
+    close_db()
+    return fname
+def getCfgFromFname(fname):
+    pairs = fname.split()
+    cfg = {}
+    for pair in pairs:
+        key,value = pair.split(':')
+        if not any(c.isalpha() for c in value):
+            if '.' in value:
+                # value has a decimal, so convert to float
+                value = float(value)
+            else:
+                # value has no decimal, so convert to int
+                value = int(value)
+
+        cfg[key] = value
+    return cfg
+    
 # Add a task name to the tasks table
 def add_task(task_name):
     mycursor = mydb.cursor()
@@ -90,20 +115,45 @@ def run_instance(args):
         print('Error in run_instance():', e)
         
 def argGenerator():
-
-    ma_lens = [5,10,15,20,50]
-    band_widths = [1,1.5,2,2.5]
-    cfgMiniBandWidthMults = [0.5,0.75,1]
-    cfgSuperBandWidthMults = [1,1.25,1.5]
-    fast_ma_lens = [5,7]
-    adx_lens = [10,15,20,25]
-    adx_thresholds = [10,15,20,25,30,40,80]
+    ## Varaibles for Orig Strategy
+    # ma_lens = [10,15,20] # 5/50 absolutely sucks, 10 seems to be the best sharpe, 15 a close second with better returns than 10, but more variance, and 20 isnt bad 
+    # band_widths = [1,1.5,2,2.5] # bw 2, w mini at .5, and supebw at 1 is the best
+    # cfgMiniBandWidthMults = [0.5,0.75,1]
+    # cfgSuperBandWidthMults = [1,1.25,1.5]
+    # fast_ma_lens = [5,7] # 5 seems better, 7 not bad; used for exit, Is this a sign we should be exiting earlir ? try 2 here ? or just exit when trend following stops ?
+    # adx_lens = [10,15,20,25] # 25 is the best, 20 is a far second.  Try 30 ?
+    # adx_thresholds = [10,15,20,25,30,40,80] # 30 firmly the best(may change for longer adx len)
+    
+    #Variables for justFollowMA strategy
+    ma_lens = [2,4,6,8,10,12,14,16] 
+    band_widths = [1] 
+    cfgMiniBandWidthMults = [0.5]
+    cfgSuperBandWidthMults = [1]
+    fast_ma_lens = [5] 
+    adx_lens = [5,10,15,20,25,30] # 25 is the best, 20 is a far second.  Try 30 ?
+    adx_thresholds = [10,15,20,25,30,40,80] # 30 firmly the best(may change for longer adx len)
     adx_thresh_yellow_multipliers = [0.6]
-    num_candles_for_slope_proj = [2,5]
-    atr_lens = [14]
+    num_candles_for_slope_proj = [2,5,7,9] # 2 or 5 works 
+    atr_lens = [7,14,21]
     cfgTickers = ['NIFTYWEEKLYOPTION']
-    for params in itertools.product(ma_lens, band_widths, fast_ma_lens, adx_lens, adx_thresholds, adx_thresh_yellow_multipliers, num_candles_for_slope_proj,
-                                    atr_lens, cfgMiniBandWidthMults, cfgSuperBandWidthMults, cfgTickers):
+    
+    param_iterator = itertools.product(ma_lens, band_widths, fast_ma_lens, adx_lens, adx_thresholds, adx_thresh_yellow_multipliers, num_candles_for_slope_proj,
+                                atr_lens, cfgMiniBandWidthMults, cfgSuperBandWidthMults, cfgTickers)
+
+    # startCFG = getCfgFromFname(getFnameForLastTask())
+
+    # if (startCFG is not None) and len(startCFG):
+    #     start_index = list(itertools.product(ma_lens, band_widths, fast_ma_lens, adx_lens, adx_thresholds, adx_thresh_yellow_multipliers, num_candles_for_slope_proj, 
+    #                                         atr_lens, cfgMiniBandWidthMults, cfgSuperBandWidthMults, cfgTickers)).index((startCFG['maLen'], startCFG['bandWidth'], 
+    #                                         startCFG['fastMALen'], startCFG['adxLen'], startCFG['adxThresh'], startCFG['adxThreshYellowMultiplier'], startCFG['numCandlesForSlopeProjection'], 
+    #                                         startCFG['atrLen'], startCFG['cfgMiniBandWidthMult'], startCFG['cfgSuperBandWidthMult'], startCFG['cfgTicker']))
+
+    #     # Slice the iterator to start at the desired point -- where we left off at the last run 
+    #     sliced_iterator = itertools.islice(param_iterator, start_index, None)
+    # else: 
+    sliced_iterator = param_iterator # start afresh if no last task found
+        
+    for params in sliced_iterator:
         ma_len, band_width, fast_ma_len, adx_len, adx_thresh, adx_thresh_yellow_multiplier, num_candles, atr_len, cfgMiniBandWidthMult, cfgSuperBandWidthMult, cfgTicker, \
         = params
         #check w db to see if this combination has been run before or is currently running
