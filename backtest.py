@@ -78,7 +78,7 @@ ist = pytz.timezone('Asia/Kolkata')
 tickers = td.get_sp500_tickers()
 nifty = td.get_nifty_tickers()
 index_tickers = td.get_index_tickers()
-firstTradeTime = datetime.datetime(2023, 1,1, 9, 0)
+firstTradeTime = datetime.datetime(2022, 5,1, 9, 0)
 firstTradeTime = ist.localize(firstTradeTime)
 zgetFrom = firstTradeTime - timedelta(days=cfgHistoricalDaysToGet)
 zgetTo = datetime.datetime(2023, 3,31, 15, 30)
@@ -382,13 +382,13 @@ def backtestCombinator(src='z'):
         
     performance = pd.DataFrame()    
     ma_slope_threshes = [0.01,0.05,0.1,0.3,0.7,1]
-    # ma_slope_thresh_yellow_multipliers = [0.5,0.7,0.9]
+    ma_slope_thresh_yellow_multipliers = [0.5,0.7,0.9]
     # obv_osc_threshes = [0.1, 0.2, 0.4]
     # obv_osc_thresh_yellow_multipliers = [0.7, 0.9, 1]
     # obv_ma_lens = [10,20,30]
 
     # ma_slope_threshes = [0.5]
-    ma_slope_thresh_yellow_multipliers = [0]
+    #ma_slope_thresh_yellow_multipliers = [0]
     #ma_slope_slope_threshes = [0.1]
     obv_osc_threshes = [0.1]
     obv_osc_thresh_yellow_multipliers = [0,1]
