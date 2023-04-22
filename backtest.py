@@ -391,7 +391,7 @@ def backtestCombinator(src='z'):
     #ma_slope_thresh_yellow_multipliers = [0]
     #ma_slope_slope_threshes = [0.1]
     obv_osc_threshes = [0.1]
-    obv_osc_thresh_yellow_multipliers = [0,1]
+    obv_osc_thresh_yellow_multipliers = [0]
     obv_ma_lens = [20]
     signal_generators = [
                         [signals.getSig_BB_CX
