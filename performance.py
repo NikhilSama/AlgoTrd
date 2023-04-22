@@ -250,6 +250,7 @@ def tearsheet (df):
         tearsheet['max_drawdown_from_0'] = trades['cum_return'].min()
         tearsheet['max_drawdown_from_0_sum'] = trades['sum_return'].min()
         tearsheet['max_drawdown_from_peak'] = trades['drawdown_from_prev_peak'].min()
+        tearsheet['max_drawdown_from_prev_peak_sum'] = trades['drawdown_from_prev_peak_sum'].min()
         tearsheet["average_per_trade_return"] = trades[trades['return'] != 0]['return'].mean()
         tearsheet["std_dev_pertrade_return"] = trades[trades['return'] != 0]['return'].std()
         tearsheet["sharpe_ratio"] = tearsheet['average_per_trade_return'] / tearsheet['std_dev_pertrade_return']

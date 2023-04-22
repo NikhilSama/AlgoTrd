@@ -162,6 +162,7 @@ def printTearsheet(tearsheet):
     
     print(f"Total Return: {tearsheet['return']:.2%}")
     print(f"Drawdown: {tearsheet['max_drawdown_from_0_sum']:.2%}")
+    print(f"Drawdown from Prev Peak: {tearsheet['max_drawdown_from_prev_peak_sum']:.2%}")
     print("Sharpe: ", tearsheet['sharpe_ratio'])
     print("Num Trades: ", tearsheet['num_trades'])
     print(f"Avg Return per day: {tearsheet['avg_daily_return']:.2%}")
