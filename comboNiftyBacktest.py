@@ -98,7 +98,7 @@ def argGenerator():
     fast_ma_lens = [5,7]
     adx_lens = [10,15,20,25]
     adx_thresholds = [10,15,20,25,30,40,80]
-    adx_thresh_yellow_multipliers = [0.5,0.7,0.9]
+    adx_thresh_yellow_multipliers = [0.6]
     num_candles_for_slope_proj = [2,5]
     atr_lens = [14]
     cfgTickers = ['NIFTYWEEKLYOPTION']
@@ -116,6 +116,8 @@ def argGenerator():
         # will run 3^5=243 * 2^3=8 = 1944 times == approx 20K min @ 10 min per run 
         # 100 paraaZllel cpu = 200 min = 3.2 hrs * $7/hr = $12.8
         # 64 cpu 20000/64 = 312.5 min = 5.2 hrs * $4/hr = $20.8
+        
+        
         # create view top_performers as select num_trades,FORMAT(max_drawdown_from_peak*100,2) as percentage,FORMAT(`return`*100,2) as percentage,round(sharpe_ratio,2),maLen,bandWidth,fastMALen,adxLen,adxThresh,adxThreshYellowMultiplier,numCandlesForSlopeProjection,atrLen,ma_slope_thresh,ma_slope_thresh_yellow_multiplier,obv_osc_thresh,obv_osc_thresh_yellow_multiplier from performance order by sharpe_ratio desc limit 10;
 
         yield f'{cloud_args} {argString}'
