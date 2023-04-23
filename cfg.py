@@ -50,7 +50,7 @@ cfgDict = {
         # 'options'
         ],
 # google cloud specific stuff 
-    # 'dbhost' : 'localhost', 
+    'dbhost' : 'localhost', 
     'dbname' : 'trading',
     'zerodha_access_token': False,
 #    'dbhost' : '34.131.115.155',
