@@ -8,6 +8,8 @@ Created on Sun Feb  5 14:26:36 2023
 import sys
 import datetime
 cfgDict = {
+    'cfgZGetStartDate': None,
+    'cfgZGetEndDate': None,    
     'cfgMaxLotsForTrade' : 36,
     'cfgTicker': 'NIFTYWEEKLYOPTION',
     'cfgHistoricalDaysToGet': 10,
@@ -41,20 +43,18 @@ cfgDict = {
     'includeOptions': False,
     'plot': [
         
-        #'trade_returns'
-        #,
-          'adjCloseGraph'
+        'trade_returns'
+        # ,
+        #    'adjCloseGraph'
         # ,
         # 'options'
         ],
 # google cloud specific stuff 
-    'dbhost' : 'localhost', 
-    #'dbhost' : 'algotrade.cck6cwihhy4y.ap-southeast-1.rds.amazonaws.com',
+    # 'dbhost' : 'localhost', 
     'dbname' : 'trading',
     'zerodha_access_token': False,
 #    'dbhost' : '34.131.115.155',
     'dbuser' : 'trading',
-    'dbpass' : 'trading',
     'showTradingViewLive' : False,
     'cacheTickData' : False, 
     'bet_size': 10000
@@ -79,7 +79,8 @@ for arg in args:
             elif value == 'True':
                 value = True
             pass
-             
+    if key == 'cfgZGetStartDate' or key == 'cfgZGetEndDate':
+        value = datetime.datetime.strptime(value, "%Y-%m-%d")
     cfgDict[key] = value
                
 # Create variables with names as dict keys and values as dict values

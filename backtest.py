@@ -78,10 +78,10 @@ ist = pytz.timezone('Asia/Kolkata')
 tickers = td.get_sp500_tickers()
 nifty = td.get_nifty_tickers()
 index_tickers = td.get_index_tickers()
-firstTradeTime = datetime.datetime(2022, 5,1, 9, 0)
+firstTradeTime = datetime.datetime(2022, 5,1, 9, 0) if cfgZGetStartDate == None else cfgZGetStartDate
 firstTradeTime = ist.localize(firstTradeTime)
 zgetFrom = firstTradeTime - timedelta(days=cfgHistoricalDaysToGet)
-zgetTo = datetime.datetime(2022, 7,31, 15, 30)
+zgetTo = datetime.datetime(2022, 5,31, 15, 30) if cfgZGetEndDate == None else cfgZGetEndDate
 zgetTo = ist.localize(zgetTo)
 
 # def mmReturns(row,df):
@@ -362,7 +362,7 @@ def performanceToCSV(performance):
     args = sys.argv[1:]
     for arg in args:
         key, value = arg.split(':')
-        if key in ['zerodha_access_token','dbuser','dbpass','cacheTickData', 'dbname', 'dbhost']:
+        if key in ['zerodha_access_token','dbuser','dbpass','cacheTickData', 'dbname', 'dbhost','cfgZGetStartDate','cfgZGetStartDate']:
             continue
         performance[key] = value
     #perfFileName = utils.fileNameFromArgs('Data/backtest/combo/niftyPerf-')
