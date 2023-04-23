@@ -15,7 +15,7 @@ cfgDict = {
     'cfgHistoricalDaysToGet': 10,
     'cfgFreezeGun': False,
     'cfgUseVolumeDataForOptions': False,
-    'cfgStartTimeOfDay': datetime.datetime.strptime("10:00+05:30", "%H:%M%z").time(),
+    'cfgStartTimeOfDay': datetime.datetime.strptime("09:30+05:30", "%H:%M%z").time(),
     'cfgEndNewTradesTimeOfDay': datetime.datetime.strptime("14:00+05:30", "%H:%M%z").time(),
     'cfgEndExitTradesOnlyTimeOfDay': datetime.datetime.strptime("15:00+05:30", "%H:%M%z").time(),
     'cfgMinCandlesForMA': 5,
@@ -43,7 +43,7 @@ cfgDict = {
     'includeOptions': False,
     'plot': [
         
-        'trade_returns'
+        #'trade_returns'
         # ,
         #    'adjCloseGraph'
         # ,

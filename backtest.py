@@ -400,7 +400,7 @@ def backtestCombinator(src='z'):
     performance = pd.DataFrame()    
     #ma slopes threshold overloaded and used as fastma slope threshold
     #for justFOllwoFastMA strategy
-    ma_slope_threshes = [0,0.01,0.02,0.03,0.04,0.05,0.1,0.2]
+    ma_slope_threshes = [0,0.01,0.05,0.1,0.15,0.2]
 
 #ma slopes for bb + trending normal strategy 
 #    ma_slope_threshes = [0.01,0.05,0.1,0.3,0.7,1] #for MA 15 0.3 seems the best, with 0.1 a close second; For MA go with 1 (experiment with higher values)
