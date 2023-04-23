@@ -78,12 +78,28 @@ ist = pytz.timezone('Asia/Kolkata')
 tickers = td.get_sp500_tickers()
 nifty = td.get_nifty_tickers()
 index_tickers = td.get_index_tickers()
-firstTradeTime = datetime.datetime(2023, 1,1, 9, 0)
+firstTradeTime = datetime.datetime(2022, 5,1, 9, 0)
 firstTradeTime = ist.localize(firstTradeTime)
 zgetFrom = firstTradeTime - timedelta(days=cfgHistoricalDaysToGet)
-zgetTo = datetime.datetime(2023, 3,31, 15, 30)
+zgetTo = datetime.datetime(2022, 7,31, 15, 30)
 zgetTo = ist.localize(zgetTo)
 
+# def mmReturns(row,df):
+#     i = df.index.get_loc(row.name)
+#     lastCandleHigh = df.iloc[i-1, df.columns.get_loc('High')]
+#     lastCandleLow = df.iloc[i-1, df.columns.get_loc('Low')]
+    
+#     High = row['High']
+#     Low = row['Low']
+    
+#     if High >= lastCandleHigh 
+# def stratMarketMakeLastCandle():
+#     df = dbget('NIFTYWEEKLYOPTION',firstTradeTime,zgetTo)
+#     df['signal'] = df.apply(mmReturns, 
+#         args=(df), axis=1)
+
+
+    
 def dbget(t,s,e):
     df = downloader.getCachedTikerData('NIFTYITMCALL',s,e,'minute')
     if not df.empty:
