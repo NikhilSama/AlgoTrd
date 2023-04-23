@@ -78,10 +78,10 @@ ist = pytz.timezone('Asia/Kolkata')
 tickers = td.get_sp500_tickers()
 nifty = td.get_nifty_tickers()
 index_tickers = td.get_index_tickers()
-firstTradeTime = datetime.datetime(2022, 5,1, 9, 0) if cfgZGetStartDate == None else cfgZGetStartDate
+firstTradeTime = datetime.datetime(2022, 6,1, 9, 0) if cfgZGetStartDate == None else cfgZGetStartDate
 firstTradeTime = ist.localize(firstTradeTime)
 zgetFrom = firstTradeTime - timedelta(days=cfgHistoricalDaysToGet)
-zgetTo = datetime.datetime(2022, 5,31, 15, 30) if cfgZGetEndDate == None else cfgZGetEndDate
+zgetTo = datetime.datetime(2022, 6,30, 15, 30) if cfgZGetStartDate == None else cfgZGetStartDate + timedelta(days=5)
 zgetTo = ist.localize(zgetTo)
 
 # def mmReturns(row,df):
@@ -221,16 +221,16 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
     
     signalGenerators = [
                     #    signals.randomSignalGenerator
-                        #signals.justFollowMA
+                        signals.justFollowMA
                      #   signals.justFollowFastMA
-                          signals.getSig_BB_CX
-                         ,signals.getSig_ADX_FILTER
-                         ,signals.getSig_MASLOPE_FILTER
-                    #      ,signals.getSig_OBV_FILTER
-                    #     ,signals.getSig_exitAnyExtremeADX_OBV_MA20_OVERRIDE
-                          ,signals.getSig_followAllExtremeADX_OBV_MA20_OVERRIDE
-                    # # #     #,signals.followTrendReversal
-                          ,signals.exitTrendFollowing
+                    #       signals.getSig_BB_CX
+                    #      ,signals.getSig_ADX_FILTER
+                    #      ,signals.getSig_MASLOPE_FILTER
+                    # #      ,signals.getSig_OBV_FILTER
+                    # #     ,signals.getSig_exitAnyExtremeADX_OBV_MA20_OVERRIDE
+                    #       ,signals.getSig_followAllExtremeADX_OBV_MA20_OVERRIDE
+                    # # # #     #,signals.followTrendReversal
+                    #       ,signals.exitTrendFollowing
                            # signals.fastSlowMACX
 
                         ] if signalGenerators is None else signalGenerators
@@ -454,7 +454,7 @@ def backtestCombinator(src='z'):
             return
         # Add in config variables we are looping through to the tearsheetdf
         tearsheetdf['ma_slope_thresh'] = ma_slope_thresh
-        print(f"Doing for ma_slope_thresh: {ma_slope_thresh} ma_slope_thresh_yellow_multiplier: {ma_slope_thresh_yellow_multiplier} obv_osc_thresh: {obv_osc_thresh} obv_osc_thresh_yellow_multiplier: {obv_osc_thresh_yellow_multiplier} obv_ma_len: {obv_ma_len}")
+        print(f"Doing for start:{firstTradeTime} end: {zgetTo} ma_slope_thresh: {ma_slope_thresh} ma_slope_thresh_yellow_multiplier: {ma_slope_thresh_yellow_multiplier} obv_osc_thresh: {obv_osc_thresh} obv_osc_thresh_yellow_multiplier: {obv_osc_thresh_yellow_multiplier} obv_ma_len: {obv_ma_len}")
         tearsheetdf['ma_slope_thresh_yellow_multiplier'] = ma_slope_thresh_yellow_multiplier
         tearsheetdf['obv_osc_thresh'] = obv_osc_thresh
         tearsheetdf['obv_osc_thresh_yellow_multiplier'] = obv_osc_thresh_yellow_multiplier
@@ -463,7 +463,7 @@ def backtestCombinator(src='z'):
         tearsheetdf['interval'] = 'minute'
         tearsheetdf['startTime'] = firstTradeTime
         tearsheetdf ['endTime'] = zgetTo
-        tearsheetdf['duration_in_days'] = (zgetTo - zgetFrom).days
+        tearsheetdf['duration_in_days'] = (zgetTo - firstTradeTime).days
         if len(sigGen) == 2:
             tearsheetdf['signalGenerators'] = 'TrendingOnly'
         elif len(sigGen) == 3:

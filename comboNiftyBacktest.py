@@ -6,10 +6,41 @@ import sys
 import itertools 
 import time 
 import mysql.connector
-from datetime import datetime
+import datetime
 import socket 
 
 mydb = None
+
+def generate_days(start_date, end_date, target_day):
+    days = {
+        "Monday": 0,
+        "Tuesday": 1,
+        "Wednesday": 2,
+        "Thursday": 3,
+        "Friday": 4,
+        "Saturday": 5,
+        "Sunday": 6
+    }
+    
+    if target_day not in days:
+        raise ValueError("Invalid day specified. Please provide a valid day of the week.")
+    
+    target_day_num = days[target_day]
+
+    start = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+    end = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+    
+    # Find the first target_day after the start_date
+    start += datetime.timedelta(days=(target_day_num - start.weekday()) % 7)
+    
+    # Iterate through the target days and store them as strings in the 'result_days' list
+    result_days = []
+    while start <= end:
+        if start.weekday() == target_day_num:
+            result_days.append(start.strftime("%Y-%m-%d"))
+        start += datetime.timedelta(days=7)
+
+    return result_days
 
 def connect_to_db():
     global mydb
@@ -51,7 +82,7 @@ def getCfgFromFname(fname):
 # Add a task name to the tasks table
 def add_task(task_name):
     mycursor = mydb.cursor()
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     hostname = socket.gethostname()
     num_cpus = cpu_count()
 
@@ -74,7 +105,7 @@ def is_task_in_progress(task_name):
 
 def mark_task_complete(task_name):
     mycursor = mydb.cursor()
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     sql = "UPDATE tasks SET status = 1, completed_time = %s WHERE task_name = %s"
     val = (now,task_name)
     mycursor.execute(sql, val)
@@ -125,7 +156,12 @@ def argGenerator():
     # adx_thresholds = [10,15,20,25,30,40,80] # 30 firmly the best(may change for longer adx len)
     
     #Variables for justFollowMA strategy
-    ma_lens = [2,4,6,8,10,12,14,16] 
+    
+    start_date = "2022-05-01"
+    end_date = "2023-03-31"
+
+    startTimes = generate_days(start_date, end_date, "Monday")
+    ma_lens = [2,4,6,8,10,12] 
     band_widths = [1] 
     cfgMiniBandWidthMults = [0.5]
     cfgSuperBandWidthMults = [1]
@@ -138,7 +174,7 @@ def argGenerator():
     cfgTickers = ['NIFTYWEEKLYOPTION']
     
     param_iterator = itertools.product(ma_lens, band_widths, fast_ma_lens, adx_lens, adx_thresholds, adx_thresh_yellow_multipliers, num_candles_for_slope_proj,
-                                atr_lens, cfgMiniBandWidthMults, cfgSuperBandWidthMults, cfgTickers)
+                                atr_lens, cfgMiniBandWidthMults, cfgSuperBandWidthMults, cfgTickers, startTimes)
 
     # startCFG = getCfgFromFname(getFnameForLastTask())
 
@@ -154,14 +190,14 @@ def argGenerator():
     sliced_iterator = param_iterator # start afresh if no last task found
         
     for params in sliced_iterator:
-        ma_len, band_width, fast_ma_len, adx_len, adx_thresh, adx_thresh_yellow_multiplier, num_candles, atr_len, cfgMiniBandWidthMult, cfgSuperBandWidthMult, cfgTicker, \
+        ma_len, band_width, fast_ma_len, adx_len, adx_thresh, adx_thresh_yellow_multiplier, num_candles, atr_len, cfgMiniBandWidthMult, cfgSuperBandWidthMult, cfgTicker, startTime, \
         = params
         #check w db to see if this combination has been run before or is currently running
         # if not then mark it as running
         # do it
         # check that csv exists and mark it as done in db 
         
-        argString = f"maLen:{ma_len} bandWidth:{band_width} fastMALen:{fast_ma_len} adxLen:{adx_len} adxThresh:{adx_thresh} adxThreshYellowMultiplier:{adx_thresh_yellow_multiplier} numCandlesForSlopeProjection:{num_candles} atrLen:{atr_len} cfgMiniBandWidthMult:{cfgMiniBandWidthMult} cfgSuperBandWidthMult:{cfgSuperBandWidthMult} cfgTicker:{cfgTicker}"
+        argString = f"maLen:{ma_len} bandWidth:{band_width} fastMALen:{fast_ma_len} adxLen:{adx_len} adxThresh:{adx_thresh} adxThreshYellowMultiplier:{adx_thresh_yellow_multiplier} numCandlesForSlopeProjection:{num_candles} atrLen:{atr_len} cfgMiniBandWidthMult:{cfgMiniBandWidthMult} cfgSuperBandWidthMult:{cfgSuperBandWidthMult} cfgTicker:{cfgTicker} cfgZGetStartDate:{startTime}"
                 
         # will run 3^5=243 * 2^3=8 = 1944 times == approx 20K min @ 10 min per run 
         # 100 paraaZllel cpu = 200 min = 3.2 hrs * $7/hr = $12.8
