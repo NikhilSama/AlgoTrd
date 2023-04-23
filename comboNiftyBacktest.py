@@ -10,7 +10,7 @@ import datetime
 import socket 
 
 mydb = None
-
+monthlyStartDates = ['2022-05-01','2022-06-01', '2022-07-01', '2022-08-01', '2022-09-01', '2022-10-01', '2022-11-01', '2022-12-01', '2023-01-01', '2023-02-01', '2023-03-01', '2023-04-01', '2023-05-01', '2023-06-01', '2023-07-01', '2023-08-01', '2023-09-01', '2023-10-01', '2023-11-01', '2023-12-01', '2024-01-01', '2024-02-01', '2024-03-01']
 def generate_days(start_date, end_date, target_day):
     days = {
         "Monday": 0,
@@ -41,6 +41,16 @@ def generate_days(start_date, end_date, target_day):
         start += datetime.timedelta(days=7)
 
     return result_days
+
+
+
+def printSQLToGetRESULTS():
+    start_date = "2022-05-01"
+    end_date = "2023-03-31"
+
+    startTimes = generate_days(start_date, end_date, "Monday")
+    for startDate in startTimes:
+        print(f"select id,t,startTime,endTime,num_trades,drawdn,retrn,sharpe,avgRet, stdDev,dayAv,dayShrp,maLen,slpThres,adxLen,adxThresh,candles from niftystratview where startTime = '{startDate}' order by sharpe desc, cast(retrn as decimal) desc limit 10;")
 
 def connect_to_db():
     global mydb
@@ -112,6 +122,36 @@ def mark_task_complete(task_name):
     mydb.commit()
 perfTIME = time.time()    
 
+def sqlFetchone(q):
+    connect_to_db()
+    mycursor = mydb.cursor(buffered=True)
+    mycursor.execute(q)
+    res = mycursor.fetchone()
+    mycursor.close()
+    close_db()
+    return res
+
+def getTopParamsForWeekStarting(strt):
+    q = f"select id,maLen,slpThres,adxLen,adxThresh,candles from niftystratview where startTime = '{strt}' and num_trades between 10 and 50 order by cast(retrn as decimal)/cast(drawdn as decimal) asc limit 10;"
+    return sqlFetchone(q)
+def previous_monday(date_str):
+    dt = datetime.datetime.strptime(date_str, '%Y-%m-%d')
+
+    weekday = dt.weekday()
+    
+    if weekday == 0: # If the given date is a Monday, we want the Monday from the last week
+        days_to_subtract = 7
+    else:
+        days_to_subtract = weekday+7
+    
+    previous_monday_date = dt - datetime.timedelta(days=days_to_subtract)
+    return previous_monday_date.strftime('%Y-%m-%d')
+
+def applyConfigForDate(strt):
+    prevMonday = previous_monday(strt)
+    (id,maLen,slepThres,adxLen,adxThresh,candles) = getTopParamsForWeekStarting(prevMonday)
+    print(f"monday:{prevMonday} id:{id} maLen:{maLen} slepThres:{slepThres} adxLen:{adxLen} adxThresh:{adxThresh} candles:{candles}")
+
 cloud_args=''
 #if 'cloud' in sys.argv:
 cloud_args = 'cacheTickData:True zerodha_access_token:uzifIMYFPPnuRFLWVe3vM89jYKDHMM4V dbhost:trading.ca6bwmzs39pr.ap-south-1.rds.amazonaws.com dbuser:trading dbpass:trading123 dbname:trading'
@@ -134,13 +174,13 @@ def run_instance(args):
         global iter
         
         iter = iter + 1
-        connect_to_db()
+        # connect_to_db()
         print(f'{iter}: Runing: {argString}')
-        if is_task_in_progress(argString):
-            print(f'SKIP - Already running task {argString}')
-            return
-        add_task(argString)
-        close_db()
+        # if is_task_in_progress(argString):
+        #     print(f'SKIP - Already running task {argString}')
+        #     return
+        # add_task(argString)
+        # close_db()
         subprocess.call(f'python3 backtest_combinator.py {args}', shell=True) 
     except Exception as e:
         print('Error in run_instance():', e)
@@ -160,7 +200,7 @@ def argGenerator():
     start_date = "2022-05-01"
     end_date = "2023-03-31"
 
-    startTimes = generate_days(start_date, end_date, "Monday")
+    startTimes = monthlyStartDates #generate_days(start_date, end_date, "Monday")
     ma_lens = [2,4,6,8,10,12] 
     band_widths = [1] 
     cfgMiniBandWidthMults = [0.5]

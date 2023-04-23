@@ -81,7 +81,7 @@ index_tickers = td.get_index_tickers()
 firstTradeTime = datetime.datetime(2022, 6,1, 9, 0) if cfgZGetStartDate == None else cfgZGetStartDate
 firstTradeTime = ist.localize(firstTradeTime)
 zgetFrom = firstTradeTime - timedelta(days=cfgHistoricalDaysToGet)
-zgetTo = datetime.datetime(2022, 6,30, 15, 30) if cfgZGetStartDate == None else cfgZGetStartDate + timedelta(days=5)
+zgetTo = datetime.datetime(2022, 6,30, 15, 30) if cfgZGetStartDate == None else cfgZGetStartDate + timedelta(months=1)
 zgetTo = ist.localize(zgetTo)
 
 # def mmReturns(row,df):
