@@ -174,13 +174,13 @@ def run_instance(args):
         global iter
         
         iter = iter + 1
-        # connect_to_db()
+        connect_to_db()
         print(f'{iter}: Runing: {argString}')
-        # if is_task_in_progress(argString):
-        #     print(f'SKIP - Already running task {argString}')
-        #     return
-        # add_task(argString)
-        # close_db()
+        if is_task_in_progress(argString):
+            print(f'SKIP - Already running task {argString}')
+            return
+        add_task(argString)
+        close_db()
         subprocess.call(f'python3 backtest_combinator.py {args}', shell=True) 
     except Exception as e:
         print('Error in run_instance():', e)
@@ -200,15 +200,15 @@ def argGenerator():
     start_date = "2022-05-01"
     end_date = "2023-03-31"
 
-    startTimes = monthlyStartDates #generate_days(start_date, end_date, "Monday")
+    startTimes = ["2022-05-01"] #monthlyStartDates #generate_days(start_date, end_date, "Monday")
     ma_lens = [2,4,6,8,10,12] 
     band_widths = [1] 
     cfgMiniBandWidthMults = [0.5]
     cfgSuperBandWidthMults = [1]
     fast_ma_lens = [5] 
-    adx_lens = [5,10,15,20,25,30] # 25 is the best, 20 is a far second.  Try 30 ?
+    adx_lens = [5,10,15,20,25,30,35] # 25 is the best, 20 is a far second.  Try 30 ?
     adx_thresholds = [10,15,20,25,30,40,80] # 30 firmly the best(may change for longer adx len)
-    adx_thresh_yellow_multipliers = [0.6]
+    adx_thresh_yellow_multipliers = [0.6,0.9]
     num_candles_for_slope_proj = [2,5,7,9] # 2 or 5 works 
     atr_lens = [7,14,21]
     cfgTickers = ['NIFTYWEEKLYOPTION']
