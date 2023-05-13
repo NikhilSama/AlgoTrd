@@ -178,7 +178,6 @@ def zGetSurrogateVolumeFromFuture(symbol,from_date,to_date,interval='minute',con
     
 def zget(from_date, to_date, symbol,interval='minute',
          includeOptions=False, continuous=False, instrumentToken=None):
-
     if utils.tickerIsFuture(symbol):
         continuous = False # set continuous True for futures//Correction, contiinous only works for day 
         # candles not for minute candles
@@ -187,7 +186,6 @@ def zget(from_date, to_date, symbol,interval='minute',
     
     if df.empty:
         return df
-    
     # if (df['Volume'].iloc[-1] == 0):
     #     # Likely an Index Ticker, use surrogate volume from its future
     #     df['Volume'] = zGetSurrogateVolumeFromFuture(symbol,from_date,to_date,interval,continuous)

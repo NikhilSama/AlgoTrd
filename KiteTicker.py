@@ -278,7 +278,17 @@ def processTicks(ticks):
         tickThread.start()
         tickThreadBacklog = []
 
-           
+def placeStopLossOrder(ticker,exchange,q,p): 
+    print("Placing stop loss")
+def placeTargetOrder(ticker,exchange,q,p):
+    print("Placing target")
+    # tl.placeOrder(ticker,exchange,'BUY',q,p,targetPrice,)
+    
+def placeStopLossAndTargetOrders (ticker,exchange,q,p):
+    # placeStopLossOrder(ticker,exchange,q,p)
+    # placeTargetOrder(ticker,exchange,q,p)
+    x = None
+
 ####### KITE TICKER CALLBACKS #######
 def on_ticks(ws, ticks):
     # Callback to receive ticks.
@@ -310,6 +320,7 @@ def on_order_update(ws, data):
     localized_timestamp = ist.localize(rounded_timestamp)
 
     ticker = data['tradingsymbol']
+    exchange = data['exchange']
     token = data['instrument_token']
     status = data['status']
     tx = data['transaction_type']
@@ -320,7 +331,9 @@ def on_order_update(ws, data):
     
 #    tickerlog("Order update: {}".format(data))  
     #tickerlog(f"Order update: {tx} {q} {ticker}@{q} {status} filledQ:{filled}")
-    
+    if status == 'COMPLETE':
+        if tag == 'main-long':
+            placeStopLossAndTargetOrders(ticker,exchange,q,p)
     if tag == 'TargetExit' and status == 'COMPLETE':
         tickerlog(f"TargetExit order complete. Adding {localized_timestamp} to targetExitAchieved")
         tickersToTrack[token]['targetExitAchieved'].append(localized_timestamp)

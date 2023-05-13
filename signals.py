@@ -20,6 +20,9 @@ import pickle
 import tickerCfg
 import utils
 import random
+import talib as ta
+from itertools import compress
+from candlerankings import candle_rankings
 
 #cfg has all the config parameters make them all globals here
 import cfg
@@ -33,15 +36,28 @@ tickerStatus = {}
 def updateCFG(ma_slope_thresh, ma_slope_thresh_yellow_multiplier, \
                          obv_osc_thresh, \
                          obv_osc_thresh_yellow_multiplier, \
-                         obv_ma_len):
+                         obv_ma_len, ma_slope_period, 
+                         RenkoBrickMultiplier, atrlen \
+                             , RenkoBrickMultiplierLongTarget, RenkoBrickMultiplierLongSL, \
+                                 RenkoBrickMultiplierShortTarget, RenkoBrickMultiplierShortSL):
     global maSlopeThresh,maSlopeThreshYellowMultiplier, \
         obvOscThresh, obvOscThreshYellowMultiplier, overrideMultiplier, \
-        cfgObvMaLen
+        cfgObvMaLen, cfgMASlopePeriods, cfgRenkoBrickMultiplier, atrLen \
+        , cfgRenkoBrickMultiplierLongTarget, cfgRenkoBrickMultiplierLongSL \
+        , cfgRenkoBrickMultiplierShortTarget, cfgRenkoBrickMultiplierShortSL
     maSlopeThresh = ma_slope_thresh
     maSlopeThreshYellowMultiplier = ma_slope_thresh_yellow_multiplier
     obvOscThresh =  obv_osc_thresh
     obvOscThreshYellowMultiplier = obv_osc_thresh_yellow_multiplier
     cfgObvMaLen = obv_ma_len
+    cfgMASlopePeriods = ma_slope_period
+    cfgRenkoBrickMultiplier = RenkoBrickMultiplier
+    atrLen = atrlen
+    cfgRenkoBrickMultiplierLongTarget = RenkoBrickMultiplierLongTarget
+    cfgRenkoBrickMultiplierLongSL = RenkoBrickMultiplierLongSL
+    cfgRenkoBrickMultiplierShortTarget = RenkoBrickMultiplierShortTarget
+    cfgRenkoBrickMultiplierShortSL = RenkoBrickMultiplierShortSL
+    
 def updateCFG2(cfg={}):
     for key, value in cfg.items():
         globals()[key] = value
@@ -67,7 +83,63 @@ def printCFG():
     print(f"\tobvOscThreshYellowMultiplier: {obvOscThreshYellowMultiplier}")
     print(f"\tcfgObvMaLen: {cfgObvMaLen}")
     print(f"\tbet_size: {bet_size}")
-    
+
+def candleStickPatterns(df):
+    candle_names = ta.get_function_groups()['Pattern Recognition']
+    avVol = df.Volume.mean()
+    for candle in candle_names:
+        # below is same as;
+        # df["CDL3LINESTRIKE"] = talib.CDL3LINESTRIKE(op, hi, lo, cl)
+        df[candle] = getattr(ta, candle)(df['Open'], df['High'], df['Low'], df['Adj Close'])
+
+    df['candlestick_pattern'] = np.nan
+    df['candlestick_match_count'] = np.nan
+    df['candlestick_signal'] = np.nan
+    for index, row in df.iterrows():
+
+        # no pattern found
+        if row.Volume < 1.2*avVol:
+            df.loc[index,'candlestick_pattern'] = "NO_VOLUME"
+        elif len(row[candle_names]) - sum(row[candle_names] == 0) == 0:
+            df.loc[index,'candlestick_pattern'] = "NO_PATTERN"
+            df.loc[index, 'candlestick_match_count'] = 0
+        # single pattern found
+        elif len(row[candle_names]) - sum(row[candle_names] == 0) == 1:
+            # bull pattern 100 or 200
+            if any(row[candle_names].values > 0):
+                pattern = list(compress(row[candle_names].keys(), row[candle_names].values != 0))[0] + '_Bull'
+                df.loc[index, 'candlestick_pattern'] = pattern
+                df.loc[index, 'candlestick_match_count'] = 1
+                df.loc[index, 'candlestick_signal'] = 1
+            # bear pattern -100 or -200
+            else:
+                pattern = list(compress(row[candle_names].keys(), row[candle_names].values != 0))[0] + '_Bear'
+                df.loc[index, 'candlestick_pattern'] = pattern
+                df.loc[index, 'candlestick_match_count'] = 1
+                df.loc[index, 'candlestick_signal'] = -1
+
+        # multiple patterns matched -- select best performance
+        else:
+            # filter out pattern names from bool list of values
+            patterns = list(compress(row[candle_names].keys(), row[candle_names].values != 0))
+            container = []
+            for pattern in patterns:
+                if row[pattern] > 0:
+                    container.append(pattern + '_Bull')
+                    df.loc[index, 'candlestick_signal'] = 1
+                else:
+                    container.append(pattern + '_Bear')
+                    df.loc[index, 'candlestick_signal'] = -1
+            rank_list = [candle_rankings[p] for p in container]
+            if len(rank_list) == len(container):
+                rank_index_best = rank_list.index(min(rank_list))
+                df.loc[index, 'candlestick_pattern'] = container[rank_index_best]
+                df.loc[index, 'candlestick_match_count'] = len(container)
+    # clean up candle columns
+    df.drop(candle_names, axis = 1, inplace = True)
+
+    # hanging_man = ta.CDLHANGINGMAN(df['Open'], df['High'], df['Low'], df['Adj Close'])
+    # return (hanging_man)
 def MACD(DF,f=20,s=50):
     df = DF.copy()
     df["ma_fast"] = df["Adj Close"].ewm(span=f,min_periods=f).mean()
@@ -79,20 +151,25 @@ def MACD(DF,f=20,s=50):
 
 def OBV(df):
     df = df.copy()
+    obv = ta.OBV(df['Adj Close'], df['Volume'])
+    obv_pct_chang = obv.pct_change(periods=cfgObvLen).clip(-.1, .1)
+    obv_osc = obv/obv.mean() - 1
+    obv_osc_pct_chang = obv_osc.diff(cfgObvLen)/cfgObvLen
+    return (obv_osc, obv_osc_pct_chang, obv, obv_pct_chang)
     # calculate the OBV column
     df['change'] = df['Adj Close'] - df['Open']
     df['direction'] = df['change'].apply(lambda x: 1 if x > 0 else -1 if x < 0 else 0)
     df['obv'] = df['direction'] * df['Volume']
-    df['obv'] = df['obv'].rolling(window=round(cfgMaxLookbackCandles/3), min_periods=round(cfgMaxLookbackCandles/3)).sum() # instead of cumsum; this restricts it to historical candles spec in cfg
-    df['ma_obv'] = df['obv'].rolling(window=cfgObvMaLen, min_periods=5).mean()
+    df['obv'] = df['obv'].rolling(window=cfgObvLen, min_periods=cfgObvLen).sum() # instead of cumsum; this restricts it to historical candles spec in cfg
+    df['ma_obv'] = df['obv'].rolling(window=cfgObvMaLen, min_periods=2).mean()
     df['ma_obv_diff'] = df['ma_obv'].diff(5)
     
     #OBV-Diff Max/Min diff should only look at previous candles, not future candles
     #Also restrict the lookback to cfgMaxLookbackCandles, to keep backtest results consistent
     #apples to apples with live trading
     
-    df['ma_obv_diff_max'] = df['ma_obv_diff'].rolling(window=round(cfgMaxLookbackCandles/3), min_periods=round(cfgMaxLookbackCandles/3)).max()
-    df['ma_obv_diff_min'] = df['ma_obv_diff'].rolling(window=round(cfgMaxLookbackCandles/3), min_periods=round(cfgMaxLookbackCandles/3)).min()
+    df['ma_obv_diff_max'] = df['ma_obv_diff'].rolling(window=cfgObvLen, min_periods=cfgObvLen).max()
+    df['ma_obv_diff_min'] = df['ma_obv_diff'].rolling(window=cfgObvLen, min_periods=cfgObvLen).min()
     df['obv_osc'] = df['ma_obv_diff'] / (df['ma_obv_diff_max'] - df['ma_obv_diff_min'])
     df['obv_osc_pct_change'] = df['obv_osc'].diff(2)/2
     df['obv_trend'] = np.where(df['obv_osc'] > obvOscThresh,1,0)
@@ -103,6 +180,33 @@ def OBV(df):
     # df.to_csv("obv1.csv")
     # exit(0)
     return (df['ma_obv'],df['obv_osc'],df['obv_trend'],df['obv_osc_pct_change'])
+def renko(DF):
+    from stocktrends import Renko
+    "function to convert ohlc data into renko bricks"
+    df = DF.copy()
+    brick_size = round(df['Adj Close'].iloc[-1] * cfgRenkoBrickMultiplier)
+    df.reset_index(inplace=True)
+    df.columns = ["date","i","open","high","low","close","volume","symbol","signal","ATR"]
+    df2 = Renko(df)
+    df2.brick_size = brick_size
+    renko_df = df2.get_ohlc_data() #if using older version of the library please use get_bricks() instead
+    renko_df["bar_num"] = np.where(renko_df["uptrend"]==True,1,np.where(renko_df["uptrend"]==False,-1,0))
+    for i in range(1,len(renko_df["bar_num"])):
+        if renko_df["bar_num"][i]>0 and renko_df["bar_num"][i-1]>0:
+            renko_df["bar_num"][i]+=renko_df["bar_num"][i-1]
+        elif renko_df["bar_num"][i]<0 and renko_df["bar_num"][i-1]<0:
+            renko_df["bar_num"][i]+=renko_df["bar_num"][i-1]
+    renko_df.drop_duplicates(subset="date",keep="last",inplace=True)
+    renko_df["brick_size"] = brick_size
+    return renko_df
+def vwap(df):
+    df['VWAP'] = np.cumsum(df['Adj Close'] * df['Volume']) / np.cumsum(df['Volume'])
+
+    # Calculate Standard Deviation (SD) bands
+    num_periods = 20  # Number of periods for SD calculation
+    df['VWAP_SD'] = df['VWAP'].rolling(num_periods).std()  # Rolling standard deviation
+    df['VWAP_upper'] = df['VWAP'] + 2 * df['VWAP_SD']  # Upper band (2 SD above VWAP)
+    df['VWAP_lower'] = df['VWAP'] - 2 * df['VWAP_SD']  # Lower band (2 SD below VWAP)
 
 def tenAMToday (now=0):
     if (now == 0):
@@ -125,22 +229,55 @@ def ATR(DF,n=atrLen):
     df['ATR'] = df['TR'].ewm(com=n,min_periods=cfgMinCandlesForMA).mean()
     return df['ATR']
 
+def supertrend(df, multiplier=3, atr_period=10):
+    high = df['High']
+    low = df['Low']
+    close = df['Adj Close']
+    atr = df['ATR']
+    # HL2 is simply the average of high and low prices
+    hl2 = (high + low) / 2
+    # upperband and lowerband calculation
+    # notice that final bands are set to be equal to the respective bands
+    final_upperband = upperband = hl2 + (multiplier * atr)
+    final_lowerband = lowerband = hl2 - (multiplier * atr)
+    # initialize Supertrend column to True
+    supertrend = [True] * len(df)
+    supertrend_signal = np.full(len(df), np.nan)
+    
+    for i in range(1, len(df.index)):
+        curr, prev = i, i-1
+                # if current close price crosses above upperband
+        if close[curr] > final_upperband[prev]:
+            supertrend[curr] = True
+        # if current close price crosses below lowerband
+        elif close[curr] < final_lowerband[prev]:
+            supertrend[curr] = False
+        # else, the trend continues
+        else:
+            supertrend[curr] = supertrend[prev]
+            # adjustment to the final bands
+            if supertrend[curr] == True and final_lowerband[curr] < final_lowerband[prev]:
+                final_lowerband[curr] = final_lowerband[prev]
+            if supertrend[curr] == False and final_upperband[curr] > final_upperband[prev]:
+                final_upperband[curr] = final_upperband[prev]
+
+        # to remove bands according to the trend direction
+        if supertrend[curr] == True:
+            final_upperband[curr] = np.nan
+        else:
+            final_lowerband[curr] = np.nan
+        
+        if supertrend[curr] and (not supertrend[prev]):
+            supertrend_signal[curr] = 1
+        elif (not supertrend[curr]) and supertrend[prev]:
+            supertrend_signal[curr] = -1 
+    return supertrend_signal,supertrend, final_upperband,final_lowerband
+
+
 def ADX(DF, n=adxLen):
-    "function to calculate ADX"
-    df = DF.copy()
-    df["ATR"] = ATR(DF, n)
-    df["upmove"] = df["High"] - df["High"].shift(1)
-    df["downmove"] = df["Low"].shift(1) - df["Low"]
-    df["+dm"] = np.where((df["upmove"]>df["downmove"]) & (df["upmove"] >0), df["upmove"], 0)
-    df["-dm"] = np.where((df["downmove"]>df["upmove"]) & (df["downmove"] >0), df["downmove"], 0)
-    df["+di"] = 100 * (df["+dm"]/df["ATR"]).ewm(alpha=1/n, min_periods=cfgMinCandlesForMA).mean()
-    df["-di"] = 100 * (df["-dm"]/df["ATR"]).ewm(alpha=1/n, min_periods=cfgMinCandlesForMA).mean()
-    df["ADX"] = 100* abs((df["+di"] - df["-di"])/(df["+di"] + df["-di"])).ewm(alpha=1/n, min_periods=n).mean()
-    df['ADX-PCT-CHNG'] = df['ADX'].diff(2)/2
-    df['ADX-PCT-CHNG'] = df['ADX-PCT-CHNG'].clip(lower=-1, upper=1)
-
-    return (df["ADX"],df['ADX-PCT-CHNG'],df['ATR'],df["+di"],df["-di"])
-
+    adx = ta.ADX(DF['High'], DF['Low'], DF['Adj Close'], timeperiod=n)
+    adx_pct_change = adx.diff(2)/2
+    return (adx,adx_pct_change)
 
 def RSI(DF, n=14):
     df = DF.copy()
@@ -172,16 +309,16 @@ def addSMA(df,fast=8,slow=26,superTrend=200):
 def addBBStats(df):
     # creating bollinger band indicators
     df['ma_superTrend'] = df['Adj Close'].ewm(com=superLen, min_periods=cfgMinCandlesForMA).mean()
-    df['ma_superTrend_pct_change'] = 10000*df['ma_superTrend'].pct_change(periods=1)
+    df['ma_superTrend_pct_change'] = 10000*df['ma_superTrend'].pct_change(periods=3)
     df['ma20'] = df['Adj Close'].rolling(window=maLen).mean()
     df['MA-FAST'] = df['Adj Close'].rolling(window=fastMALen).mean()
     df['MA-FAST-SLP'] = df['MA-FAST'].pct_change(periods=3)
     df['MA-FAST-SLP'] = df['MA-FAST-SLP'].clip(lower=-0.1, upper=0.1)
-    df['ma20_pct_change'] = df['ma20'].pct_change(periods=1)
+    df['ma20_pct_change'] = df['ma20'].pct_change(periods=cfgMASlopePeriods)
     df['ma20_pct_change_ma'] = df['ma20_pct_change'].ewm(com=5, min_periods=1).mean()
     df['ma20_pct_change_ma_sq'] = df['ma20_pct_change_ma'].pct_change()
-    df['ma20_pct_change_ma_sq'] = df['ma20_pct_change_ma_sq'].ewm(com=maLen, min_periods=maLen).mean()
-    df['ma20_pct_change_ma_sq'] = df['ma20_pct_change_ma_sq'].clip(lower=-0.5, upper=0.5)
+    # df['ma20_pct_change_ma_sq'] = df['ma20_pct_change_ma_sq'].ewm(com=maLen, min_periods=maLen).mean()
+    # df['ma20_pct_change_ma_sq'] = df['ma20_pct_change_ma_sq'].clip(lower=-0.5, upper=0.5)
     df['std'] = df['Adj Close'].rolling(window=maLen).std()
     df['upper_band'] = df['ma20'] + (bandWidth * df['std'])
     df['lower_band'] = df['ma20'] - (bandWidth * df['std'])
@@ -193,8 +330,11 @@ def addBBStats(df):
     #df.tail(5)
     slopeStdDev = df['ma20_pct_change_ma'].rolling(window=cfgMaxLookbackCandles,min_periods=maLen).std()
     slopeMean = df['ma20_pct_change_ma'].rolling(window=cfgMaxLookbackCandles,min_periods=maLen).mean()
-    df['SLOPE-OSC'] = (df['ma20_pct_change_ma'] - slopeMean)/slopeStdDev
-    df['SLOPE-OSC-SLOPE'] = df['SLOPE-OSC'].diff(2)/2
+    # df['SLOPE-OSC'] = (df['ma20_pct_change_ma'] - slopeMean)/slopeStdDev
+    # df['SLOPE-OSC-SLOPE'] = df['SLOPE-OSC'].diff(2)/2
+    
+    df['SLOPE-OSC'] = df['ma20_pct_change']
+    df['SLOPE-OSC-SLOPE'] = df['ma20_pct_change_ma_sq']
     return df
         
 def eom_effect(df):
@@ -235,22 +375,53 @@ def adxIsBullish(row):
 def adxIsBearish(row):
     return row['-di'] >= row['+di']
 def adxIsHigh(row):
-    return valueOrProjectedValueBreachedThreshold(row['ADX'],adxThresh,
+    return valueAndProjectedValueBreachedThreshold(row['ADX'],adxThresh,
                 row['ADX-PCT-CHNG'], adxThreshYellowMultiplier,'H')
     return True if row['ADX'] >= adxThresh else False
 def adxIsLow(row):
-    return not adxIsHigh(row)
+    return row['ADX'] <= adxThresh*cfgAdxThreshExitMultiplier
+def adxIsHighAndBullish(row):
+    return adxIsHigh(row) and adxIsBullish(row)
+def adxIsHighAndBearish(row):
+    return adxIsHigh(row) and adxIsBearish(row)
 def maSteepSlopeUp(row):
-    return valueOrProjectedValueBreachedThreshold(row['SLOPE-OSC'],
-                maSlopeThresh,row['SLOPE-OSC-SLOPE'], maSlopeThreshYellowMultiplier, "H")
+    return row['ma20_pct_change']>=maSlopeThresh
 def maSteepSlopeDn(row):
-    return valueOrProjectedValueBreachedThreshold(row['SLOPE-OSC'],
-                maSlopeThresh,row['SLOPE-OSC-SLOPE'], maSlopeThreshYellowMultiplier, "L")
+    return row['ma20_pct_change']<=-maSlopeThresh
 def maSlopeFlattish(row):
     return valueOrProjectedValueBreachedThreshold(row['SLOPE-OSC'], \
                 maSlopeThresh,row['SLOPE-OSC-SLOPE'], maSlopeThreshYellowMultiplier, "H_OR_L") \
             == False
-
+def maDivergesFromADX(row):
+    return (adxIsBullish(row) and row['ma20_pct_change'] < 0) \
+        or (adxIsBearish(row) and row['ma20_pct_change'] > 0)
+def maDivergesFromTrend(row):
+    trend = getTickerTrend(row['symbol'])
+    if trend == 1 and row['ma20_pct_change'] < 0:
+        return True
+    elif trend == -1 and row['ma20_pct_change'] > 0:
+        return True
+    return False
+def obvIsBullish(row):
+    return row['OBV-PCT-CHNG'] >= cfgObvSlopeThresh 
+    return valueOrProjectedValueBreachedThreshold(row['OBV-OSC'],obvOscThresh,
+                row['OBV-OSC-PCT-CHNG'],obvOscThreshYellowMultiplier, "H_OR_L") \
+            == 'H'
+def obvIsBearish(row):
+    return row['OBV-PCT-CHNG'] <= -cfgObvSlopeThresh 
+    return valueOrProjectedValueBreachedThreshold(row['OBV-OSC'],obvOscThresh,
+                row['OBV-OSC-PCT-CHNG'],obvOscThreshYellowMultiplier, "H_OR_L") \
+            == 'L'
+def obvNoLongerHigh(row):
+    obv = row['OBV-OSC']
+    slp = row['OBV-OSC-PCT-CHNG']
+    projObv = projectedValue(obv,slp)
+    return obv < obvOscThresh or projObv < obvOscThresh
+def obvNoLongerLow(row):
+    obv = row['OBV-OSC']
+    slp = row['OBV-OSC-PCT-CHNG']
+    projObv = projectedValue(obv,slp)
+    return obv > -obvOscThresh or projObv > -obvOscThresh
 def valueBreachedThreshold (value,threshold,type='H'):
     if type == 'H':
         return value >= threshold
@@ -319,6 +490,14 @@ def valueOrProjectedValueBreachedThreshold(value,threshold,slope,
         return projectedValueBreachedThreshold(value,threshold,slope,multiplier,type)
     else:
         return p
+def valueAndProjectedValueBreachedThreshold(value,threshold,slope,
+                                            multiplier,type):
+    p = valueBreachedThreshold(value,threshold,type)
+    if p == False:
+        return p
+    else:
+        type = p if (p == 'H' or p == 'L') else type
+        return p if projectedValueBreachedThreshold(value,threshold,slope,multiplier,type) else False
 def projectedValue(value,slope):
     #Calc projectedValue is where the value will be after {candlesToProject}
     #if it starts at value and continues at current slope levels
@@ -375,14 +554,59 @@ def tickerHasLongPosition(ticker):
     return getTickerPosition(ticker) == 1
 def tickerHasShortPosition(ticker):
     return getTickerPosition(ticker) == -1
+def setTickerMaxPriceForTrade(ticker,entry_price,signal):
+    default_min = 1000000
+    default_max = 0
+    if 'max_price' not in tickerStatus[ticker] or \
+        signal == 0:
+        tickerStatus[ticker]['max_price'] = default_max
+        tickerStatus[ticker]['min_price'] = default_min
+    if np.isnan(signal):
+        if tickerStatus[ticker]['max_price'] != default_max:
+            tickerStatus[ticker]['max_price'] = max(entry_price,tickerStatus[ticker]['max_price'])
+        if tickerStatus[ticker]['min_price'] != default_min:
+            tickerStatus[ticker]['min_price'] = min(entry_price,tickerStatus[ticker]['min_price'])
+    elif signal == 1:
+        tickerStatus[ticker]['max_price'] = max(entry_price,tickerStatus[ticker]['max_price'])
+    elif signal == -1:
+        tickerStatus[ticker]['min_price'] = min(entry_price,tickerStatus[ticker]['min_price'])
+
 def setTickerPosition(ticker,signal, entry_price):
+    setTickerMaxPriceForTrade(ticker,entry_price,signal)
+    #logging.info(f"signal: {signal} entry: {tickerStatus[ticker]['entry_price']} max: {tickerStatus[ticker]['max_price']} min: {tickerStatus[ticker]['min_price']}")
     if np.isnan(signal):
         return # nan signal does not change position
     if ticker not in tickerStatus:
         tickerStatus[ticker] = {}
-    tickerStatus[ticker]['position'] = signal
-    tickerStatus[ticker]['entry_price'] = entry_price
-    
+    if tickerStatus[ticker]['position'] != signal:
+        tickerStatus[ticker]['position'] = signal
+        if signal == 0:
+            tickerStatus[ticker]['entry_price'] = float('nan')
+        else:
+            tickerStatus[ticker]['entry_price'] = entry_price
+def getTickerEntryPrice(ticker):
+    return tickerStatus[ticker]['entry_price']
+
+def enoughReturnForDay(ret):
+    return ret >= cfgEnoughReturnForTheDay or \
+                ret <= -cfgEnoughLossForTheDay
+def getTickerRenkoTargetPrices(row):
+    renkoBrickSize = row['renko_brick_high'] - row['renko_brick_low']
+    longTarget = row['renko_brick_high']+(renkoBrickSize*cfgRenkoBrickMultiplierLongTarget)
+    longSL = row['renko_brick_low']-(renkoBrickSize*cfgRenkoBrickMultiplierLongSL)
+    shortTarget = row['renko_brick_low']-(renkoBrickSize*cfgRenkoBrickMultiplierShortTarget)
+    shortSL = row['renko_brick_high']+(renkoBrickSize*cfgRenkoBrickMultiplierShortSL)
+    return(longTarget,longSL,shortTarget,shortSL)
+
+def getTickerTargetPrices(ticker):
+    entryPrice = getTickerEntryPrice(ticker)
+    longTarget = ((1+cfgTarget)*entryPrice)
+    longSL = ((1-cfgStopLoss)*entryPrice)
+    longSLFromPeak = ((1-cfgStopLossFromPeak)*tickerStatus[ticker]['max_price'])
+    shortTarget = ((1-cfgTarget)*entryPrice)
+    shortSL = ((1+cfgStopLoss)*entryPrice)
+    shortSLFromPeak = ((1+cfgStopLossFromPeak)*tickerStatus[ticker]['min_price'])
+    return(longTarget,max(longSL,longSLFromPeak),shortTarget,min(shortSL,shortSLFromPeak))
 def logTickerStatus(ticker):
     if tickerStatus[ticker]['trendSignal'] == 1:
         logging.info(f"TickerStatus: {ticker} is trending up")
@@ -390,7 +614,6 @@ def logTickerStatus(ticker):
         logging.info(f"TickerStatus: {ticker} is trending down")
     else:
         logging.info(f"TickerStatus: {ticker} is not trending")
-
 def getTickerTrend(ticker):
     if ticker not in tickerStatus:
         return float ('nan')
@@ -403,6 +626,7 @@ def setTickerTrend(ticker,trend):
     if ticker not in tickerStatus:
         tickerStatus[ticker] = {}
     tickerStatus[ticker]['trendSignal'] = trend
+    #print("setTickerTrend: ",ticker,trend)
     
 def tickerIsTrending(ticker):
     t = getTickerTrend(ticker)
@@ -440,15 +664,16 @@ def isLongOrShortSignal(s):
 def signalChanged(s,lastS):
     #Oddly s!=lastS is True if both are nan, because nan's cant compare
     return s != lastS and (not math.isnan(s))
-
+ 
 def logSignal(msg,reqData,signal,s,row,window,isLastRow,extra='',logWithNoSignalChange=False):
     rowInfo = f'{row.symbol}:{row.i} '
     rowPrice = f'p:{round(row["Adj Close"],1)} '
     sigInfo = f'sig:{"-" if np.isnan(signal) else signal} s:{"-" if np.isnan(s) else s} {"E" if window == 1 else "X"} '
     dataStrings = {
-        "adxData" : f"ADX:{round(row['ADX'],1)} > {adxThresh}(*{round(adxThreshYellowMultiplier,1)}) adxSLP:{round(row['ADX-PCT-CHNG'],2)}*{numCandlesForSlopeProjection} ",
-        "maSlpData" : f"maSlp:{round(row['SLOPE-OSC'],2)} >= {maSlopeThresh}(*{maSlopeThreshYellowMultiplier}) maSlpChng:{round(row['SLOPE-OSC-SLOPE'],2)}>*{numCandlesForSlopeProjection} ",
-        "obvData" : f"OBV:{round(row['OBV-OSC'],2)} > {obvOscThresh}(*{obvOscThreshYellowMultiplier}) obvSLP:{round(row['OBV-OSC-PCT-CHNG'],2)}>*{numCandlesForSlopeProjection} " if "OBV-OSC" in row else 'No Volume Data'
+        "adxData" : f"ADX:{round(row['ADX'],1)} > {adxThresh}(*{round(adxThreshYellowMultiplier,1)}) adxSLP:{round(row['ADX-PCT-CHNG'],2)}*{numCandlesForSlopeProjection} " if "ADX" in row else 'No ADX Data',
+        "maSlpData" : f"maSlp:{round(row['SLOPE-OSC'],2)} >= {maSlopeThresh}(*{maSlopeThreshYellowMultiplier}) maSlpChng:{round(row['SLOPE-OSC-SLOPE'],2)}>*{numCandlesForSlopeProjection} " if "SLOPE-OSC" in row else 'No Slope Data',
+        "obvData" : f"OBV:{round(row['OBV-OSC'],2)} > {obvOscThresh}(*{obvOscThreshYellowMultiplier}) obvSLP:{round(row['OBV-OSC-PCT-CHNG'],2)}>*{numCandlesForSlopeProjection} " if "OBV-OSC" in row else 'No Volume Data',
+        "RenkoData": f"Renko Trend:{'↑' if row['renko_uptrend'] else '↓'}:{round(row['renko_brick_num'])}({round(row['renko_brick_diff'])}) StaticCandles:{round(row['renko_static_candles']) if not np.isnan(row['renko_static_candles']) else 'nan'} H:{round(row['renko_brick_high'],1)} L:{round(row['renko_brick_low'],1)}" if "renko_uptrend" in row else 'No Renko Data'
     }
     dataString = ''
     for key in reqData:
@@ -481,13 +706,82 @@ def skipFilter (signal,type):
 def populateBB (df):
     addBBStats(df)
 
+def populateATR(df):
+    df['ATR'] = ATR(df,atrLen)
+    
 def populateADX (df):
-    (df['ADX'],df['ADX-PCT-CHNG'],df['ATR'],df["+di"],df["-di"]) = ADX(df,adxLen)
+    (df['ADX'],df['ADX-PCT-CHNG']) = ADX(df,adxLen)
 
 def populateOBV (df):
-    if (df['Volume'].max() == 0):
-        return False # Index has no volume data so skip it
-    (df['OBV'],df['OBV-OSC'],df['OBV-TREND'],df['OBV-OSC-PCT-CHNG']) = OBV(df)
+    # if (df['Volume'].max() == 0):
+    #     return False # Index has no volume data so skip it
+    (df['OBV-OSC'],df['OBV-OSC-PCT-CHNG'], df['OBV'], df['OBV-PCT-CHNG']) = OBV(df)
+def populateSuperTrend (df):
+    (df['SuperTrend'],df['SuperTrendDirection'],df['SuperTrendUpper'],df['SuperTrendLower']) = supertrend(df)
+
+def populateCandleStickPatterns(df):
+    #(df['HANGINGMAN']) = 
+    candleStickPatterns(df)
+def populateRenko(df):
+    renkoDF = renko(df)
+    renkoDF.columns = ["Date","open","renko_brick_high","renko_brick_low","close","uptrend","bar_num","brick_size"]
+    df["Date"] = df.index
+    df_renko_ohlc = df.merge(renkoDF.loc[:,["Date","uptrend","renko_brick_high","renko_brick_low","bar_num","brick_size"]],how="outer",on="Date")
+    df_renko_ohlc["uptrend"].fillna(method='ffill',inplace=True)
+    df_renko_ohlc["bar_num"].fillna(method='ffill',inplace=True)
+    df_renko_ohlc["renko_brick_high"].fillna(method='ffill',inplace=True)
+    df_renko_ohlc["renko_brick_low"].fillna(method='ffill',inplace=True)
+    df_renko_ohlc.set_index('Date', drop=True, inplace=True)
+    df['renko_uptrend'] = df_renko_ohlc['uptrend']
+    df['renko_brick_num'] = df_renko_ohlc['bar_num']
+    
+    diff = df['renko_brick_num'].diff()
+    same_sign = np.sign(df['renko_brick_num']) == np.sign(df['renko_brick_num'].shift(1))
+    renko_brick_diff = diff.where(same_sign, 0)
+    df['renko_brick_diff'] = renko_brick_diff
+
+    # Calculate renko_static_candles
+    df['renko_static_candles'] = (
+        df.loc[df['renko_brick_diff'] == 0, 'renko_brick_diff']
+        .groupby((df['renko_brick_diff'] != 0).cumsum())
+        .cumcount()
+        .where(df['renko_brick_diff'] == 0)
+        .fillna(0)
+    )
+    df['renko_static_candles'].fillna(0)
+    
+    df['renko_brick_high'] = df_renko_ohlc['renko_brick_high']
+    df['renko_brick_low'] = df_renko_ohlc['renko_brick_low']
+    df.drop(["Date"],inplace=True,axis=1)
+    df.to_csv('renko.csv')
+
+def genAnalyticsForDay(df_daily,analyticsGenerators): 
+    if df_daily.empty or len(df_daily) < 2:
+        return df_daily
+    for analGen in analyticsGenerators:
+        analGen(df_daily)
+    
+    return df_daily
+
+def generateAnalytics(analyticsGenerators,df):
+    df.index = pd.to_datetime(df.index, utc=True)
+    # Convert timezone-aware datetime index from UTC to IST
+    df.index = df.index.tz_convert(ist)
+    
+    # Assuming the input dataframe is 'df' with a datetime index
+    # 1. Split the dataframe into separate dataframes for each day
+    daily_dataframes = [group for _, group in df.groupby(pd.Grouper(freq='D'))]
+
+    # 2. Run the 'genAnalyticsForDay' function on each day's dataframe
+    daily_analytics = [genAnalyticsForDay(day_df, analyticsGenerators) for day_df in daily_dataframes]
+
+    # 3. Combine the resulting pandas series from the analytics function
+    combined_analytics = pd.concat(daily_analytics)
+
+    # 4. Merge the combined series with the original dataframe 'df'
+    df_with_analytics = df.merge(combined_analytics, left_index=True, right_index=True)
+    return combined_analytics
+
 ########### END OF POPULATE FUNCTIONS ###########
 
 ## SIGNAL GENERATION functions
@@ -765,7 +1059,7 @@ def exitTrendFollowing(type, signal, isLastRow, row, df,
         ((not np.isnan(signal)) and (getTickerTrend(row.symbol) == signal)):
         return signal
     #If We get here then ticker is trending, and trend signal no longer matches the trend
-    #Trend may not continue, need to find a good spot to exit 
+    #Trend may not continue, need to finda  good spot to exit 
     currTrend = getTickerTrend(row.symbol)
     s = signal
     i = df.index.get_loc(row.name) # get index of current row
@@ -879,27 +1173,174 @@ def followTrendReversal (type, signal, isLastRow, row, df,
         else:
             logging.debug(f"{row.symbol}:{row.i}:{row.name}  => FOLLOW TREND-REVERSAL => Extreme ADX/OBV/MA20 OVERRIDE signal ({signal})  s={s} / last_signal ({last_signal}) TO FOLLOW TREND.ADX:{row['ADX']} > {adxThresh} AND OBV:{obvOsc} > {obvOscThresh} AND MA20:{row['SLOPE-OSC']} > {maSlopeThresh}")
     return s 
-def justFollowMA(type, signal, isLastRow, row, df, 
+def justFollowADX(type, signal, isLastRow, row, df, 
                         last_signal=float('nan')):
     s = signal
     if adxIsHigh(row):
+        if adxIsBullish(row):
+            s = 1
+        elif adxIsBearish(row):
+            s = -1
+    elif tickerIsTrending(row.symbol) and adxIsLow(row):
+        s = 0
+    setTickerTrend(row.symbol, s) if signalChanged(s,signal) else None
+
+    print(f"{row.symbol}:{row.i}:{row.name}  => FOLLOW ADX => adxi is low:{adxIsLow(row)} Trend?: {tickerIsTrending(row.symbol)} ADX:{row['ADX']} > {adxThresh} yellowMult:{adxThreshYellowMultiplier} exitMult:{cfgAdxThreshExitMultiplier} s={s} / last_signal ({last_signal})")
+    return s
+def justFollowMA(type, signal, isLastRow, row, df, 
+                        last_signal=float('nan')):
+    s = signal
+    if maSteepSlopeUp(row):
+        s = 1
+    elif maSteepSlopeDn(row):
+        s = -1
+    #    else: No need to exit if ADX is High, and trend has not yet fully reversed; no new entry, but no exit either in hte mid zone
+    setTickerTrend(row.symbol, s) if signalChanged(s,signal) else None
+    return s
+def followMAandADX(type, signal, isLastRow, row, df,
+                        last_signal=float('nan')):
+    s = signal
+    if adxIsHigh(row):
+        adxStatus = 'ADX-HIGH'
         if maSteepSlopeUp(row):
             s = 1
         elif maSteepSlopeDn(row):
             s = -1
-    setTickerTrend(row.symbol, s)
+    elif tickerIsTrending(row.symbol) and maDivergesFromTrend(row):
+        s = 0
+    setTickerTrend(row.symbol, s) if signalChanged(s,signal) else None
+    logSignal('TRND-SLP-ADX',["adxData","maSlpData"],signal,s,row,type,isLastRow)
+
     return s
-def justFollowFastMA(type, signal, isLastRow, row, df, 
+def followSuperTrend(type, signal, isLastRow, row, df, 
+                        last_signal=float('nan')):
+    #return row['SuperTrendDirection']
+    s = signal
+    if row['SuperTrend'] > 0:
+        s = 1 if row['ma_superTrend_pct_change'] > 50 else 0
+    elif row['SuperTrend'] < 0:
+        s = -1 if row['ma_superTrend_pct_change'] < -50 else 0
+    setTickerTrend(row.symbol, s) if signalChanged(s,signal) else None
+    if isLastRow:
+        logging.info(f"{row.symbol}:{row.i} => FOLLOW SUPERTREND => {s} ")
+
+    return s
+def followObvAdxMA(type, signal, isLastRow, row, df, 
                         last_signal=float('nan')):
     s = signal
-    if adxIsHigh(row):
-        if row['MA-FAST-SLP'] > maSlopeThresh:
-            s = 1
-        elif row['MA-FAST-SLP'] < -maSlopeThresh:
-            s = -1
-    #    else: No need to exit if ADX is High, and trend has not yet fully reversed; no new entry, but no exit either in hte mid zone
-    setTickerTrend(row.symbol, s)
+    obvBreach = projectedValueBreachedThreshold(row['OBV-OSC'],obvOscThresh,
+                row['OBV-OSC-PCT-CHNG'], 
+                obvOscThreshYellowMultiplier, "H_OR_L")
+
+    if obvBreach == 'L' and adxIsHigh(row) and maSteepSlopeDn(row):
+        s = -1
+    elif obvBreach == 'H' and adxIsHigh(row) and maSteepSlopeUp(row):
+        s = 1
+        
+    setTickerTrend(row.symbol, s) if signalChanged(s,signal) else None
+    logSignal('TRND-OBV-ADX-SLP',["obvData","adxData","maSlpData"],signal,s,row,type,isLastRow,logWithNoSignalChange=True)
     return s
+def followObvMA(type, signal, isLastRow, row, df, 
+                        last_signal=float('nan')):
+    s = signal
+    if obvIsBearish(row) and maSteepSlopeDn(row):
+        s = -1
+    elif obvIsBullish(row) and maSteepSlopeUp(row):
+        s = 1
+        
+    setTickerTrend(row.symbol, s) if signalChanged(s,signal) else None
+    logSignal('TRND-OBV-SLP',["obvData","maSlpData"],signal,s,row,type,isLastRow,logWithNoSignalChange=True)
+    return s
+
+def exitOBV(type, signal, isLastRow, row, df, 
+                        last_signal=float('nan')):
+    if (not tickerHasPosition(row.symbol)):
+        return signal
+    s = signal
+    pos = getTickerPosition(row.symbol)
+    
+    if tickerHasLongPosition(row.symbol) and obvNoLongerHigh(row):
+        log = "EXIT-OBV-NO-LONGER-HIGH"
+        s = 0  
+    elif tickerHasShortPosition(row.symbol) and obvNoLongerLow(row):
+        log = "EXIT-OBV-NO-LONGER-LOW"
+        s = 0  
+    if signalChanged(s,signal):
+        setTickerTrend(row.symbol, s) if tickerIsTrending(row.symbol) else None
+        logSignal(log,["obvData","adxData","maSlpData"],signal,s,row,type,isLastRow)
+    return s 
+
+def exitTargetOrSL(type, signal, isLastRow, row, df, 
+                        last_signal=float('nan')):
+
+    if (not tickerHasPosition(row.symbol) and np.isnan(signal)) :
+        # return if ticker has no position
+        # or if stop loss not configured
+        # or if current signal is 1 or -1 or 0
+        return signal
+    
+    s = signal
+    entryPrice = getTickerEntryPrice(row.symbol)
+
+    if np.isnan(entryPrice):
+        return signal # likely got position just now, so entry price not yet set
+    # We proceed only if tickerHasPosition, and stop loss is configured
+    # and current signal is nan 
+    
+    if row.renko_brick_diff!=0:
+        return signal # We do not exit if renko brick is not 0
+    
+    close = row['Adj Close']
+    high = row['High']
+    low = row['Low']
+    (longTarget,longSL,shortTarget,shortSL) = getTickerRenkoTargetPrices(row)
+    #getTickerTargetPrices(row.symbol)
+    trade_price = float('nan')
+    if tickerHasLongPosition(row.symbol):
+        target = longTarget
+        sl = longSL
+        if high >= longTarget: 
+            trade_price = longTarget
+            s=0 if cfgIsBackTest else s#Targets are only partial exits in live
+        elif low <= longSL:
+            trade_price = longSL
+            s=0  
+    else:
+        target = shortTarget
+        sl = shortSL
+        if low <= shortTarget: 
+            trade_price = shortTarget
+            s = 0 if cfgIsBackTest else s #Targets are only partial exits in live
+        elif high >= shortSL:
+            trade_price = shortSL
+            s = 0
+            
+    if signalChanged(s,signal):
+        setTickerTrend(row.symbol, s) if tickerIsTrending(row.symbol) else None
+        logSignal('TARGET-HIT',["obvData","adxData","maSlpData"],signal,s,row,type,isLastRow,
+                  f'(E:{entryPrice}, L:{row.Low}, H:{row.High} sl:{sl} target:{target} hasLongPos:{tickerHasLongPosition(row.symbol)} hasShortPos:{tickerHasShortPosition(row.symbol)}) ')
+    return (s,trade_price)
+
+def followOBVSlope(type, signal, isLastRow, row, df, 
+                        last_signal=float('nan')):
+    s = signal
+    breached = valueOrProjectedValueBreachedThreshold(row['OBV-OSC'],obvOscThresh,
+                row['OBV-OSC-PCT-CHNG'], 
+                obvOscThreshYellowMultiplier, "H_OR_L")
+
+    if row['OBV-OSC-PCT-CHNG'] > -0.02 and row['OBV-OSC'] >= obvOscThresh:
+        s = 1
+    elif row['OBV-OSC-PCT-CHNG'] < 0.02 and row['OBV-OSC'] <= -obvOscThresh:
+        s = -1
+    else:
+        s = 0
+
+    setTickerTrend(row.symbol, s) if signalChanged(s,signal) else None
+    if isLastRow:
+        logging.info(f"{row.symbol}:{row.i} => FOLLOW SUPERTREND => {s} ")
+
+    return s
+
 def fastSlowMACX(type, signal, isLastRow, row, df, 
                         last_signal=float('nan')):
     s = signal
@@ -914,7 +1355,45 @@ def fastSlowMACX(type, signal, isLastRow, row, df,
         s = 0
     setTickerTrend(row.symbol, s)
     return s
-
+def followRenkoWithOBV(type, signal, isLastRow, row, df, 
+                        last_signal=float('nan')):
+    s = signal
+    if row['renko_uptrend'] == True:
+        # we just entered a trend may bounce around entry brick lines; 
+        if not (row['renko_brick_num'] == 1 and getTickerTrend(row.symbol) == 1): 
+            s = 1 if (type == 1 and row['renko_brick_num'] >= 2) else 0
+    else:
+        if not (row['renko_brick_num'] == -1 and getTickerTrend(row.symbol) == -1):
+            s = -1 if (type == 1 and row['renko_brick_num'] <= -2)else 0
+    if signalChanged(s,signal):
+        setTickerTrend(row.symbol, s)
+    logSignal('FOLLW-RENKO',['RenkoData'],signal,s,row,type,isLastRow,'',logWithNoSignalChange=True)
+    return s
+def followRenkoWithTargetedEntry(type, signal, isLastRow, row, df, 
+                        last_signal=float('nan')):
+    s = signal
+    trade_price = float('nan')
+    if row['renko_uptrend'] == True:
+        # we just entered a trend may bounce around entry brick lines; 
+        if not (row['renko_brick_num'] == 1 and getTickerTrend(row.symbol) == 1): 
+            if (type == 1 and row['renko_brick_num'] >= 2):
+                if row.Low <= row.lower_band:
+                    s = 1
+                    trade_price = row.lower_band
+            else:
+                s = 0
+    else:
+        if not (row['renko_brick_num'] == -1 and getTickerTrend(row.symbol) == -1):
+            if (type == 1 and row['renko_brick_num'] <= -2):
+                if row.High >= row.upper_band:
+                    s = -1
+                    trade_price = row.upper_band
+            else:
+                s = 0
+    if signalChanged(s,signal):
+        setTickerTrend(row.symbol, s)
+    logSignal('FOLLW-RENKO',['RenkoData'],signal,s,row,type,isLastRow,'',logWithNoSignalChange=True)
+    return (s,trade_price)
 def randomSignalGenerator(type, signal, isLastRow, row, df, 
                         last_signal=float('nan')):
     if random.randint(0,100) > 90:
@@ -923,13 +1402,13 @@ def randomSignalGenerator(type, signal, isLastRow, row, df,
     else:
         s = signal
     return s
-def exitStopLoss(type, signal, isLastRow, row, df):
+def exitTarget(type, signal, isLastRow, row, df):
     if not (tickerHasPosition(row.symbol) and \
-            cfgStopLoss and np.isnan(signal)):
+            cfgTarget):
         # return if ticker has no position
         # or if stop loss not configured
         # or if current signal is 1 or -1 or 0
-        return
+        return signal
     
     s = signal
     entryPrice = getTickerEntryPrice(row.symbol)
@@ -937,26 +1416,114 @@ def exitStopLoss(type, signal, isLastRow, row, df):
     # and current signal is nan 
     
     if tickerHasLongPosition(row.symbol):
-        if ((1-cfgStopLoss)*entryPrice) <= row.Low:
+        if row.High >= ((1+cfgTarget)*entryPrice):
             s = 0
     else:
-        if ((1+cfgStopLoss)*entryPrice) >= row.High:
+        if row.Low <= ((1-cfgTarget)*entryPrice):
             s = 0
     if signalChanged(s,signal):
         #print("entering trend following", row.i)
         setTickerTrend(row.symbol, s) if tickerIsTrending(row.symbol) else None
-        logSignal('STOP-LOSS',["obvData","adxData","maSlpData"],signal,s,row,type,isLastRow,
-                  f'(E:{entryPrice}, L:{row.Low}, H:{row.High} sl:{cfgStopLoss}) ',
-                  logWithNoSignalChange=True)
+        # logSignal('TARGET-HIT',["obvData","adxData","maSlpData"],signal,s,row,type,isLastRow,
+        #           f'(E:{entryPrice}, L:{row.Low}, H:{row.High} sl:{cfgStopLoss}) ',
+        #           logWithNoSignalChange=True)
+    return s 
+def exitStopLoss(type, signal, isLastRow, row, df):
+    if not (tickerHasPosition(row.symbol) and \
+            cfgStopLoss):
+        # return if ticker has no position
+        # or if stop loss not configured
+        # or if current signal is 1 or -1 or 0
+        return signal
+    
+    s = signal
+    entryPrice = getTickerEntryPrice(row.symbol)
+    # We proceed only if tickerHasPosition, and stop loss is configured
+    # and current signal is nan 
+    renkoBrickSize = row['renko_brick_high'] - row['renko_brick_low']
+    if tickerHasLongPosition(row.symbol):
+        sl = ((1-cfgStopLoss)*entryPrice)
+        sl = row['renko_brick_low']-renkoBrickSize
+        if row.Low <= sl:
+            s = 0
+    else:
+        sl = ((1+cfgStopLoss)*entryPrice)
+        sl = row['renko_brick_high']+(renkoBrickSize*3)
+        if row.High >= sl:
+            s = 0
+    if signalChanged(s,signal):
+        #print("entering trend following", row.i)
+        setTickerTrend(row.symbol, s) if tickerIsTrending(row.symbol) else None
+        # logSignal('STOP-LOSS',["obvData","adxData","maSlpData"],signal,s,row,type,isLastRow,
+        #           f'(E:{entryPrice}, L:{row.Low}, H:{row.High} sl:{cfgStopLoss}) ',
+        #           logWithNoSignalChange=True)
     return s 
 
     return s
+def exitCandleStickReversal(type, signal, isLastRow, row, df):
+    return row['candlestick_signal']
+    print(f"{row.name} hanngingMan:{row['HANGINGMAN']}")
+    s=signal
+    if row['HANGINGMAN'] == 1:
+        s = 0
+        exitType='EXIT-HANGING-MAN'
+    if signalChanged(s,signal):
+        setTickerTrend(row.symbol, s) if tickerIsTrending(row.symbol) else None
+        logSignal(exitType,["obvData","adxData","maSlpData"],signal,s,row,type,isLastRow)
+    return s
+    
+enoughForDay = []
+def exitEnoughForTheDay(type, signal, isLastRow, row, df, last_signal=float('nan')):
+    global enoughForDay
+    s = signal = row.signal
+    if signal == 0 :
+        return row.signal
+    date = row.name.date()
+    if date in enoughForDay:
+        return 0
+    
+    todayDF = df.loc[df.index.date == date]
+    todayDF = todayDF.loc[todayDF.index <= row.name]
+    perf.prep_dataframe(todayDF, close_at_end=False)
+    trades = perf.get_trades(todayDF)
+    if (len(trades) > 0):
+        for index,trade in trades.iterrows():
+            ret = trade["sum_return"]
+            if enoughReturnForDay(ret):
+                break
+        
+        if enoughReturnForDay(ret):
+            s = 0
+        else:
+            #check if we are in a trade
+            pos = trades.iloc[-1].loc['position']
+            if trades['position'].iloc[-1] != 0:
+                trade_entry = trades.iloc[-1].loc['Open']
+                curr_price = todayDF.iloc[-1].loc['Adj Close']
+                trade_ret = pos*(curr_price - trade_entry)/trade_entry
+                ret = ret + trade_ret
+                if enoughReturnForDay(ret):
+                        s = 0
+    else:
+        ret = 0
+    
+    if s == 0:
+        enoughForDay.append(date)
+        print(f"enough for {date}")
+          
+    if signalChanged(s,signal):
+        setTickerTrend(row.symbol, s) if tickerIsTrending(row.symbol) else None
+    logSignal('EXIT-ENOUGH-FOR-TODAY',["obvData","adxData","maSlpData"],signal,s,row,type,isLastRow,
+                f'(ret:{ret}) > {cfgEnoughReturnForTheDay}')
+    trades.to_csv('trades.csv')
+    return s
+
 ######### END OF SIGNAL GENERATION FUNCTIONS #########
 def getOverrideSignal(row,ovSignalGenerators, df):
     
     s = row['signal'] #the signal that non-override sig generators generated
     #Could be nan, diff rom getLastSignal, which returns last valid, non-nan,
-    #signal in df
+    #signal in dfs
 
     #Return nan if its not within trading hours
     if(row.name >= tradingStartTime) & \
@@ -986,7 +1553,7 @@ def getOverrideSignal(row,ovSignalGenerators, df):
     return s    
     
 def getSignal(row,signalGenerators, df):
-    s = float("nan")
+    s = trade_price = float("nan")
     isLastRow = row.name == df.index[-1]
     row_time = row.name.time()
 
@@ -1000,7 +1567,7 @@ def getSignal(row,signalGenerators, df):
                 # No new psitions will be entered
                 type = 0 
             else:
-                return 0 # Outside of trading hours EXIT ALL POSITIONS
+                return (0,trade_price) # Outside of trading hours EXIT ALL POSITIONS
 
             for sigGen in signalGenerators:
                 # these functions can get the signal for *THIS* row, based on the
@@ -1009,15 +1576,16 @@ def getSignal(row,signalGenerators, df):
                 # signal s from previous signal generations is passed in as an 
                 # argument
 
-                s = sigGen(type,s, isLastRow, row, df)
+                result = sigGen(type,s, isLastRow, row, df)
+                (s,trade_price) = result if isinstance(result, tuple) else (result,float("nan"))
             setTickerPosition(row.symbol, s, row['Adj Close'])
     else:
         #reset at start of day
         initTickerStatus(row.symbol)
-        return 0 # Exit all positions outside of trading hours
+        return (0,trade_price) # Exit all positions outside of trading hours
     # if isLastRow:
     #     logTickerStatus(row.symbol)
-    return s
+    return (s,trade_price)
 ## MAIN APPLY STRATEGY FUNCTION
 def applyIntraDayStrategy(df,analyticsGenerators=[populateBB], signalGenerators=[getSig_BB_CX],
                         overrideSignalGenerators=[],tradeStartTime=None, \
@@ -1033,21 +1601,30 @@ def applyIntraDayStrategy(df,analyticsGenerators=[populateBB], signalGenerators=
         tradingStartTime = datetime.datetime(2000,1,1,10,0,0) #Long ago :-)
         tradingStartTime = ist.localize(tradingStartTime)
     
-    
     df['signal'] = float("nan")
     
-    for analGen in analyticsGenerators:
-        analGen(df)
-    
+    dfWithAnalytics = generateAnalytics(analyticsGenerators,df)
     initTickerStatus(df['symbol'][0])
     
+    # Select the columns that are present in dfWithAnalytics but not in df
+    new_cols = [col for col in dfWithAnalytics.columns if col not in df.columns]
+
+    # Copy the new columns from dfWithAnalytics to df   
+    for col in new_cols:
+        df[col] = dfWithAnalytics[col]
+
+    # df['SuperTrendDirection'] = dfWithAnalytics['SuperTrendDirection']
+    # df['ma_superTrend_pct_change'] = dfWithAnalytics['ma_superTrend_pct_change']
     # apply the condition function to each row of the DataFrame
     # these functions can get the signal for *THIS* row, based on the
     # what signal Generators previous to this have done
     # they cannot get or act on signals generated in previous rows
-    df['signal'] = df.apply(getSignal, 
+    #(df['signal'],df['trade_price']) 
+    x = df.apply(getSignal, 
         args=(signalGenerators, df), axis=1)
-    
+    #print(x)
+    (df['signal'],df['trade_price']) = zip(*x)
+    df['Open'] = np.where(df['trade_price'].shift(1).notnull(), df['trade_price'].shift(1), df['Open'])
     #Override signals if any:
     #Override signal generators are similar to other signal Generators
     #The only difference is that they are run on a second traversal of the dataframe

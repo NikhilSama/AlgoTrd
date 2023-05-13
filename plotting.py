@@ -14,6 +14,7 @@ import pytz
 import scipy.stats as stats
 import tickerCfg
 import utils
+import matplotlib.dates as mdates
 
 # set timezone to IST
 ist = pytz.timezone('Asia/Kolkata')
@@ -29,8 +30,26 @@ def applyTickerSpecificCfg(ticker):
     for key, value in tCfg.items():
         globals()[key] = value
         #print(f"setting {key} to {value}")
+def plot_trades (df):
+    fig, (ax1) = \
+        plt.subplots(1, 1, figsize=(8, 8), sharex=True, 
+                    gridspec_kw={'height_ratios': [1]})
+    ax1.plot(df['trade_num'], df['sum_return'], color='grey', linewidth=2)
+    ax1.plot(df['trade_num'], df['prev_peak_sum_return'], color='green', linewidth=2)
+    ax1.plot(df['trade_num'], df['drawdown_from_prev_peak_sum'], color='red', linewidth=2)
 
-def plot_trades(df):
+
+    # Set the x-axis label and title
+    ax1.set_xlabel('Date')
+    ax1.set_title('Trade Returns')
+
+    # Add the month labels
+    for d in pd.date_range(df.index[0], df.index[-1], freq='MS'):
+        ax1.text(mdates.date2num(d), ax1.get_ylim()[0], d.strftime('%Y-%m'), ha='center', va='top', fontsize=8)
+
+    plt.show()
+
+def plot_trades_histogram(df):
     # create 20 bins based on the range of return values
     bins = np.linspace(df['return'].min(), df['return'].max(), 20)
 
@@ -60,7 +79,8 @@ def plot_stock_and_option(df):
     ax2.plot(df['i'], -df['pct_change_put'], color='grey', linewidth=2)
     ax3.plot(df['i'], df['pct_change_call'], color='grey', linewidth=2)
     plt.show()
-    
+
+
 def plot_backtest(df,trades=None):
     applyTickerSpecificCfg(df['symbol'][0])
     # Plot trades 
@@ -78,7 +98,7 @@ def plot_backtest(df,trades=None):
         plt.subplots(9, 1, figsize=(8, 8), sharex=True, 
                      gridspec_kw={'height_ratios': [4, 1, 1, 1, 1, 1,1,1,1]})
     plt.subplots_adjust(left=0.1, bottom=0.1)
-    df['SLOPE-OSC'].fillna(0, inplace=True)
+    # df['SLOPE-OSC'].fillna(0, inplace=True)
     df['ma20_pct_change_ma'].fillna(0, inplace=True)
     df['ADX-PCT-CHNG'].fillna(0, inplace=True)
     
@@ -89,13 +109,14 @@ def plot_backtest(df,trades=None):
     df['OBV-OSC-PCT-CHNG'].fillna(0, inplace=True)
 
     # plot the first series in the first subplot
-    #ax1.plot(df['i'], df['ma_superTrend'], color='green', linewidth=2)
-    #ax1.plot(df['i'], df['ma20'], color='gold', linewidth=2)
-    ax1.plot(df['i'], df['Adj Close'], color='red', linewidth=2)
-    ax1.plot(df['i'], df['lower_band'], color='grey', linewidth=2)
-    ax1.plot(df['i'], df['upper_band'], color='grey', linewidth=2)
-    ax1.plot(df['i'], df['ma20'], color='orange', linewidth=1)
-    ax1.plot(df['i'], df['MA-FAST'], color='green', linewidth=1)
+    #ax1.plot(df['i'], df['ma_superTrend'], color='green', linewidth=3)
+    ax1.plot(df['i'], df['VWAP'], color='gold', linewidth=2)
+    ax1.plot(df['i'], df['Adj Close'], color='black', linewidth=2)
+    ax1.plot(df['i'], df['VWAP_upper'], color='red', linewidth=1)
+    ax1.plot(df['i'], df['VWAP_lower'], color='green', linewidth=1)
+    # ax1.plot(df['i'], df['SuperTrend'], color='green', linewidth=3)
+    # ax1.plot(df['i'], df['ma20'], color='orange', linewidth=1)
+    # ax1.plot(df['i'], df['MA-FAST'], color='green', linewidth=1)
     
     # plot the second series in the second subplot
     #ax2.plot(df['i'], df['ma_superTrend_pct_change'], color='red', linewidth=2)
@@ -110,8 +131,8 @@ def plot_backtest(df,trades=None):
     ax3.set_title('Position↓', loc='right')
     df['ADX'] .fillna(0, inplace=True)
     ax4.plot(df['i'], df['ADX'], color='black', linewidth=2)
-    # ax4.plot(df['i'], df['+di'], color='green', linewidth=2)
-    # ax4.plot(df['i'], df['-di'], color='red', linewidth=2)
+    # ax4.plot(df['i'], df['+di'], color='green', linewidth=1)
+    # ax4.plot(df['i'], df['-di'], color='red', linewidth=1)
     # draw a threshold line at y=0.5
     ax4.axhline(y=adxThresh, color='red', linestyle='--')
     ax4.axhline(y=-adxThresh, color='red', linestyle='--')
@@ -124,8 +145,8 @@ def plot_backtest(df,trades=None):
     # ax5.axhline(y=adxSlopeThresh, color='red', linestyle='--')
     # ax5.axhline(y=-adxSlopeThresh, color='red', linestyle='--')
 
-    ax6.plot(df['i'], df['SLOPE-OSC'], color='green', linewidth=2)
-    ax6.set_title('SLOPE-OSC↓', loc='right')
+    ax6.plot(df['i'], df['ma20_pct_change'], color='green', linewidth=2)
+    ax6.set_title('MA-SLOPE↓', loc='right')
     ax6.axhline(y=maSlopeThresh, color='red', linestyle='--')
     ax6.axhline(y=-maSlopeThresh, color='red', linestyle='--')
 
@@ -135,8 +156,8 @@ def plot_backtest(df,trades=None):
     # ax7.axhline(y=-maSlopeSlopeThresh, color='red', linestyle='--')
 
     if 'OBV-OSC' in df.columns and df['OBV-OSC'][-1] != 0:
-        ax8.plot(df['i'], df['OBV-OSC'], color='green', linewidth=2)
-        ax8.set_title('OBV OSC↓', loc='right')
+        ax8.plot(df['i'], df['OBV'], color='green', linewidth=2)
+        ax8.set_title('OBV↓', loc='right')
         ax8.axhline(y=obvOscThresh, color='red', linestyle='--')
         ax8.axhline(y=-obvOscThresh, color='red', linestyle='--')
         ax8.axhline(y=obvOscThresh*obvOscThreshYellowMultiplier, color='blue', linestyle='--')
@@ -148,10 +169,10 @@ def plot_backtest(df,trades=None):
         ax8.axhline(y=-cfgFastMASlpThresh, color='red', linestyle='--')
 
 
-    ax9.plot(df['i'], df['OBV-OSC-PCT-CHNG'], color='green', linewidth=2)
-    ax9.set_title('OBV-OSC-PCT-CHNG OSC↓', loc='right')
-    # ax9.axhline(y=obvOscSlopeThresh, color='red', linestyle='--')
-    # ax9.axhline(y=-obvOscSlopeThresh, color='red', linestyle='--')
+    ax9.plot(df['i'], df['OBV-PCT-CHNG'], color='green', linewidth=2)
+    ax9.set_title('OBV-PCT-CHNG ↓', loc='right')
+    ax9.axhline(y=cfgObvSlopeThresh, color='red', linestyle='--')
+    ax9.axhline(y=-cfgObvSlopeThresh, color='red', linestyle='--')
     
     if len(df) > 500:
         plt.show()

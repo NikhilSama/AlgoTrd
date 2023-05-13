@@ -206,11 +206,11 @@ def argGenerator():
     cfgMiniBandWidthMults = [0.5]
     cfgSuperBandWidthMults = [1]
     fast_ma_lens = [5] 
-    adx_lens = [5,10,15,20,25,30,35] # 25 is the best, 20 is a far second.  Try 30 ?
-    adx_thresholds = [10,15,20,25,30,40,80] # 30 firmly the best(may change for longer adx len)
-    adx_thresh_yellow_multipliers = [0.6,0.9]
+    adx_lens = [5] # 25 is the best, 20 is a far second.  Try 30 ?
+    adx_thresholds = [10] # 30 firmly the best(may change for longer adx len)
+    adx_thresh_yellow_multipliers = [0.6]
     num_candles_for_slope_proj = [2,5,7,9] # 2 or 5 works 
-    atr_lens = [7,14,21]
+    atr_lens = [7]
     cfgTickers = ['NIFTYWEEKLYOPTION']
     
     param_iterator = itertools.product(ma_lens, band_widths, fast_ma_lens, adx_lens, adx_thresholds, adx_thresh_yellow_multipliers, num_candles_for_slope_proj,

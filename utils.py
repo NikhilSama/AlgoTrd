@@ -32,6 +32,8 @@ def fileNameFromArgs(prefix=''):
     return fname
 def fileExists(fname):
     return os.path.isfile(fname)
+def tickerIsFutOrOption(t):
+    return tickerIsFuture(t) or isOption(t)
 def tickerIsFuture(t):
     return re.match(r'^[a-zA-Z]+\d+[a-zA-Z]{3}FUT$', t)
 def getUnderlyingTickerForFuture(t):
@@ -79,7 +81,7 @@ def getTickerCfg(ticker):
         if futTicker is not None:
             ticker = futTicker
     if ticker in tickerCfg.tickerCfg:
-        print(f"Applying CFG for {ticker}")
+        #print(f"Applying CFG for {ticker}")
         return tickerCfg.tickerCfg[ticker]
     else:
         print(f"No CFG for {ticker}. Reverting to default CFG")

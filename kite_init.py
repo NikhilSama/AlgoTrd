@@ -19,6 +19,7 @@ import pandas as pd
 import numpy as np
 import utils
 import math 
+# import time_loop as tl
 
 #cfg has all the config parameters make them all globals here
 import cfg
@@ -181,22 +182,65 @@ def get_ltp(kite,t,exchange):
         return 0
 
     return ltp
-def getOrderVariety(q,lot_size) : 
-    v = VARIETY_REGULAR if q <= (lot_size*cfgMaxLotsForTrade) else VARIETY_ICEBERG
-    iceberg_legs = math.ceil(q/(lot_size*cfgMaxLotsForTrade)) if v == VARIETY_ICEBERG else 0
-    iceberg_q = round(q/iceberg_legs) if v == VARIETY_ICEBERG else 0
-    return (v,iceberg_legs,iceberg_q)
+def getOrderVariety(kite,q,lot_size) : 
+    if q > (lot_size*cfgMaxLotsForTrade):
+        v = kite.VARIETY_ICEBERG
+        iceberg_legs = math.ceil(q/(lot_size*cfgMaxLotsForTrade))
+        iceberg_q = q/iceberg_legs
+        iceberg_q = (lot_size*max(round(iceberg_q/lot_size),1)) 
+        q = iceberg_q * iceberg_legs 
+    else:
+        v = kite.VARIETY_REGULAR
+        iceberg_legs = 0
+        iceberg_q = 0
+    return (v,iceberg_legs,iceberg_q, q)
 
+def convertSLTriggerToPrice(sltrigger,slTxType,tick_size):
+    slTriggerMult = 1.01 if slTxType == 'BUY' else 0.99
+    return round(sltrigger*slTriggerMult/tick_size)*tick_size
+def convertSLTriggerToTrigger(sltrigger,tick_size):
+    return round(sltrigger/tick_size)*tick_size
+
+def exec_sl(kite,t,exchange,slTxType,sltrigger, 
+            lot_size=1,tick_size=0.05, slqt = 0, slvariety = None,sliceberg_legs=None,
+            sliceberg_quantity=None, ltp=0, betsize=bet_size):
+    slqt = getQ(lot_size,ltp,betsize, 0) if slqt == 0 else slqt
+
+    if slvariety == None:
+        (slvariety,sliceberg_legs,sliceberg_quantity,slqt) = \
+            getOrderVariety(kite,slqt,lot_size)
+    slprice = convertSLTriggerToPrice(sltrigger,slTxType,tick_size) 
+    sltrigger = convertSLTriggerToTrigger(sltrigger,tick_size)
+    exch = getExchange(kite,exchange)
+
+    try:
+        # logging.info(f"Placing SL order for {t} {slTxType}  trigger:{sltrigger} bet:{betsize} qt:{slqt} legs:{sliceberg_legs} iceberg_q:{sliceberg_quantity}")
+        sl_order_id = kite.place_order(variety=slvariety,tradingsymbol=t,
+                                    exchange=exch,
+                                    transaction_type=getTxType(kite,slTxType),
+                                    quantity=slqt,
+                                    order_type=kite.ORDER_TYPE_SL,
+                                    product=kite.PRODUCT_MIS,
+                                    iceberg_legs=sliceberg_legs, iceberg_quantity=sliceberg_quantity,
+                                    validity=kite.VALIDITY_TTL, validity_ttl = 1,
+                                    trigger_price=sltrigger,
+                                    price = slprice, tag="StopLoss")
+    except Exception as e:
+        print(f'{exchange} {slTxType} Failed for {t}')
+        print(e.args[0])
+        print(f"SL exec {t} {exchange} {slTxType} Lot:{lot_size} tick:{tick_size} q:{slqt} ltp:{ltp}  betsize:{betsize} {slprice} ")
+        return -1
+
+    return sl_order_id
 def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05
-         
-         
-         
-         ,q=0,ltp=0,sl=0,qToExit=0,betsize=bet_size,p=0,tag=None):
-    # print(f"exec {t} {exchange} {tx_type} Lot:{lot_size} tick:{tick_size} q:{q} ltp:{ltp} {sl} toExit:{qToExit} betsize:{betsize} {p} {tag}")
+         ,q=0,ltp=0,sl=0,qToExit=0,betsize=bet_size,p=0,tag=None, 
+         order_type=None,sltrigger=0,slTxType=None,slqt=None):
+    order_type = kite.ORDER_TYPE_LIMIT if order_type is None else order_type
+    #print(f"exec {t} {exchange} {tx_type} Lot:{lot_size} tick:{tick_size} q:{q} ltp:{ltp} {sl} toExit:{qToExit} betsize:{betsize} p:{p} tag:{tag}")
     if is_not_tradable(t):
         logging.info(f"{t} is not a tradable instrument.  {exchange} {tx_type} not executed")
         return
-    if (ltp ==0):
+    if (ltp == 0):
         #Get ltp if not provided
         ltp = kite.ltp([f"{exchange}:{t}"])
         if f"{exchange}:{t}" in ltp.keys():
@@ -204,15 +248,21 @@ def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05
         else:
             logging.warning(f"No ltp found for {exchange}:{t}. {ltp} Skipping")
             return
+    # if (lot_size==1) and (exchange=="NFO") and utils.isOption(t):
+    #     #Option order and we were not provided lot size info 
+    #     #get the lot size from db
+    #     db = DBBasic() 
+    #     optionTicker,lot_size,tick_size = db.get_option_ticker(t, None, None,None) #if t is an option other arguments are not looked at
+
     qToExit = abs(qToExit) #Make sure qToExit is positive, for short positions it may be negative
     q = getQ(lot_size,ltp,betsize, qToExit) if q == 0 else q
 
-    (variety,iceberg_legs,iceberg_quantity) = getOrderVariety(q,lot_size)
+    (variety,iceberg_legs,iceberg_quantity,q) = getOrderVariety(kite,q,lot_size)
     
     delta = getDelta(exchange,tx_type)
     
     p = getP(ltp,tick_size,delta) if p == 0 else getP(p,tick_size,1)
-
+    #print(f"exec {t} {exchange} {tx_type} legs:{iceberg_legs} qt: {iceberg_quantity} Lot:{lot_size} tick:{tick_size} q:{q} ltp:{ltp} {sl} toExit:{qToExit} betsize:{betsize} {p} {tag}")
     exch = getExchange(kite,exchange)
 
     kite_tx_type = getTxType(kite,tx_type)
@@ -224,7 +274,7 @@ def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05
 
     #1 Min TTL LIMIT ORDER priced really as a market order (10% above market)
     try:
-        order_id = kite.place_order(variety=kite.variety,tradingsymbol=t,
+        order_id = kite.place_order(variety=variety,tradingsymbol=t,
                      exchange=exch,
                      transaction_type=kite_tx_type,
                      quantity=q,
@@ -236,32 +286,38 @@ def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05
         #SL to accompany 
         ### UNTESTED CODE -- need to get teh right tx type etc in there 
         if (sl):
-            order_id = kite.place_order(variety=kite.VARIETY_REGULAR,tradingsymbol=t,
-                                        exchange=exch,
-                                        transaction_type=kite.TRANSACTION_TYPE_SELL,
-                                        quantity=q,
-                                        order_type=kite.ORDER_TYPE_SL,
-                                        product=kite.PRODUCT_MIS,
-                                        trigger_price=getP(ltp,tick_size,0.9), 
-                                        price = getP(ltp,tick_size,.85))
+            if slTxType is None:
+                slTxType = 'BUY' if tx_type == 'SELL' else 'SELL'
+            if slqt is None:
+                slqt = q
+                slvariety = variety
+                sliceberg_legs = iceberg_legs
+                sliceberg_quantity = iceberg_quantity
+            else:
+                slvariety,sliceberg_legs,sliceberg_quantity = (None,None,None)
+            sl_order_id = exec_sl(kite,t,exchange,slTxType,sltrigger,lot_size=lot_size,
+                                  tick_size = tick_size, slqt = slqt,slvariety = slvariety,
+                                  sliceberg_legs=sliceberg_legs,sliceberg_quantity=sliceberg_quantity)
+        else:
+            sl_order_id = 0
     except Exception as e:
         print(f'{exchange} {tx_type} Failed for {t}')
         print(e.args[0])
         print(f"exec {t} {exchange} {tx_type} Lot:{lot_size} tick:{tick_size} q:{q} ltp:{ltp} {sl} toExit:{qToExit} betsize:{betsize} {p} {tag}")
         return -1
-    return order_id
+    return order_id,sl_order_id
 
-def nse_buy (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,exchange='NSE',qToExit=0,betsize=bet_size):
-    return exec(kite,t,exchange,'BUY',lot_size,tick_size,q,ltp,sl,qToExit,betsize)
+def nse_buy (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,exchange='NSE',qToExit=0,betsize=bet_size,tag=None):
+    return exec(kite,t,exchange,'BUY',lot_size,tick_size,q,ltp,sl,qToExit,betsize,tag=tag)
 
-def nse_sell (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,exchange='NSE',qToExit=0,betsize=bet_size):
-    return exec(kite,t,exchange,'SELL',lot_size,tick_size,q,ltp,sl,qToExit,betsize)
+def nse_sell (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,exchange='NSE',qToExit=0,betsize=bet_size,tag=None):
+    return exec(kite,t,exchange,'SELL',lot_size,tick_size,q,ltp,sl,qToExit,betsize,tag=tag)
 
-def nfo_buy (kite,t,lot_size=1,tick_size=0.5, q=0,ltp=0,sl=0,qToExit=0,betsize=bet_size):
-    return exec(kite,t,'NFO', 'BUY', lot_size,tick_size,q,ltp,sl,qToExit,betsize)
+def nfo_buy (kite,t,lot_size=1,tick_size=0.5, q=0,ltp=0,sl=0,qToExit=0,betsize=bet_size, tag=None):
+    return exec(kite,t,'NFO', 'BUY', lot_size,tick_size,q,ltp,sl,qToExit,betsize,tag=tag)
     
-def nfo_sell (kite, t, lot_size=1, tick_size=0.5, q=0,ltp=0,sl=0, qToExit=0,betsize=bet_size):
-    return exec(kite,t,'NFO', 'SELL', lot_size,tick_size,q,ltp,sl,qToExit,betsize)
+def nfo_sell (kite, t, lot_size=1, tick_size=0.5, q=0,ltp=0,sl=0, qToExit=0,betsize=bet_size, tag=None):
+    return exec(kite,t,'NFO', 'SELL', lot_size,tick_size,q,ltp,sl,qToExit,betsize,tag=tag)
 
 def gettFromOption (string):
     return utils.optionUnderlyingFromTicker(string)
@@ -358,6 +414,8 @@ def exit_given_position(kite,p):
     logging.info(f"EXIT: {p['tradingsymbol']}")
     exch = p['exchange']
     t = p['tradingsymbol']
+    lot_size = p['lot_size']
+    tick_size = p['tick_size']
     #ltp = p['last_price'] # SEems to be very inacurate and laggy, let exec get a updated value
     
     if exch not in ['NSE','BSE','NFO']:
@@ -368,7 +426,7 @@ def exit_given_position(kite,p):
     txType = 'BUY' if p['quantity'] < 0 else 'SELL'
     q = abs(p['quantity'])
 
-    return exec(kite,t,exch,txType,q=q)
+    return exec(kite,t,exch,txType,q=q,lot_size=lot_size,tick_size=tick_size)
     
     if p['exchange'] == 'NFO':
         if p['quantity'] > 0:

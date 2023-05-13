@@ -22,6 +22,7 @@ Created on Sun Feb  5 12:43:21 2023
 import pandas as pd
 import numpy as np
 import csv
+import math 
 
 pd.options.mode.chained_assignment = None  # default='warn'
 
@@ -29,21 +30,23 @@ pd.options.mode.chained_assignment = None  # default='warn'
 ### based on signal column
 
 def calculate_bnh_returns (df):
-    df['bnh_returns'] = df["Adj Close"].pct_change()
+    df['bnh_returns'] = df["Open"].pct_change()
+    #pct change gets the pct change from prev row open to this row open
+    #we want this row bnh_returns to contain the returns for holding from this row open
+    #to next row open, so we shift the column down by one
+    df['bnh_returns'] = df['bnh_returns'].shift(-1)
     df['cum_bnh_returns'] = (1+df["bnh_returns"]).cumprod() - 1
-    df['bnh_ln_returns'] = np.log(df['Adj Close']/df['Adj Close'].shift(1))
+    df['bnh_ln_returns'] = np.log(df['Open']/df['Open'].shift(1))
     df['cum_bnh_ln_returns'] = df['bnh_ln_returns'].cumsum()
 
     ## IF Call and Put option data exists
     if "Adj Close-C" in df.columns:
-        df['bnh_returns-C'] = df["Adj Close-C"].pct_change()
+        df['bnh_returns-C'] = df["Open-C"].pct_change().shift(-1)
     if "Adj Close-P" in df.columns:
-        df['bnh_returns-P'] = df["Adj Close-P"].pct_change()
+        df['bnh_returns-P'] = df["Open-P"].pct_change().shift(-1)
 
 
 def calculate_positions (df,close_at_end=True):
-    
-    
     # creating long and short positions 
     #df['position'] = df['signal'].replace(to_replace=10, method='ffill')
     
@@ -93,14 +96,14 @@ def calculate_strategy_returns (df):
     df['strategy_ln_returns'] = df['bnh_ln_returns'] * (df['position'])
     df['cum_strategy_ln_returns'] = df['strategy_ln_returns'].cumsum()
 
-def prep_dataframe (df):
+def prep_dataframe (df, close_at_end=True):
     #calc returns if not already calculated
     if not set(['position','cum_bnh_returns']).issubset(df.columns):
         calculate_bnh_returns(df)
         
     #calc positions if not already calculated
     if not set(['position']).issubset(df.columns):
-        calculate_positions (df)
+        calculate_positions (df, close_at_end)
     
     #calc strategy returns if not already calculated
     if not set(['strategy_returns','cum_strategy_returns']).issubset(df.columns):
@@ -137,7 +140,7 @@ def max_drawdown (df):
 def calc_trade_returns (date, trades, ticker_data): 
     #last row of tickers is really the first day a new position was taken
     #therfore returns from that candle should not be included in this trade
-    #they will be included in next trade.  Therefore set strategy returns for 
+    #they will be included in ne 0xt trade.  Therefore set strategy returns for 
     #last candle here to 0
     ticker_data.iloc[-1, ticker_data.columns.get_loc('strategy_returns')] = 0
     ticker_data['cum_trade_returns'] =  (1+ticker_data['strategy_returns']).cumprod() - 1
@@ -214,7 +217,7 @@ def addDailyReturns(trades,tearsheet):
     
     tearsheet["avg_daily_return"] = avg_return
     tearsheet["std_daily_return"] = daily_returns.std()
-    tearsheet["sharpe_daily_return"] = avg_return/tearsheet["std_daily_return"]
+    tearsheet["sharpe_daily_return"] = math.sqrt(252) * avg_return/tearsheet["std_daily_return"]
     tearsheet["kurtosis_daily_return"] = daily_returns.kurtosis()
     tearsheet["skew_daily_return"] = daily_returns.skew()
 
@@ -245,7 +248,7 @@ def tearsheet (df):
         tearsheet["win_pct"] = tearsheet["num_winning_trades"]/tearsheet["num_trades"]
         tearsheet["return"] = trades.iloc[-1]["sum_return"]
         tearsheet["return per day in trade"] =     tearsheet["return"] / tearsheet["days_in_trade"]
-        tearsheet["annualized return"] = tearsheet["return per day in trade"] * 250
+        tearsheet["annualized return"] = tearsheet["return per day in trade"] * math.sqrt(252)
         #tearsheet["return_fixed_bet"] = df["cum_bnh_returns"][-1]
         tearsheet['max_drawdown_from_0'] = trades['cum_return'].min()
         tearsheet['max_drawdown_from_0_sum'] = trades['sum_return'].min()
@@ -253,7 +256,8 @@ def tearsheet (df):
         tearsheet['max_drawdown_from_prev_peak_sum'] = trades['drawdown_from_prev_peak_sum'].min()
         tearsheet["average_per_trade_return"] = trades[trades['return'] != 0]['return'].mean()
         tearsheet["std_dev_pertrade_return"] = trades[trades['return'] != 0]['return'].std()
-        tearsheet["sharpe_ratio"] = tearsheet['average_per_trade_return'] / tearsheet['std_dev_pertrade_return']
+        tearsheet["sharpe_ratio"] = tearsheet['return per day in trade'] * math.sqrt(252) / tearsheet['std_daily_return']
+        tearsheet['calamar_ratio'] = tearsheet['return per day in trade'] * math.sqrt(252) / tearsheet['max_drawdown_from_prev_peak_sum']
         tearsheet["skewness_pertrade_return"] = trades[trades['return'] != 0]['return'].skew()
         tearsheet["kurtosis_pertrade_return"] = trades[trades['return'] != 0]['return'].kurtosis()
         tearsheet["wins"] = get_trade_stats(trades.loc[trades['return'] > 0, 'return'])

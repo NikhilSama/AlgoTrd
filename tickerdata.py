@@ -95,10 +95,10 @@ def get_sp500_tickers():
 def getTickerPrice(t,zgetTO):
     zgetFROM = zgetTO - datetime.timedelta(minutes=1)
     df = downloader.zget(zgetFROM,zgetTO,'NIFTY 50','minute',includeOptions=False)
-    return df.iloc[0]['Adj Close'] # 10 am price
+    return df.iloc[0]['Adj Close'] 
 
 def getStrike(t):
-    niftyOpen = getTickerPrice(t,datetime.datetime.combine(datetime.date.today(), datetime.time(10)))
+    niftyOpen = getTickerPrice(t,datetime.datetime.combine(datetime.date.today(), datetime.time(9,16)))
     strikeFloor = math.floor(niftyOpen/100)*100
     strikeCiel = math.ceil(niftyOpen/100)*100
     #print(f"Strike Floor: {strikeFloor}, Strike Ciel: {strikeCiel}")

@@ -27,7 +27,7 @@ if root.handlers:
 #####
 
  
-logging.basicConfig(filename=f'Data/logs/{fname}.log', level='ERROR', 
+logging.basicConfig(filename=f'Data/logs/{fname}.log', level='INFO', 
                     format=log_format, datefmt='%I:%M:%S %p')
 
 #print(f"Logging to Data/logs/{fname}.log")
@@ -37,3 +37,4 @@ logging.info("This is an informational message")
 #logging.error("You have encountered an error")
 #logging.critical("You are in trouble")
 ## END
+logging.getLogger('matplotlib.font_manager').disabled = True

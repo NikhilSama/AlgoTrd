@@ -139,7 +139,7 @@ class DBBasic:
     #If given ticker is an option, then it returns the same ticker along with log and tick_size
     #If given ticker is a future, then it returns the underlying option ticker
     #IF it an put option and the request is call, then it returns the call option instead. 
-    def get_option_ticker(self,ticker,price,type,kite,strike=0):
+    def get_option_ticker(self,ticker,price,type,kite=None,strike=0):
         #get rid of anything after a space in ticker NIFTY 50 => NIFTY
         ticker = ticker.split(' ',1)[0]
 
@@ -156,7 +156,7 @@ class DBBasic:
                 q = f"SELECT tradingsymbol,lot_size,tick_size FROM trading.instruments_zerodha where instrument_type = '{type}' and underlying_ticker = '{ticker}' AND expiry >= '{date.today()}' AND strike = {strike} ORDER BY ABS( strike - {price} ) ASC, expiry ASC LIMIT 1"
         else:
             #ticker is alreadu an option; just return the same ticker, with lot_size and tick_size
-            q = f"SELECT tradingsymbol,lot_size,tick_size FROM trading.instruments_zerodha where tradingsymbol = '{ticker}' AND expiry >= '{date.today()}' ORDER BY ABS( strike - {price} ) ASC, expiry ASC LIMIT 1"    
+            q = f"SELECT tradingsymbol,lot_size,tick_size FROM trading.instruments_zerodha where tradingsymbol = '{ticker}' ORDER BY expiry ASC LIMIT 1"    
         # else:#Ticker is PE and request is CE or vice versa
         #     inverseTicker = utils.convertPEtoCEAndViceVersa(ticker)
         #     q = f"SELECT tradingsymbol,lot_size,tick_size FROM trading.instruments_zerodha where instrument_type = '{type}' and tradingsymbol = '{inverseTicker}' AND expiry > '{date.today()}' ORDER BY ABS( strike - {price} ) ASC, expiry ASC LIMIT 1"    

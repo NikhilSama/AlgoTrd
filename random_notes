@@ -1,62 +1,26 @@
-ZGet timeline
+BACKTESTING
 
+NIFTY options broadly has 3 diff periods
+2/1 to 3/31 and I think now where our setting is just too good 200% in 2 months 
+10/1/22 to 2/1 where it was good returns, 100% in 3 months:-) just not sky rockting
+5/1 to 10/1 where it serously underperformed
 
---- 
-Issues to investigate
-at Timestamp('2023-03-31 13:37:00+0530', tz='tzoffset(None, 19800)')
-the OBV-OSC for Reliance is significantly different in hisotical(0.09482582299582268)
-vs live 0.2.  There  are 3 additional rows in historical listed belwo: 
+What defines these periods ? 
 
-2023-03-31 09:07:00+05:30    1  2255.00  ...          0               NaN
-2023-03-31 09:08:00+05:30    2  2255.00  ...          0               NaN
-2023-03-31 09:11:00+05:30    3  2255.00  ...          0               NaN
-2023-03-31 09:14:00+05:30    4  2255.00  ...          0               NaN
+Is it seasonal ? this month every year ? 
+Does it have to do with Adani crash in Feb ? 
+Does it have to do with general pullback / fII flows etc ? 
+If we can relate some macro / long term forces that influence the period then we may be able to pick 
+the best strategies for specfiic periods
+---
 
-that are not there in online df which starts at 9:15.  Could these rows be the reason for the diff ?? 
-One hypothesis is that the presense of those 3 random rows before 9:15, with Adj Close below 9:15 close, would lead that first minute volume to be counted as UP volume in historical, and start volume in live .. verify .. 
+Things to try -- 
 
-Almost certain this is the issue.  Those candles have zero volume, and they probably mess up the obv_diff.min/max functions.  Solution will likely be to pop any rows before 9:15 or any rows with zero volume in the backtesting, to get clean apples to apples data. 
+seperate out the analytics on a day by day basis for more acurate apples to apples back test vs real 
 
-How do we handle this.  Figure out how to remove the rows in historical to see if we get same results.  Also figure out how to change backtest methods to be par w online if this recurs -- backtest should only consider data 9:15 onwards even if it somehow gets come ticks before that, because thats all that online gets, 
+Try OBV or something else, I think in long term upgrending markets, the sharp declines where we exit and lose happen at low volume -- HOLLLDD THOSE 
 
-VERIFIED and HACKED For now .. by putting 4 statments to remove the first 4 rows in Download historical zgetbasic.  improve this by programatically removing any leading rows with zero volume. 
+Get the prev day or week (LT MEGA TREND -- or 200 period super trend).  If that is positive then add a multiplier to short term positions consistent with the trend, and divide the multiplier for positions counter long term trend
 
-Also looking like out OBV/MSSLoope filters are super correct on saying no to bb .. should we just follow them as OR without multiplier for trends as well ?? Seems like a profitable strategy
-
-There is some junk after market data after 3:30 as well that needs to be filtered out .. I think that is messing up OBV calc as well .. 
-mask = ((df.index.hour == 9 & df.index.minute < 15)) | (df.index.hour == 15 & df.index.minute >30) | (df.index.hour < 9) | (df.index.hour > 15))
-        # Use the shift method to get the start and end times of each region where the mask is True
-indexes = df.index[(mask & ~mask.shift(1, fill_value=False))].tolist()
-      
--- 
-BACK TEST TIME PROFILING 
-
-From Kite 
-1 ticker, 1 day = 0.3 seconds (300 ms)
-
-From cache 
-1 ticker, 1 day = 0.003 seconds (3 ms)
-
-
-1 ticker 1 day (100 ms w/o kite and csv)
-ZGET took 2.93ms (300ms if get from kite -  k)
-SIGNAL GENERATION took 39.74ms
-Tearsheet took took 77.59ms
-to CSV took 93.37ms
-
-1 ticker 5 trading days (300 ms w/o kite and csv)
-ZGET took 13.44ms (395.52ms kite)
-SIGNAL GENERATION took 101.4ms
-Tearsheet took took 111.55ms
-to CSV took 66.2ms
-
-1 ticker 60 days (40 trading days) = 1500ms (1.5ms w/o k and csv)
-ZGET took 1.95 ms (1271.71ms if get from kite)
-SIGNAL GENERATION took 631.28ms
-Tearsheet took took 878.28ms
-to CSV took 609.09ms
-===
-if we take csv out and use cache - should take around 2 to 3 seconds for 60 days per ticker
-10,000 iterations = 30,000 seconds = 500 minutes = 8.33 hours * 50 tickers = 416 hours = 17 days
-1000 iterations = 3000 seconds = 50 minutes * 50 tickers = 2500 minutes = 41.66 hours
+Compare the sudden wierd dips where to lose to the underlying NIFTY ? Do those only happen in the options or also in underlying NIFTY ? That could be another way to filter those out
 

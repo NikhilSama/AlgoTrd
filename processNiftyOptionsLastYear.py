@@ -118,7 +118,7 @@ def cleanDF(df):
     df.rename(columns={"Ticker":"symbol"},inplace=True)
     df.rename(columns={"Close":"Adj Close"},inplace=True)
     # Drop the original Date and Time columns
-    df.drop(columns=['Date', 'Time','Open Interest'], inplace=True)
+    df.drop(columns=['Date', 'Time'], inplace=True)
     return df
 
 def constructDF():
@@ -134,7 +134,7 @@ def constructDF():
         thisDay = thisDay + timedelta(days=1)
     df = cleanDF(df)
     db = DBBasic()
-    db.toDB('niftyITMCall',df)
+    #db.toDB('niftyITMCall',df)
     df.to_csv('Data/NIFTYOPTIONSDATA/contNiftyWeeklyOptionDF.csv')
     
 constructDF()
