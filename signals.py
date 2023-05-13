@@ -770,7 +770,7 @@ def generateAnalytics(analyticsGenerators,df):
     
     # Assuming the input dataframe is 'df' with a datetime index
     # 1. Split the dataframe into separate dataframes for each day
-    daily_dataframes = [group for _, group in df.groupby(pd.Grouper(freq='D'))]
+    daily_dataframes = [group for _, group in df.groupby(pd.Grouper(freq='H'))]
 
     # 2. Run the 'genAnalyticsForDay' function on each day's dataframe
     daily_analytics = [genAnalyticsForDay(day_df, analyticsGenerators) for day_df in daily_dataframes]

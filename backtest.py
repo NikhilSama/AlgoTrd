@@ -84,10 +84,10 @@ ist = pytz.timezone('Asia/Kolkata')
 tickers = td.get_sp500_tickers()
 nifty = td.get_nifty_tickers()
 index_tickers = td.get_index_tickers()
-firstTradeTime = datetime.datetime(2022, 5,1, 9, 0) if cfgZGetStartDate == None else cfgZGetStartDate
+firstTradeTime = datetime.datetime(2022, 4,1, 9, 0) if cfgZGetStartDate == None else cfgZGetStartDate
 firstTradeTime = ist.localize(firstTradeTime)
 zgetFrom = firstTradeTime - timedelta(days=cfgHistoricalDaysToGet)
-zgetTo = datetime.datetime(2023,5,10, 15, 30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+zgetTo = datetime.datetime(2023,5,4, 15, 30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 zgetTo = ist.localize(zgetTo)
 
 
