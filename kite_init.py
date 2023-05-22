@@ -204,6 +204,8 @@ def convertSLTriggerToTrigger(sltrigger,tick_size):
 def exec_sl(kite,t,exchange,slTxType,sltrigger, 
             lot_size=1,tick_size=0.05, slqt = 0, slvariety = None,sliceberg_legs=None,
             sliceberg_quantity=None, ltp=0, betsize=bet_size):
+    return None
+
     slqt = getQ(lot_size,ltp,betsize, 0) if slqt == 0 else slqt
 
     if slvariety == None:
@@ -235,6 +237,7 @@ def exec_sl(kite,t,exchange,slTxType,sltrigger,
 def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05
          ,q=0,ltp=0,sl=0,qToExit=0,betsize=bet_size,p=0,tag=None, 
          order_type=None,sltrigger=0,slTxType=None,slqt=None):
+    return (None,None)
     order_type = kite.ORDER_TYPE_LIMIT if order_type is None else order_type
     #print(f"exec {t} {exchange} {tx_type} Lot:{lot_size} tick:{tick_size} q:{q} ltp:{ltp} {sl} toExit:{qToExit} betsize:{betsize} p:{p} tag:{tag}")
     if is_not_tradable(t):
@@ -247,7 +250,7 @@ def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05
             ltp = ltp[f"{exchange}:{t}"]['last_price']
         else:
             logging.warning(f"No ltp found for {exchange}:{t}. {ltp} Skipping")
-            return
+            return (None,None)
     # if (lot_size==1) and (exchange=="NFO") and utils.isOption(t):
     #     #Option order and we were not provided lot size info 
     #     #get the lot size from db
@@ -299,13 +302,13 @@ def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05
                                   tick_size = tick_size, slqt = slqt,slvariety = slvariety,
                                   sliceberg_legs=sliceberg_legs,sliceberg_quantity=sliceberg_quantity)
         else:
-            sl_order_id = 0
+            sl_order_id = None
     except Exception as e:
         print(f'{exchange} {tx_type} Failed for {t}')
         print(e.args[0])
         print(f"exec {t} {exchange} {tx_type} Lot:{lot_size} tick:{tick_size} q:{q} ltp:{ltp} {sl} toExit:{qToExit} betsize:{betsize} {p} {tag}")
-        return -1
-    return order_id,sl_order_id
+        return (None,None)
+    return (order_id,sl_order_id)
 
 def nse_buy (kite,t,lot_size=1,tick_size=0.05,q=0,ltp=0,sl=0,exchange='NSE',qToExit=0,betsize=bet_size,tag=None):
     return exec(kite,t,exchange,'BUY',lot_size,tick_size,q,ltp,sl,qToExit,betsize,tag=tag)

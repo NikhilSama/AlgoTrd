@@ -15,6 +15,7 @@ import scipy.stats as stats
 import tickerCfg
 import utils
 import matplotlib.dates as mdates
+import DownloadHistorical as downloader
 
 # set timezone to IST
 ist = pytz.timezone('Asia/Kolkata')
@@ -80,6 +81,15 @@ def plot_stock_and_option(df):
     ax3.plot(df['i'], df['pct_change_call'], color='grey', linewidth=2)
     plt.show()
 
+def plot_returns_on_nifty(df):
+    fig, (ax1, ax2) = \
+    plt.subplots(2, 1, figsize=(8, 8), sharex=True, 
+                gridspec_kw={'height_ratios': [3,1]})
+    niftyDf = downloader.zget(df.index[0],df.index[-1],'NIFTY 50','day',includeOptions=False)
+    ax1.plot(niftyDf.index, niftyDf['Adj Close'], color='red', linewidth=2)
+    ax2.plot(df.index, df['strategy_returns'], color='red', linewidth=2)
+    plt.show()
+
 
 def plot_backtest(df,trades=None):
     applyTickerSpecificCfg(df['symbol'][0])
@@ -94,13 +104,13 @@ def plot_backtest(df,trades=None):
     #pprint.pprint(tearsheet, indent=4)
     #df[['ma_superTrend', 'ma_slow', 'ma_fast']].plot(grid=True, figsize=(12, 8))
 #    fig, (ax1, ax2, ax3, ax4, ax5, ax7) = plt.subplots(6, 1, figsize=(8, 8))
-    fig, (ax1, ax2, ax3, ax4, ax5, ax6, ax7,ax8,ax9) = \
-        plt.subplots(9, 1, figsize=(8, 8), sharex=True, 
-                     gridspec_kw={'height_ratios': [4, 1, 1, 1, 1, 1,1,1,1]})
+    fig, (ax1, ax2, ax3, ax4, ax5) = \
+        plt.subplots(5, 1, figsize=(8, 8), sharex=True, 
+                     gridspec_kw={'height_ratios': [6, 1, 1, 2,2]})
     plt.subplots_adjust(left=0.1, bottom=0.1)
     # df['SLOPE-OSC'].fillna(0, inplace=True)
-    df['ma20_pct_change_ma'].fillna(0, inplace=True)
-    df['ADX-PCT-CHNG'].fillna(0, inplace=True)
+    # df['ma20_pct_change_ma'].fillna(0, inplace=True)
+    # df['ADX-PCT-CHNG'].fillna(0, inplace=True)
     
     if 'OBV-OSC' not in df.columns:
         df['OBV-OSC'] = 0
@@ -110,11 +120,14 @@ def plot_backtest(df,trades=None):
 
     # plot the first series in the first subplot
     #ax1.plot(df['i'], df['ma_superTrend'], color='green', linewidth=3)
-    ax1.plot(df['i'], df['VWAP'], color='gold', linewidth=2)
+    # ax1.plot(df['i'], df['VWAP'], color='gold', linewidth=2)
     ax1.plot(df['i'], df['Adj Close'], color='black', linewidth=2)
-    ax1.plot(df['i'], df['VWAP_upper'], color='red', linewidth=1)
-    ax1.plot(df['i'], df['VWAP_lower'], color='green', linewidth=1)
-    # ax1.plot(df['i'], df['SuperTrend'], color='green', linewidth=3)
+    # ax1.plot(df['i'], df['renko_brick_high'], color='green', linewidth=1)
+    # ax1.plot(df['i'], df['renko_brick_low'], color='red', linewidth=1)
+    ax1.plot(df['i'], df['poc'], color='blue', linewidth=1)
+    ax1.plot(df['i'], df['vah'], color='green', linewidth=3)
+    ax1.plot(df['i'], df['val'], color='red', linewidth=3)
+    ax1.plot(df['i'], df['val']+(df['slpVal']*10), color='red', linewidth=1)
     # ax1.plot(df['i'], df['ma20'], color='orange', linewidth=1)
     # ax1.plot(df['i'], df['MA-FAST'], color='green', linewidth=1)
     
@@ -129,52 +142,58 @@ def plot_backtest(df,trades=None):
 
     ax3.plot(df['i'], df['position'], color='green', linewidth=2)
     ax3.set_title('Position↓', loc='right')
-    df['ADX'] .fillna(0, inplace=True)
-    ax4.plot(df['i'], df['ADX'], color='black', linewidth=2)
+    # df['ADX'] .fillna(0, inplace=True)
+    ax4.plot(df['i'], df['renko_brick_num'], color='black', linewidth=2)
     # ax4.plot(df['i'], df['+di'], color='green', linewidth=1)
     # ax4.plot(df['i'], df['-di'], color='red', linewidth=1)
     # draw a threshold line at y=0.5
-    ax4.axhline(y=adxThresh, color='red', linestyle='--')
-    ax4.axhline(y=-adxThresh, color='red', linestyle='--')
-    ax4.axhline(y=adxThresh*adxThreshYellowMultiplier, color='blue', linestyle='--')
-    ax4.axhline(y=-adxThresh*adxThreshYellowMultiplier, color='blue', linestyle='--')
-    ax4.set_title('ADX↓', loc='right')
+    # ax4.axhline(y=-1, color='red', linestyle='--')
+    # ax4.axhline(y=-2, color='blue', linestyle='--')
+    ax4.axhline(y=-3, color='red', linestyle='--')
+    ax4.axhline(y=-4, color='blue', linestyle='--')
+    # ax4.axhline(y=1, color='green', linestyle='--')
+    # ax4.axhline(y=2, color='blue', linestyle='--')
+    ax4.axhline(y=3, color='green', linestyle='--')
+    ax4.axhline(y=4, color='blue', linestyle='--')
+    ax4.set_title('bricknum↓', loc='right')
 
-    ax5.plot(df['i'], df['ADX-PCT-CHNG'], color='green', linewidth=2)
-    ax5.set_title('ADX-PCT-CHNG↓', loc='right')
-    # ax5.axhline(y=adxSlopeThresh, color='red', linestyle='--')
-    # ax5.axhline(y=-adxSlopeThresh, color='red', linestyle='--')
+    ax5.plot(df['i'], df['slpPoc'], color='yellow', linewidth=1)
+    ax5.plot(df['i'], df['slpVah'], color='green', linewidth=1)
+    ax5.plot(df['i'], df['slpVal'], color='red', linewidth=1)
+    ax5.set_title('SVP SLOPE↓', loc='right')
+    # # ax5.axhline(y=adxSlopeThresh, color='red', linestyle='--')
+    # # ax5.axhline(y=-adxSlopeThresh, color='red', linestyle='--')
 
-    ax6.plot(df['i'], df['ma20_pct_change'], color='green', linewidth=2)
-    ax6.set_title('MA-SLOPE↓', loc='right')
-    ax6.axhline(y=maSlopeThresh, color='red', linestyle='--')
-    ax6.axhline(y=-maSlopeThresh, color='red', linestyle='--')
+    # ax6.plot(df['i'], df['ma20_pct_change'], color='green', linewidth=2)
+    # ax6.set_title('MA-SLOPE↓', loc='right')
+    # ax6.axhline(y=maSlopeThresh, color='red', linestyle='--')
+    # ax6.axhline(y=-maSlopeThresh, color='red', linestyle='--')
 
-    ax7.plot(df['i'], df['SLOPE-OSC-SLOPE'], color='green', linewidth=2)
-    ax7.set_title('SLOPE-OSC-SLOPE sq ↓', loc='right')
-    # ax7.axhline(y=maSlopeSlopeThresh, color='red', linestyle='--')
-    # ax7.axhline(y=-maSlopeSlopeThresh, color='red', linestyle='--')
+    # ax7.plot(df['i'], df['SLOPE-OSC-SLOPE'], color='green', linewidth=2)
+    # ax7.set_title('SLOPE-OSC-SLOPE sq ↓', loc='right')
+    # # ax7.axhline(y=maSlopeSlopeThresh, color='red', linestyle='--')
+    # # ax7.axhline(y=-maSlopeSlopeThresh, color='red', linestyle='--')
 
-    if 'OBV-OSC' in df.columns and df['OBV-OSC'][-1] != 0:
-        ax8.plot(df['i'], df['OBV'], color='green', linewidth=2)
-        ax8.set_title('OBV↓', loc='right')
-        ax8.axhline(y=obvOscThresh, color='red', linestyle='--')
-        ax8.axhline(y=-obvOscThresh, color='red', linestyle='--')
-        ax8.axhline(y=obvOscThresh*obvOscThreshYellowMultiplier, color='blue', linestyle='--')
-        ax8.axhline(y=-obvOscThresh*obvOscThreshYellowMultiplier, color='blue', linestyle='--')
-    else:
-        ax8.plot(df['i'], df['MA-FAST-SLP'], color='green', linewidth=2)
-        ax8.set_title('MA-FAST-SLP↓', loc='right')
-        ax8.axhline(y=cfgFastMASlpThresh, color='red', linestyle='--')
-        ax8.axhline(y=-cfgFastMASlpThresh, color='red', linestyle='--')
+    # if 'OBV-OSC' in df.columns and df['OBV-OSC'][-1] != 0:
+    #     ax8.plot(df['i'], df['OBV'], color='green', linewidth=2)
+    #     ax8.set_title('OBV↓', loc='right')
+    #     ax8.axhline(y=obvOscThresh, color='red', linestyle='--')
+    #     ax8.axhline(y=-obvOscThresh, color='red', linestyle='--')
+    #     ax8.axhline(y=obvOscThresh*obvOscThreshYellowMultiplier, color='blue', linestyle='--')
+    #     ax8.axhline(y=-obvOscThresh*obvOscThreshYellowMultiplier, color='blue', linestyle='--')
+    # else:
+    #     ax8.plot(df['i'], df['MA-FAST-SLP'], color='green', linewidth=2)
+    #     ax8.set_title('MA-FAST-SLP↓', loc='right')
+    #     ax8.axhline(y=cfgFastMASlpThresh, color='red', linestyle='--')
+    #     ax8.axhline(y=-cfgFastMASlpThresh, color='red', linestyle='--')
 
 
-    ax9.plot(df['i'], df['OBV-PCT-CHNG'], color='green', linewidth=2)
-    ax9.set_title('OBV-PCT-CHNG ↓', loc='right')
-    ax9.axhline(y=cfgObvSlopeThresh, color='red', linestyle='--')
-    ax9.axhline(y=-cfgObvSlopeThresh, color='red', linestyle='--')
+    # ax9.plot(df['i'], df['OBV-PCT-CHNG'], color='green', linewidth=2)
+    # ax9.set_title('OBV-PCT-CHNG ↓', loc='right')
+    # ax9.axhline(y=cfgObvSlopeThresh, color='red', linestyle='--')
+    # ax9.axhline(y=-cfgObvSlopeThresh, color='red', linestyle='--')
     
-    if len(df) > 500:
+    if len(df) > 500 or True:
         plt.show()
         return # dont plot the shaded region if there are too many rows
     

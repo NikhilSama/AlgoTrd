@@ -22,7 +22,7 @@ import DownloadHistorical as downloader
 import pytz
 import strategies15m as strat15m
 import ppprint
-from plotting import plot_backtest,plot_stock_and_option,plot_trades
+from plotting import plot_backtest,plot_stock_and_option,plot_trades,plot_returns_on_nifty
 import itertools 
 from sqlalchemy import create_engine
 import mysql.connector
@@ -84,10 +84,10 @@ ist = pytz.timezone('Asia/Kolkata')
 tickers = td.get_sp500_tickers()
 nifty = td.get_nifty_tickers()
 index_tickers = td.get_index_tickers()
-firstTradeTime = datetime.datetime(2022, 4,1, 9, 0) if cfgZGetStartDate == None else cfgZGetStartDate
+firstTradeTime = datetime.datetime(2023,1,1,9,0) if cfgZGetStartDate == None else cfgZGetStartDate
 firstTradeTime = ist.localize(firstTradeTime)
 zgetFrom = firstTradeTime - timedelta(days=cfgHistoricalDaysToGet)
-zgetTo = datetime.datetime(2023,5,4, 15, 30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+zgetTo = datetime.datetime(2023,5,1,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 zgetTo = ist.localize(zgetTo)
 
 
@@ -196,7 +196,7 @@ def printTearsheet(tearsheet):
     print(f"Worst Day ({tearsheet['worst_daily_return_date']}): {tearsheet['worst_daily_return']:.2%}")
     print(f"Best Day ({tearsheet['best_daily_return_date']}): {tearsheet['best_daily_return']:.2%}")
 def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
-            exportCSV=False, tradingStartTime = firstTradeTime, \
+            exportCSV=True, tradingStartTime = firstTradeTime, \
             applyTickerSpecificConfig = True, signalGenerators = None,
             src = 'z'):
     #perfTIME = time.time()    
@@ -223,16 +223,21 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
     # exit(0)
     #df = zgetNDays(t,days,i=i)
     #perfTime = perfProfiler("ZGET", perfTIME)
-    dataPopulators = [
-        signals.populateATR,
-        signals.populateRenko,
-        signals.populateBB,     
-        signals.populateADX, 
-        signals.populateSuperTrend,
-        signals.populateOBV,
-        signals.vwap
-        # signals.populateCandleStickPatterns
+    dataPopulators = {
+        'daily': [
+            signals.populateATR,
+            signals.populateRenko,
+            # signals.populateBB,     
+            # signals.populateADX, 
+            # signals.populateSuperTrend,
+            # signals.populateOBV,
+            signals.vwap,
+            signals.populateSVP
+            # signals.populateCandleStickPatterns
+        ], 
+        'hourly': [
         ]
+    }
     
     signalGenerators = [
                     #    signals.randomSignalGenerator
@@ -253,7 +258,7 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
                     #       ,signals.exitTrendFollowing
                            # signals.fastSlowMACX
                     #       ,signals.exitCandleStickReversal
-                           ,signals.exitTargetOrSL
+                        #    ,signals.exitTargetOrSL
 
                         ] if signalGenerators is None else signalGenerators
     overrideSignalGenerators = []   
@@ -283,17 +288,20 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
    # perfTIME = perfProfiler("to CSV", perfTIME)expo
     #perfTIME = perfProfiler("Backtest:", startingTime)
 
-    if (plot == [] or (not 'trades' in tearsheet.keys())):
+    if (plot == []):
         return tearsheetdf
     
     if 'options' in plot:
         plot_stock_and_option(df.loc[firstTradeTime:])
         
     if 'adjCloseGraph' in plot:
-        plot_backtest(df.loc[firstTradeTime:],tearsheet['trades'])
+        plot_backtest(df.loc[firstTradeTime:],tearsheet['trades'] if 'trades' in tearsheet else None)
     
     if 'trade_returns' in plot:
         plot_trades(tearsheet['trades'])
+
+    if 'plot_returns_on_nifty' in plot:
+        plot_returns_on_nifty(df)
     # print (f"END Complete {datetime.datetime.now(ist)}")
     return tearsheetdf
 

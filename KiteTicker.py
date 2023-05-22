@@ -18,6 +18,7 @@ import time
 import datetime
 from time import time, ctime, sleep
 import pandas as pd
+import numpy as np
 import random 
 from freezegun import freeze_time   
 import math
@@ -94,7 +95,14 @@ def getTickersToTrack():
         tickersToTrack[token] = {
                 "ticker": t,
                 'df': pd.DataFrame(),
-                'ticks': pd.DataFrame()
+                'ticks': pd.DataFrame(),
+                'status': {},
+                'orders': {
+                    'limit1': {'order_id': None, 'price': None, 'status': None},
+                    'limit2': {'order_id': None, 'price': None, 'status': None},
+                    'sl1': {'order_id': None, 'price': None, 'status': None},
+                    'sl2': {'order_id': None, 'price': None, 'status': None}
+                }
             }
         
         #Create an empty DataFrame with column names and index
@@ -214,13 +222,13 @@ def resampleToMinDF():
             if minute_candle_df.empty:
                 tickerlog(f"Min candle emply. First call for {token}. Getting historical, and ignoring this first half formed tick candle")
                 historicalEnd = tick_df.index[-1] #downloader will remove lst min half formed candle
-                historicalStart = historicalEnd - datetime.timedelta(days=cfgHistoricalDaysToGet)
+                historicalStart = datetime.datetime.combine(historicalEnd.date(),datetime.time(9, 15))#historicalEnd - datetime.timedelta(days=cfgHistoricalDaysToGet)
+                historicalStart = ist.localize(historicalStart)
                 tickersToTrack[token]['df']= downloader.zget \
                     (historicalStart,historicalEnd,tickersToTrack[token]['ticker'],'minute',
                     includeOptions=False,instrumentToken=token)
                 #trim to cfgMaxLookbackCandles rows/minutes
                 trimMinuteDF(token)
-
             else:
                 # Append the new minute candle rows to the minute candle df
                             #Add in symbol and index to make it at par with the Historical data candles
@@ -240,12 +248,13 @@ def resampleToMinDF():
 def tick(tokens):
     positions = tl.get_positions()
     for token in tokens:
-        targetExitAchieved = tickersToTrack[token]['targetExitAchieved']
-        tickerlog(f"tickThread generating signals for: token {token} {tickersToTrack[token]['ticker']}")
-        tl.generateSignalsAndTrade(tickersToTrack[token]['df'].copy(),positions,
+        tokenData = tickersToTrack[token]
+        targetExitAchieved = tokenData['targetExitAchieved']
+        tickerlog(f"tickThread generating signals for: token {token} {tokenData['ticker']}")
+        df = tl.generateSignalsAndTrade(tokenData['df'].copy(),positions,
                                    False,True,tradeStartTime=tradingStartTime,
                                    targetClosedPositions=targetExitAchieved)
-
+        placeLimitOrders(df,tokenData['orders'])
 def processTicks(ticks):
     #add the tick to the tick df
     global tickThreadBacklog
@@ -288,7 +297,12 @@ def placeStopLossAndTargetOrders (ticker,exchange,q,p):
     # placeStopLossOrder(ticker,exchange,q,p)
     # placeTargetOrder(ticker,exchange,q,p)
     x = None
-
+def placeLimitOrders(df,orders):
+    (orders['limit1']['price'],orders['limit2']['price'],orders['sl1']['price'],orders['sl2']['price']) = \
+    (df['limit1'][-1],df['limit2'][-1],df['sl1'][-1],df['sl2'][-1])
+    positions = tl.get_positions()
+    (orders['limit1']['order_id'],orders['sl1']['order_id']) = tl.placeExitOrder(df,positions)
+    # print(f"lim orderID: {orders['limit1']['order_id']} SL orderID: {orders['sl1']['order_id']}")
 ####### KITE TICKER CALLBACKS #######
 def on_ticks(ws, ticks):
     # Callback to receive ticks.
@@ -318,7 +332,7 @@ def on_order_update(ws, data):
     timestamp = datetime.datetime.strptime(timestamp_str, format_str)
     rounded_timestamp = datetime.datetime(timestamp.year, timestamp.month, timestamp.day, timestamp.hour, timestamp.minute)
     localized_timestamp = ist.localize(rounded_timestamp)
-
+    oid = data['order_id']
     ticker = data['tradingsymbol']
     exchange = data['exchange']
     token = data['instrument_token']

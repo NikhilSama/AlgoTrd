@@ -112,7 +112,7 @@ def zget_basic(from_date, to_date, symbol,interval='minute',
 
     df = pd.DataFrame(records)
     if df.empty:
-        logging.info('No data returned')
+        logging.info(f'No data returned for {symbol} from: {from_date} to: {to_date} continueous:{continuous} interval:{interval}')
         return df
     df = zColsToDbCols(df)
     # Adding new index column

@@ -8,7 +8,7 @@ Created on Sun Feb  5 14:26:36 2023
 import sys
 import datetime
 cfgDict = {
-    'cfgIsBackTest': False,
+    'cfgIsBackTest': True,
     'cfgZGetStartDate': None,
     'cfgZGetEndDate': None,    
     'cfgMaxLotsForTrade' : 36,
@@ -16,7 +16,8 @@ cfgDict = {
     'cfgHistoricalDaysToGet': 0,
     'cfgFreezeGun': False,
     'cfgUseVolumeDataForOptions': True,
-    'cfgStartTimeOfDay': datetime.datetime.strptime("9:15+05:30", "%H:%M%z").time(),
+    'cfgMinPriceForOptions': 30,
+    'cfgStartTimeOfDay': datetime.datetime.strptime("10:00+05:30", "%H:%M%z").time(),
     'cfgEndNewTradesTimeOfDay': datetime.datetime.strptime("15:00+05:30", "%H:%M%z").time(),
     'cfgEndExitTradesOnlyTimeOfDay': datetime.datetime.strptime("15:18+05:30", "%H:%M%z").time(),
     'cfgMinCandlesForMA': 5,
@@ -46,21 +47,28 @@ cfgDict = {
     'obvOscThreshYellowMultiplier': 0.7,
     'cfgObvSlopeThresh': 0.01,
     'cfgMaxLookbackCandles': 400,
-    'cfgNumConditionsForTrendFollow': 3,
-    'cfgRenkoBrickMultiplier': 0.08,
-    'cfgRenkoBrickMultiplierLongTarget': 1,
-    'cfgRenkoBrickMultiplierLongSL': 0.1,
-    'cfgRenkoBrickMultiplierShortTarget': 1,
-    'cfgRenkoBrickMultiplierShortSL': 1,    
+    'cfgNumConditionsForTrendFollow': 2,
+    'cfgRenkoBrickSize': 8,
+    'cfgRenkoBrickMultiplierLongTarget': 2,
+    'cfgRenkoBrickMultiplierLongSL': 1,
+    'cfgRenkoBrickMultiplierShortTarget': 2,
+    'cfgRenkoBrickMultiplierShortSL': 1,
+    'cfgTargetPercentageFromResistance': 0.01,
+    'cfgSLPercentageFromSupport': 0.02,
+    'cfgRenkoNumBricksForTrend': 2,
+    'cfgSVPSlopeCandles': 6,
+    'cfgSVPSlopeProjectionCandles': 10,
     'cfgEnoughReturnForTheDay': 0.2,
     'cfgEnoughLossForTheDay': 1,
-    'cfgPartialExitPercent': 0.1,
+    'cfgPartialExitPercent': 0.5,
     'includeOptions': False,
     'plot': [
         
         # 'trade_returns'
         # ,
           'adjCloseGraph'
+        #  ,
+        #  'plot_returns_on_nifty'
         # ,
         # 'options'
         ],
@@ -74,7 +82,7 @@ cfgDict = {
     'dbpass' : 'trading123',
     'showTradingViewLive' : False,
     'cacheTickData' : False, 
-    'bet_size': 50000
+    'bet_size': 10000
 }
 
 args = sys.argv[1:]
