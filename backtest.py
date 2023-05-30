@@ -70,11 +70,6 @@ def mark_task_complete():
 
 #cfg has all the config parameters make them all globals here
 import cfg
-
-
-
-
-
 globals().update(vars(cfg))
 
 
@@ -84,15 +79,18 @@ ist = pytz.timezone('Asia/Kolkata')
 tickers = td.get_sp500_tickers()
 nifty = td.get_nifty_tickers()
 index_tickers = td.get_index_tickers()
-firstTradeTime = datetime.datetime(2023,1,1,9,0) if cfgZGetStartDate == None else cfgZGetStartDate
+firstTradeTime = datetime.datetime(2022,4,1,9,0) if cfgZGetStartDate == None else cfgZGetStartDate
+# firstTradeTime = datetime.datetime(2023,3,14,9,0) if cfgZGetStartDate == None else cfgZGetStartDate
 firstTradeTime = ist.localize(firstTradeTime)
 zgetFrom = firstTradeTime - timedelta(days=cfgHistoricalDaysToGet)
-zgetTo = datetime.datetime(2023,5,1,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+zgetTo = datetime.datetime(2023,4,1,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+# zgetTo = datetime.datetime(2023,3,14,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 zgetTo = ist.localize(zgetTo)
 
 
 # def mmReturns(row,df):
 #     i = df.index.get_loc(row.name)
+
 #     lastCandleHigh = df.iloc[i-1, df.columns.get_loc('High')]
 #     lastCandleLow = df.iloc[i-1, df.columns.get_loc('Low')]
     
@@ -107,19 +105,22 @@ zgetTo = ist.localize(zgetTo)
 
 
     
-def dbget(t,s,e):
-    df = downloader.getCachedTikerData('NIFTYITMCALL',s,e,'minute')
+def dbget(t,s,e,offset=None):
+    df = downloader.getCachedTikerData(f'NIFTYITMCALL{offset if offset is not None else ""}',s,e,'minute')
     if not df.empty:
-        return df
+        return df 
     print("getting from db")
     db = DBBasic()
-    q = 'select * from niftyITMCall where date between "'+s.strftime('%Y-%m-%d %H:%M:%S')+'" and "'+e.strftime('%Y-%m-%d %H:%M:%S')+'"'
+    q = f'select * from niftyITMCall{offset if offset is not None else ""} where date between "'+s.strftime('%Y-%m-%d %H:%M:%S')+'" and "'+e.strftime('%Y-%m-%d %H:%M:%S')+'"'
     df = db.frmDB(q)
-    df['symbol'] = t
-    downloader.loadTickerCache(df,'NIFTYITMCALL',s,e,'minute')
+    df.drop('Open Interest', axis = 1, inplace = True) if 'Open Interest' in df.columns else None
+
+    df['symbol'] = t+(str(offset) if offset is not None else '')
+    downloader.loadTickerCache(df,'NIFTYITMCALL{offset}',s,e,'minute')
     return df
     
 def zget(t,s,e,i):
+    
     if t == 'NIFTYWEEKLYOPTION': 
         pfname = 'Data/NIFTYOPTIONSDATA/contNiftyWeeklyOptionDF.pickle'
         # if os.path.isfile(pfname):
@@ -183,9 +184,18 @@ def printTearsheet(tearsheet):
         prevPos = trade['position']
     print("Days: ")
     daily_returns = tearsheet['trades']['return'].resample('D').sum()
+    dailyDF = pd.DataFrame(columns=['Date','Day','Open','dayReturn','return'])
     for index,day in daily_returns.iteritems():
-        print(f"\t {utils.timeToString(index,date=True,time=False)}({index.strftime('%a')}) Return:{day:.2%}") if day != 0 else None
-    
+        if day == 0:
+            continue
+        trades_on_d = tearsheet['trades'].loc[tearsheet['trades'].index.date == index.date()]
+        first_row = trades_on_d.iloc[0]
+        last_row = trades_on_d.iloc[-1]
+        dayOpen = first_row['Open']
+        dayClose = last_row['Open']
+        dailyDF.loc[len(dailyDF)] = [index,index.strftime('%a'),dayOpen,(dayClose-dayOpen)/dayOpen,day]
+        print(f"\t {utils.timeToString(index,date=True,time=False)}({index.strftime('%a')}) Open:{dayOpen} Close:{dayClose} ({(dayClose-dayOpen)/dayOpen:.1%}) Return:{day:.2%}") if day != 0 else None
+    dailyDF.to_csv("dailyReturns.csv")
     print(f"Total Return: {tearsheet['return']:.2%}")
     # print(f"Drawdown: {tearsheet['max_drawdown_from_0_sum']:.2%}")
     print(f"Drawdown from Prev Peak: {tearsheet['max_drawdown_from_prev_peak_sum']:.2%}")
@@ -195,12 +205,13 @@ def printTearsheet(tearsheet):
     print(f"Avg Return per day: {tearsheet['avg_daily_return']:.2%}")
     print(f"Worst Day ({tearsheet['worst_daily_return_date']}): {tearsheet['worst_daily_return']:.2%}")
     print(f"Best Day ({tearsheet['best_daily_return_date']}): {tearsheet['best_daily_return']:.2%}")
+    
 def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
             exportCSV=True, tradingStartTime = firstTradeTime, \
             applyTickerSpecificConfig = True, signalGenerators = None,
             src = 'z'):
-    #perfTIME = time.time()    
-    #startingTime = perfTIME
+    perfTIME = time.time()    
+    startingTime = perfTIME
     if src == 'db':
         df = dbget(t,start,end)
     else:
@@ -222,7 +233,7 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
     # print(len(df_tail))
     # exit(0)
     #df = zgetNDays(t,days,i=i)
-    #perfTime = perfProfiler("ZGET", perfTIME)
+    perfTime = perfProfiler("ZGET", perfTIME)
     dataPopulators = {
         'daily': [
             signals.populateATR,
@@ -242,7 +253,8 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
     signalGenerators = [
                     #    signals.randomSignalGenerator
                     #    signals.followSuperTrend
-                        signals.followRenkoWithOBV
+                        signals.followSVP
+                        # signals.followRenkoWithOBV
                         #signals.followRenkoWithTargetedEntry
                         # signals.followObvMA
                         # ,signals.exitObvAdxMaTrend
@@ -263,11 +275,11 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
                         ] if signalGenerators is None else signalGenerators
     overrideSignalGenerators = []   
     
-    signals.applyIntraDayStrategy(df,dataPopulators,signalGenerators,
+    df = signals.applyIntraDayStrategy(df,dataPopulators,signalGenerators,
                                   overrideSignalGenerators, 
                                   tradeStartTime=tradingStartTime,
                                   applyTickerSpecificConfig=applyTickerSpecificConfig)
-    #perfTIME = perfProfiler("SIGNAL GENERATION", perfTIME)
+    perfTIME = perfProfiler("SIGNAL GENERATION", perfTIME)
 
 
     tearsheet,tearsheetdf = perf.tearsheet(df)
@@ -287,7 +299,7 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
         df.to_csv("export.csv")
    # perfTIME = perfProfiler("to CSV", perfTIME)expo
     #perfTIME = perfProfiler("Backtest:", startingTime)
-
+  
     if (plot == []):
         return tearsheetdf
     

@@ -100,13 +100,14 @@ def plot_backtest(df,trades=None):
     if 'adjCloseGraph' not in plot:
         return
         ## PLOTTING CODE FOLLOWS 
-            
+    if len(df) > 500 :
+        return
     #pprint.pprint(tearsheet, indent=4)
     #df[['ma_superTrend', 'ma_slow', 'ma_fast']].plot(grid=True, figsize=(12, 8))
 #    fig, (ax1, ax2, ax3, ax4, ax5, ax7) = plt.subplots(6, 1, figsize=(8, 8))
-    fig, (ax1, ax2, ax3, ax4, ax5) = \
-        plt.subplots(5, 1, figsize=(8, 8), sharex=True, 
-                     gridspec_kw={'height_ratios': [6, 1, 1, 2,2]})
+    fig, (ax1, ax2, ax3, ax4, ax5, ax6) = \
+        plt.subplots(6, 1, figsize=(8, 8), sharex=True, 
+                     gridspec_kw={'height_ratios': [6, 1, 1, 2,2,2]})
     plt.subplots_adjust(left=0.1, bottom=0.1)
     # df['SLOPE-OSC'].fillna(0, inplace=True)
     # df['ma20_pct_change_ma'].fillna(0, inplace=True)
@@ -124,21 +125,30 @@ def plot_backtest(df,trades=None):
     ax1.plot(df['i'], df['Adj Close'], color='black', linewidth=2)
     # ax1.plot(df['i'], df['renko_brick_high'], color='green', linewidth=1)
     # ax1.plot(df['i'], df['renko_brick_low'], color='red', linewidth=1)
-    ax1.plot(df['i'], df['poc'], color='blue', linewidth=1)
-    ax1.plot(df['i'], df['vah'], color='green', linewidth=3)
-    ax1.plot(df['i'], df['val'], color='red', linewidth=3)
-    ax1.plot(df['i'], df['val']+(df['slpVal']*10), color='red', linewidth=1)
+    # ax1.plot(df['i'], df['poc'], color='blue', linewidth=1)
+    # ax1.plot(df['i'], df['vah'], color='green', linewidth=3)
+    # ax1.plot(df['i'], df['val'], color='red', linewidth=3)
+    ax1.plot(df['i'], df['vah15m'], color='green', linewidth=1)
+    ax1.plot(df['i'], df['val15m'], color='red', linewidth=1)
+    # ax1.plot(df['i'], df['val']+(df['slpVal']*10), color='red', linewidth=1)
     # ax1.plot(df['i'], df['ma20'], color='orange', linewidth=1)
     # ax1.plot(df['i'], df['MA-FAST'], color='green', linewidth=1)
-    
+
+    #Draw horizontal lines at renko bricks
+    start = df['renko_brick_low'].min()
+    end = df['renko_brick_high'].max()
+    for y in range(int(start), int(end), 8):
+        ax1.axhline(y, color='grey', linestyle='--')  # adjust color and linestyle as necessary
+
     # plot the second series in the second subplot
     #ax2.plot(df['i'], df['ma_superTrend_pct_change'], color='red', linewidth=2)
     #ax2.plot(df.index, df['superTrend'], color='red', linewidth=2)
     #ax2.plot(df['i'], df['Adj Close-P'], color='blue', linewidth=2)
     #ax2.plot(df['i'], df['Adj Close-C'], color='red', linewidth=2)   
     #ax3.plot(df['i'], df['ma20_pct_change_ma'], color='red', linewidth=2)
-    ax2.plot(df['i'], df['cum_strategy_returns'], color='blue', linewidth=2)
-    ax2.set_title('Cumulative Strategy Returns ↓', loc='right')
+    ax2.plot(df['i'], df['renko_static_candles'], color='blue', linewidth=2)
+    ax2.set_title('StaticCandles ↓', loc='right')
+    ax2.axhline(cfgMinStaticCandlesForMeanRev, color='grey', linestyle='--')  # adjust color and linestyle as necessary
 
     ax3.plot(df['i'], df['position'], color='green', linewidth=2)
     ax3.set_title('Position↓', loc='right')
@@ -157,15 +167,16 @@ def plot_backtest(df,trades=None):
     ax4.axhline(y=4, color='blue', linestyle='--')
     ax4.set_title('bricknum↓', loc='right')
 
-    ax5.plot(df['i'], df['slpPoc'], color='yellow', linewidth=1)
-    ax5.plot(df['i'], df['slpVah'], color='green', linewidth=1)
-    ax5.plot(df['i'], df['slpVal'], color='red', linewidth=1)
-    ax5.set_title('SVP SLOPE↓', loc='right')
+    ax5.plot(df['i'], df['Volume'], color='red', linewidth=1)
+    # ax5.plot(df['i'], df['slpPoc'], color='yellow', linewidth=1)
+    # ax5.plot(df['i'], df['slpVah'], color='green', linewidth=1)
+    # ax5.plot(df['i'], df['slpVal'], color='red', linewidth=1)
+    ax5.set_title('Vol Candle↓', loc='right')
     # # ax5.axhline(y=adxSlopeThresh, color='red', linestyle='--')
     # # ax5.axhline(y=-adxSlopeThresh, color='red', linestyle='--')
 
-    # ax6.plot(df['i'], df['ma20_pct_change'], color='green', linewidth=2)
-    # ax6.set_title('MA-SLOPE↓', loc='right')
+    ax6.plot(df['i'], df['renko_brick_volume_osc'], color='green', linewidth=2)
+    ax6.set_title('Brick Volume↓', loc='right')
     # ax6.axhline(y=maSlopeThresh, color='red', linestyle='--')
     # ax6.axhline(y=-maSlopeThresh, color='red', linestyle='--')
 
@@ -193,7 +204,7 @@ def plot_backtest(df,trades=None):
     # ax9.axhline(y=cfgObvSlopeThresh, color='red', linestyle='--')
     # ax9.axhline(y=-cfgObvSlopeThresh, color='red', linestyle='--')
     
-    if len(df) > 500 or True:
+    if len(df) > 500 :
         plt.show()
         return # dont plot the shaded region if there are too many rows
     
@@ -223,9 +234,9 @@ def plot_backtest(df,trades=None):
         ax4.axvspan(start_index, end_index, alpha=0.2, color='gray')
         ax5.axvspan(start_index, end_index, alpha=0.2, color='gray')
         ax6.axvspan(start_index, end_index, alpha=0.2, color='gray')
-        ax7.axvspan(start_index, end_index, alpha=0.2, color='gray')
-        ax8.axvspan(start_index, end_index, alpha=0.2, color='gray')
-        ax9.axvspan(start_index, end_index, alpha=0.2, color='gray')
+        ax7.axvspan(start_index, end_index, alpha=0.2, color='gray') if 'ax7' in locals() else None
+        ax8.axvspan(start_index, end_index, alpha=0.2, color='gray') if 'ax8' in locals() else None
+        ax9.axvspan(start_index, end_index, alpha=0.2, color='gray') if 'ax9' in locals() else None
 
         start_time = pd.Timestamp(year=day.year, month=day.month, day=day.day, hour=14, minute=0)
         end_time = pd.Timestamp(year=day.year, month=day.month, day=day.day, hour=15, minute=29)
@@ -243,37 +254,37 @@ def plot_backtest(df,trades=None):
             ax4.axvspan(start_index, end_index, alpha=0.2, color='yellow')
             ax5.axvspan(start_index, end_index, alpha=0.2, color='yellow')
             ax6.axvspan(start_index, end_index, alpha=0.2, color='yellow')
-            ax7.axvspan(start_index, end_index, alpha=0.2, color='yellow')
-            ax8.axvspan(start_index, end_index, alpha=0.2, color='yellow')
-            ax9.axvspan(start_index, end_index, alpha=0.2, color='yellow')
+            ax7.axvspan(start_index, end_index, alpha=0.2, color='yellow') if 'ax7' in locals() else None
+            ax8.axvspan(start_index, end_index, alpha=0.2, color='yellow') if 'ax8' in locals() else None
+            ax9.axvspan(start_index, end_index, alpha=0.2, color='yellow') if 'ax9' in locals() else None
         except KeyError:
             print(f"Label '{start_time}' not found in DataFrame index.")
         # Create a boolean mask where 'a' is greater than 'b'
         xticks.extend([start_index,end_index])
-        mask = (df['position'].shift(-1) == 0) & \
-        (df.index.hour >=10) & \
-        (df.index.hour <= 13) & \
-        ((df['Adj Close'] >= df['upper_band']) | \
-        (df['Adj Close'] <= df['lower_band']))
-        # Use the shift method to get the start and end times of each region where the mask is True
-        start_times = df.index[(mask & ~mask.shift(1, fill_value=False))].tolist()
-        end_times = df.index[(mask & ~mask.shift(-1, fill_value=False))].tolist()
-        # Loop over each start and end time and add a shaded rectangle
-        for start_time, end_time in zip(start_times, end_times):
-            start_index=df['i'][start_time]
-            end_index=df['i'][end_time]
-            xticks.extend([start_index,end_index])
+        # mask = (df['position'].shift(-1) == 0) & \
+        # (df.index.hour >=10) & \
+        # (df.index.hour <= 13) & \
+        # ((df['Adj Close'] >= df['upper_band']) | \
+        # (df['Adj Close'] <= df['lower_band']))
+        # # Use the shift method to get the start and end times of each region where the mask is True
+        # start_times = df.index[(mask & ~mask.shift(1, fill_value=False))].tolist()
+        # end_times = df.index[(mask & ~mask.shift(-1, fill_value=False))].tolist()
+        # # Loop over each start and end time and add a shaded rectangle
+        # for start_time, end_time in zip(start_times, end_times):
+        #     start_index=df['i'][start_time]
+        #     end_index=df['i'][end_time]
+        #     xticks.extend([start_index,end_index])
 
-            # Add a shaded rectangle for the time period between start_time and end_time
-            ax1.axvspan(start_index, end_index, alpha=0.2, color='red')
-            ax2.axvspan(start_index, end_index, alpha=0.2, color='red')
-            ax3.axvspan(start_index, end_index, alpha=0.2, color='red')
-            ax4.axvspan(start_index, end_index, alpha=0.2, color='red')
-            ax5.axvspan(start_index, end_index, alpha=0.2, color='red')
-            ax6.axvspan(start_index, end_index, alpha=0.2, color='red')
-            ax7.axvspan(start_index, end_index, alpha=0.2, color='red')
-            ax8.axvspan(start_index, end_index, alpha=0.2, color='red')
-            ax9.axvspan(start_index, end_index, alpha=0.2, color='red')
+        #     # Add a shaded rectangle for the time period between start_time and end_time
+        #     ax1.axvspan(start_index, end_index, alpha=0.2, color='red')
+        #     ax2.axvspan(start_index, end_index, alpha=0.2, color='red')
+        #     ax3.axvspan(start_index, end_index, alpha=0.2, color='red')
+        #     ax4.axvspan(start_index, end_index, alpha=0.2, color='red')
+        #     ax5.axvspan(start_index, end_index, alpha=0.2, color='red')
+        #     ax6.axvspan(start_index, end_index, alpha=0.2, color='red')
+        #     ax7.axvspan(start_index, end_index, alpha=0.2, color='red')
+        #     ax8.axvspan(start_index, end_index, alpha=0.2, color='red')
+        #     ax9.axvspan(start_index, end_index, alpha=0.2, color='red')
 
         mask = (df['position'].shift(-1) != 0)
         # Use the shift method to get the start and end times of each region where the mask is True
@@ -291,9 +302,9 @@ def plot_backtest(df,trades=None):
             ax4.axvspan(start_index, end_index, alpha=0.2, color='green')
             ax5.axvspan(start_index, end_index, alpha=0.2, color='green')
             ax6.axvspan(start_index, end_index, alpha=0.2, color='green')
-            ax7.axvspan(start_index, end_index, alpha=0.2, color='green')
-            ax8.axvspan(start_index, end_index, alpha=0.2, color='green')
-            ax9.axvspan(start_index, end_index, alpha=0.2, color='green')
+            ax7.axvspan(start_index, end_index, alpha=0.2, color='green') if 'ax7' in locals() else None
+            ax8.axvspan(start_index, end_index, alpha=0.2, color='green') if 'ax8' in locals() else None
+            ax9.axvspan(start_index, end_index, alpha=0.2, color='green') if 'ax9' in locals() else None
     # create the slider widget
     plt.xticks(xticks,rotation=90)
     axpos = plt.axes([0.25, 0.01, 0.65, 0.03])

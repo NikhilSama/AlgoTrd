@@ -203,9 +203,7 @@ def convertSLTriggerToTrigger(sltrigger,tick_size):
 
 def exec_sl(kite,t,exchange,slTxType,sltrigger, 
             lot_size=1,tick_size=0.05, slqt = 0, slvariety = None,sliceberg_legs=None,
-            sliceberg_quantity=None, ltp=0, betsize=bet_size):
-    return None
-
+            sliceberg_quantity=None, ltp=0, betsize=bet_size, tag="SL"):
     slqt = getQ(lot_size,ltp,betsize, 0) if slqt == 0 else slqt
 
     if slvariety == None:
@@ -226,7 +224,7 @@ def exec_sl(kite,t,exchange,slTxType,sltrigger,
                                     iceberg_legs=sliceberg_legs, iceberg_quantity=sliceberg_quantity,
                                     validity=kite.VALIDITY_TTL, validity_ttl = 1,
                                     trigger_price=sltrigger,
-                                    price = slprice, tag="StopLoss")
+                                    price = slprice, tag=tag)
     except Exception as e:
         print(f'{exchange} {slTxType} Failed for {t}')
         print(e.args[0])
@@ -237,8 +235,13 @@ def exec_sl(kite,t,exchange,slTxType,sltrigger,
 def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05
          ,q=0,ltp=0,sl=0,qToExit=0,betsize=bet_size,p=0,tag=None, 
          order_type=None,sltrigger=0,slTxType=None,slqt=None):
-    return (None,None)
     order_type = kite.ORDER_TYPE_LIMIT if order_type is None else order_type
+    if tag is not None:
+        limitTag = tag+'-limit'
+        slTag = tag+'-sl'
+    else:
+        limitTag = None
+        slTag = None
     #print(f"exec {t} {exchange} {tx_type} Lot:{lot_size} tick:{tick_size} q:{q} ltp:{ltp} {sl} toExit:{qToExit} betsize:{betsize} p:{p} tag:{tag}")
     if is_not_tradable(t):
         logging.info(f"{t} is not a tradable instrument.  {exchange} {tx_type} not executed")
@@ -285,7 +288,7 @@ def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05
                      product=kite.PRODUCT_MIS,
                      iceberg_legs=iceberg_legs, iceberg_quantity=iceberg_quantity,
                      validity=kite.VALIDITY_TTL, price = p, validity_ttl = 1,
-                     tag=tag)
+                     tag=limitTag)
         #SL to accompany 
         ### UNTESTED CODE -- need to get teh right tx type etc in there 
         if (sl):
@@ -300,7 +303,8 @@ def exec(kite,t,exchange,tx_type,lot_size=1,tick_size=0.05
                 slvariety,sliceberg_legs,sliceberg_quantity = (None,None,None)
             sl_order_id = exec_sl(kite,t,exchange,slTxType,sltrigger,lot_size=lot_size,
                                   tick_size = tick_size, slqt = slqt,slvariety = slvariety,
-                                  sliceberg_legs=sliceberg_legs,sliceberg_quantity=sliceberg_quantity)
+                                  sliceberg_legs=sliceberg_legs,sliceberg_quantity=sliceberg_quantity, 
+                                  tag=slTag)
         else:
             sl_order_id = None
     except Exception as e:

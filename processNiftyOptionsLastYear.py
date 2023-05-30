@@ -30,14 +30,15 @@ def zget(t,s,e,i):
     return df
 
 
-def getStrikeForDate(dt):
+def getStrikeForDate(dt,offset=0):
     if niftyDF.index[0].date() < dt.date():
         last_row_before_dt = niftyDF[niftyDF.index.date == dt.date()]
         last_row_before_dt = last_row_before_dt.iloc[0]
     else:
         last_row_before_dt = niftyDF.iloc[0]
-    open_value = last_row_before_dt['Adj Close']   
-    return math.floor(open_value/100)*100
+    open_value = last_row_before_dt['Adj Close'] 
+    # print(f"open_value: {open_value} offset: {offset} strike: {math.floor(open_value/100)*100 - offset}")  
+    return math.floor(open_value/100)*100 - offset
 
 # def getNiftyYear():
 #     df = zget('NIFTY 50',zgetFrom,zgetTo,'60minute')
@@ -61,8 +62,8 @@ def getExpiry(date):
         expiry = getExpiry(expiry)
     return expiry
 
-def getWeeklyTicker(date):
-    strike = getStrikeForDate(date)
+def getWeeklyTicker(date,offset=0):
+    strike = getStrikeForDate(date,offset)
     expiry = getExpiry(date)
     optionTicker = f'NIFTY{expiry.strftime("%d%b%y").upper()}{strike}CE'
     return optionTicker
@@ -102,8 +103,8 @@ def getDFFromCSV(t,date):
         return None
     return filtered_data
 
-def getOptionDF(day):
-    t=getWeeklyTicker(day)
+def getOptionDF(day,offset=0):
+    t=getWeeklyTicker(day,offset)
     return getDFFromCSV(t,day)
 
 def cleanDF(df):
@@ -121,7 +122,7 @@ def cleanDF(df):
     df.drop(columns=['Date', 'Time'], inplace=True)
     return df
 
-def constructDF():
+def constructDF(offset=0):
     global niftyDF
     niftyDF = zget('NIFTY 50',zgetFrom,zgetTo,'60minute') # Get NIFTY Data
     thisDay = zgetFrom
@@ -129,12 +130,12 @@ def constructDF():
     while thisDay<zgetTo:
         if  utils.isTradingDay(thisDay):
             #for each day 
-            day_df = getOptionDF(thisDay)
+            day_df = getOptionDF(thisDay,offset)
             df = df.append(day_df)
         thisDay = thisDay + timedelta(days=1)
     df = cleanDF(df)
     db = DBBasic()
-    #db.toDB('niftyITMCall',df)
-    df.to_csv('Data/NIFTYOPTIONSDATA/contNiftyWeeklyOptionDF.csv')
+    db.toDB(f'niftyITMCall{offset if offset !=0 else None}',df)
+    df.to_csv(f'Data/NIFTYOPTIONSDATA/contNiftyWeeklyOptionDF{offset if offset !=0 else None}.csv')
     
-constructDF()
+constructDF(100)

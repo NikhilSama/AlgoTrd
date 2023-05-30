@@ -23,7 +23,14 @@ import random
 import talib as ta
 from itertools import compress
 from candlerankings import candle_rankings
+from signal_generators.svb import svb
+from signal_generators.renko import Renko
 
+signalGenerator = Renko(limitExitOrders=False,limitEntryOrders=False,
+                        slEntryOrders=True,slExitOrders=True,
+                        exitStaticBricks=False,useSVPForEntryExitPrices=False)
+
+# signalGenerator = svb()
 #cfg has all the config parameters make them all globals here
 import cfg
 globals().update(vars(cfg))
@@ -187,6 +194,7 @@ def renko(DF):
     "function to convert ohlc data into renko bricks"
     df = DF.copy()
     df.reset_index(inplace=True)
+
     df.columns = ["date","i","open","high","low","close","volume","symbol","signal","ATR"]
     
     df2 = Renko(df)
@@ -209,11 +217,22 @@ def renko(DF):
     change_idx = np.argmax(renko_df['bar_num'].values != 1)
     # Replace the initial rows with NaN values
     renko_df.loc[mask & (renko_df.index < change_idx), ['bar_num', 'uptrend']] = np.nan
+    
     # Find the index where the first non-NaN negative integer appears in renko_brick_num
     first_negative_idx = renko_df[renko_df['bar_num'].notnull() & (renko_df['bar_num'] < 0)].index.min()
     # Reduce non-NaN leading positive integer values of renko_brick_num by 1
-    mask = (renko_df.index < first_negative_idx) & renko_df['bar_num'].notnull() & (renko_df['bar_num'] > 0)
+    mask = (renko_df.index < first_negative_idx) & renko_df['bar_num'].notnull() & (renko_df['bar_num'] > 0) if not np.isnan(first_negative_idx) else renko_df['bar_num'].notnull()
     renko_df.loc[mask, 'bar_num'] -= 1
+    
+    # renko_df['uptrend_change'] = renko_df['uptrend'].shift(-1) != renko_df['uptrend']
+    # max_min_values = renko_df.loc[renko_df['uptrend_change'], 'bar_num'].tolist()
+
+    # # The first element is not valid because it compares with NaN
+    # max_min_values = max_min_values[1:]
+
+    # print(max_min_values)
+    # print(renko_df)
+
     return renko_df
 
 def vwap(df):
@@ -226,11 +245,11 @@ def vwap(df):
     df['VWAP_lower'] = df['VWAP'] - 1 * df['VWAP_SD']  # Lower band (2 SD below VWAP)
     
 # Function to calculate POC, VAH, VAL
-def session_volume_profile (DF):
+def session_volume_profile (DF, type='normal'):
     # calculate volume distribution
     if DF.empty:
         return (np.nan, np.nan, np.nan, np.nan, np.nan)
-    df = DF[DF.index.time > datetime.time(9, 32)].copy() # remove pre-market candles as they are huge volume (OI growth) and therefore have an undue influence on SVP
+    df = DF[DF.index.time > datetime.time(9, 31)].copy() # remove pre-market candles as they are huge volume (OI growth) and therefore have an undue influence on SVP
     if df.empty:
         return (np.nan, np.nan, np.nan, np.nan, np.nan)
 
@@ -243,6 +262,7 @@ def session_volume_profile (DF):
     volume_sorted = volume_distribution.sort_index()
     volume_cumsum = volume_sorted.cumsum()
     volume_total = volume_cumsum.iloc[-1]
+    (t1,t2) = (0.15,0.85) if type == 'normal' else (0.1,0.9)
     val = volume_sorted[volume_cumsum <= volume_total * 0.15].index.max()  # 15% from top
     val = volume_sorted.index[0] if np.isnan(val) else val
     vah = volume_sorted[volume_cumsum >= volume_total * 0.85].index.min()  # 15% from bottom
@@ -515,8 +535,11 @@ def longResistance(row):
     close = row['Adj Close']
     if row.i < 100: 
         return close+100 # suppor/resistance bands not formed before 100 candles
+    elif row.slpPoc <= -cfgSVPSlopeThreshold:
+        return row.poc
     else:
-        return row.vah if row.slpVah <= 0 else close+15
+        return max(close,row.vah) if row.slpVah <= cfgSVPSlopeThreshold else close+8
+    
     (vah,poc,val) = getSVP(row)
     status = getSVPquadrant(row)
     
@@ -533,8 +556,10 @@ def longSupport(row):
     close = row['Adj Close']
     if row.i < 100: 
         return close-100 # suppor/resistance bands not formed before 100 candles
-    # else:
-    #     return row.val if row.slpVal >= 0 else row.val-10
+    elif row.slpPoc >= cfgSVPSlopeThreshold:
+        return row.poc
+    else:
+        return min(close,row.val) if row.slpVal >= -cfgSVPSlopeThreshold else row.val-8
     (vah,poc,val) = getProjectedSVP(row)
     status = getSVPquadrant(row)
     
@@ -552,6 +577,11 @@ def shortSupport(row):
         
 def shortResistance(row):
     return longSupport(row)
+
+def svpTrendsDown(row):
+    return row['slpPoc'] <= -cfgSVPSlopeThreshold
+def svpTrendsUp(row):
+    return row['slpPoc'] >= cfgSVPSlopeThreshold
     
 def OLD_valueBreachedThreshold (value,threshold,slope,
                             slopeThreshold,multiplier,type='H'):
@@ -825,16 +855,17 @@ def signalChanged(s,lastS):
     return s != lastS and (not math.isnan(s))
  
 def logSignal(msg,reqData,signal,s,row,window,isLastRow,extra='',logWithNoSignalChange=False):
+    # return
     rowInfo = f'{row.symbol}:{row.i} '
     rowPrice = f'p:{round(row["Adj Close"],1)} '
     sigInfo = f'sig:{"-" if np.isnan(signal) else signal} s:{"-" if np.isnan(s) else s} {"E" if window == 1 else "X"} '
     dataStrings = {
-        "ohlv": f"OHLV O:{round(row['Open'],1)} H:{round(row['High'],1)} L:{round(row['Low'],1)}",
-        "adxData" : f"ADX:{round(row['ADX'],1)} > {adxThresh}(*{round(adxThreshYellowMultiplier,1)}) adxSLP:{round(row['ADX-PCT-CHNG'],2)}*{numCandlesForSlopeProjection} " if "ADX" in row else 'No ADX Data',
-        "maSlpData" : f"maSlp:{round(row['SLOPE-OSC'],2)} >= {maSlopeThresh}(*{maSlopeThreshYellowMultiplier}) maSlpChng:{round(row['SLOPE-OSC-SLOPE'],2)}>*{numCandlesForSlopeProjection} " if "SLOPE-OSC" in row else 'No Slope Data',
-        "obvData" : f"OBV:{round(row['OBV-OSC'],2)} > {obvOscThresh}(*{obvOscThreshYellowMultiplier}) obvSLP:{round(row['OBV-OSC-PCT-CHNG'],2)}>*{numCandlesForSlopeProjection} " if "OBV-OSC" in row else 'No Volume Data',
-        "RenkoData": f"Renko Trend:{'↑' if row['renko_uptrend'] else '↓'}:{round(row['renko_brick_num'])}({round(row['renko_brick_diff'])})  StaticCandles:{round(row['renko_static_candles']) if not np.isnan(row['renko_static_candles']) else 'nan'} H:{round(row['renko_brick_high'],1)} L:{round(row['renko_brick_low'],1)} " if "renko_uptrend" in row else 'No Renko Data',
-        "svp": f"SVP {row['dayHigh']}-{row['vah']}({round(row['slpVah'],1)})-{row['poc']}-{row['val']}({round(row['slpVal'],1)})-{row['dayLow']} VWAP:{row['VWAP']} SVP-15 {row['15mHigh']}-{row['vah15m']}-{row['poc15m']}-{row['val15m']}-{row['15mLow']}" if "poc" in row else 'No SVP Data'
+        "ohlv": f"OHLV O:{round(row['Open'],1)} H:{round(row['High'],1)} L:{round(row['Low'],1)} | ",
+        "adxData" : f"ADX:{round(row['ADX'],1)} > {adxThresh}(*{round(adxThreshYellowMultiplier,1)}) adxSLP:{round(row['ADX-PCT-CHNG'],2)}*{numCandlesForSlopeProjection} | " if "ADX" in row else 'No ADX Data',
+        "maSlpData" : f"maSlp:{round(row['SLOPE-OSC'],2)} >= {maSlopeThresh}(*{maSlopeThreshYellowMultiplier}) maSlpChng:{round(row['SLOPE-OSC-SLOPE'],2)}>*{numCandlesForSlopeProjection} | " if "SLOPE-OSC" in row else 'No Slope Data',
+        "obvData" : f"OBV:{round(row['OBV-OSC'],2)} > {obvOscThresh}(*{obvOscThreshYellowMultiplier}) obvSLP:{round(row['OBV-OSC-PCT-CHNG'],2)}>*{numCandlesForSlopeProjection} | " if "OBV-OSC" in row else 'No Volume Data',
+        "RenkoData": f"Renko Trend:{'↑' if row['renko_uptrend'] else '↓'}:{round(row['renko_brick_num'])}({round(row['renko_brick_diff'])}) V:{round(row['renko_brick_volume_osc'],1)} StC:{round(row['renko_static_candles']) if not np.isnan(row['renko_static_candles']) else 'nan'} H:{round(row['renko_brick_high'],1)} L:{round(row['renko_brick_low'],1)} | " if "renko_uptrend" in row and not np.isnan(row.renko_brick_num) else 'No Renko Data',
+        "svp": f"SVP {row['dayHigh']}-{row['vah']}({round(row['slpVah'],1)})-{row['poc']}({round(row['slpPoc'],1)})-{row['val']}({round(row['slpVal'],1)})-{row['dayLow']} VWAP:{row['VWAP']} SVP-15 {round(row['15mHigh'],1)}-{round(row['vah15m'],1)}-{round(row['poc15m'],1)}-{round(row['val15m'],1)}-{round(row['15mLow'],1)} | " if "poc" in row else 'No SVP Data'
     }
     dataString = ''
     for key in reqData:
@@ -900,9 +931,17 @@ def populateRenko(df):
     df['renko_brick_num'] = df_renko_ohlc['bar_num']
     
     diff = df['renko_brick_num'].diff()
-    same_sign = np.sign(df['renko_brick_num']) == np.sign(df['renko_brick_num'].shift(1))
-    renko_brick_diff = diff.where(same_sign, 0)
-    df['renko_brick_diff'] = renko_brick_diff
+    df['renko_brick_diff'] = diff
+
+    df['unique_brick_id'] = np.where(df['renko_brick_diff'] != 0, 
+                                    df.index.astype(str) + df['renko_brick_num'].astype(str), 
+                                    np.nan)
+    df['unique_brick_id'].fillna(method='ffill', inplace=True)  # Forward fill the NaN values
+
+    df['renko_brick_volume'] = df.groupby('unique_brick_id')['Volume'].transform('sum')
+    df['renko_brick_volume_osc'] = df['renko_brick_volume']/np.mean(df['renko_brick_volume'].unique())
+    # df = df.drop(columns='unique_brick_id')
+    # df['renko_brick_vol'] = df_renko_ohlc['brick_volume']
 
     # Calculate renko_static_candles
     df['renko_static_candles'] = (
@@ -913,25 +952,33 @@ def populateRenko(df):
         .fillna(0)
     )
     df['renko_static_candles'].fillna(0)
-    
+    df['renko_static_candles'] = df['renko_static_candles'].where(df['renko_static_candles'] >= 1, 0)
+
+    same_sign = np.sign(df['renko_brick_num']) == np.sign(df['renko_brick_num'].shift(1))
+    renko_brick_diff = diff.where(same_sign, 0)
+    df['renko_brick_diff'] = renko_brick_diff
+
     df['renko_brick_high'] = df_renko_ohlc['renko_brick_high']
     df['renko_brick_low'] = df_renko_ohlc['renko_brick_low']
-    # df['renko_brick_vol'] = df_renko_ohlc['brick_volume']
+    
     df.drop(["Date"],inplace=True,axis=1)
     df.to_csv('renko.csv')
 def populateSVP(df):
     window_size = 15  # 15-minute window size in terms of number of rows
-    df['poc15m'] = df['vah15m'] = df['val15m'] = df['poc'] = df['vah'] = df['val']  = df['slpPoc'] = df['slpVah'] = df['slpVal'] = df['dayHigh']  = df['dayLow'] = df['15mHigh']  = df['15mLow'] = np.nan
+    df['poc15m'] = df['vah15m'] = df['val15m'] = df['poc'] = df['vah'] = df['val']  = df['slpPoc'] = df['slpVah'] = df['slpVal'] = df['slp15Poc'] = df['slp15Vah'] = df['slp15Val'] = df['dayHigh']  = df['dayLow'] = df['15mHigh']  = df['15mLow'] = np.nan
 
-    # for end in range(window_size, len(df)):
-    #     start = end-window_size
-    #     window_df = df.iloc[start:end]
-    #     (poc, vah, val,dayHigh,dayLow) = session_volume_profile(window_df)
-    #     df.iloc[end, df.columns.get_loc('poc15m')] = poc
-    #     df.iloc[end, df.columns.get_loc('vah15m')] = vah
-    #     df.iloc[end, df.columns.get_loc('val15m')] = val
-    #     df.iloc[end, df.columns.get_loc('15mHigh')] = dayHigh
-    #     df.iloc[end, df.columns.get_loc('15mLow')] = dayLow
+    for end in range(window_size, len(df)):
+        start = end-window_size
+        window_df = df.iloc[start:end]
+        (poc, vah, val,dayHigh,dayLow) = session_volume_profile(window_df,type='normal')
+        df.iloc[end, df.columns.get_loc('poc15m')] = poc
+        df.iloc[end, df.columns.get_loc('vah15m')] = vah
+        df.iloc[end, df.columns.get_loc('val15m')] = val
+        df.iloc[end, df.columns.get_loc('15mHigh')] = dayHigh
+        df.iloc[end, df.columns.get_loc('15mLow')] = dayLow
+        df.iloc[end, df.columns.get_loc('slp15Poc')] = (poc - df.iloc[end-3, df.columns.get_loc('poc15m')])
+        df.iloc[end, df.columns.get_loc('slp15Vah')] = (vah - df.iloc[end-3, df.columns.get_loc('vah15m')])
+        df.iloc[end, df.columns.get_loc('slp15Val')] = (val - df.iloc[end-3, df.columns.get_loc('val15m')])
 
     for end in range(5, len(df)):
         start = 0
@@ -940,13 +987,16 @@ def populateSVP(df):
         df.iloc[end, df.columns.get_loc('poc')] = poc
         df.iloc[end, df.columns.get_loc('vah')] = vah
         df.iloc[end, df.columns.get_loc('val')] = val        
-        df.iloc[end, df.columns.get_loc('slpPoc')] = (poc - df.iloc[end-cfgSVPSlopeCandles, df.columns.get_loc('poc')])/cfgSVPSlopeCandles
+        df.iloc[end, df.columns.get_loc('slpPoc')] = (poc - df.iloc[end-(2*cfgSVPSlopeCandles), df.columns.get_loc('poc')])/cfgSVPSlopeCandles
         df.iloc[end, df.columns.get_loc('slpVah')] = (vah - df.iloc[end-cfgSVPSlopeCandles, df.columns.get_loc('vah')])/cfgSVPSlopeCandles
         df.iloc[end, df.columns.get_loc('slpVal')] = (val - df.iloc[end-cfgSVPSlopeCandles, df.columns.get_loc('val')])/cfgSVPSlopeCandles
         df.iloc[end, df.columns.get_loc('dayHigh')] = dayHigh
         df.iloc[end, df.columns.get_loc('dayLow')] = dayLow
         # print(f"start={start}, end={end}, poc={poc}, vah={vah}, val={val}")
-    df['slpPoc'].clip(lower=0.1, upper=0.1, inplace=True)
+    df['slpPoc'] = df['slpPoc'].ewm(span=cfgSVPSlopeCandles,min_periods=cfgSVPSlopeCandles).mean()
+    df['slpVah'] = df['slpVah'].ewm(span=cfgSVPSlopeCandles,min_periods=cfgSVPSlopeCandles).mean()
+    df['slpVal'] = df['slpVal'].ewm(span=cfgSVPSlopeCandles,min_periods=cfgSVPSlopeCandles).mean()
+    df['slpPoc'].clip(lower=1, upper=-1, inplace=True)
     df['slpVah'].clip(lower=0, upper=2, inplace=True)
     df['slpVal'].clip(lower=-2, upper=0, inplace=True)
 
@@ -1662,6 +1712,10 @@ def generateAnalytics(analyticsGenerators,df):
 #     trades.to_csv('trades.csv')
 #     return s
 ### END OF NOT IN USE FUNCTIONS
+def getNumBricksForLongTrend(row):
+    return cfgRenkoNumBricksForTrend if getSVPquadrant(row) != 'Low' or row['slpPoc'] <= -cfgSVPSlopeThreshold else cfgRenkoNumBricksForTrend-1
+def getNumBricksForShortTrend(row):
+    return cfgRenkoNumBricksForTrend if getSVPquadrant(row) != 'High' or row['slpPoc'] >= cfgSVPSlopeThreshold else cfgRenkoNumBricksForTrend-1
 
 def checkRenkoLongEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,logString):
     if isRenkoUpTrend(row) != True or tickerHasPosition(row.symbol):
@@ -1672,16 +1726,20 @@ def checkRenkoLongEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,lo
     logString = "NO-RENKO-TREND"
     resistance = longResistance(row)
     
+    if svpTrendsDown(row):
+        logging.info(f"Skipping Long Entry because SVP is trending down") if isLastRow or cfgIsBackTest else None
+        return (s,entry_price,limit1,limit2,sl1,sl2,logString)
+
     if brickNum >= 1:
         if (resistance > (max(close,brickHigh)+brickSize)): # at least a brick away from resistance
-            if brickNum < cfgRenkoNumBricksForTrend:
+            if brickNum < getNumBricksForLongTrend(row):
                 if row.High >= prevLimit1:
                     s = 1
                     entry_price = prevLimit1 if prevLimit1 >= row.Low else row.Open 
                     logString = "RENKO-LONG-ENTRY"
                     logging.info(f"Limit order hit at {prevLimit1}. Next row will form next brick.")  if isLastRow else None
                 else:
-                    potentialLongEntry = brickHigh + ((cfgRenkoNumBricksForTrend-brickNum)*brickSize)
+                    potentialLongEntry = brickHigh + ((getNumBricksForLongTrend(row)-brickNum)*brickSize)
                     if resistance > potentialLongEntry+brickSize:
                         logString = "RENKO-WAITING-FOR-LONG-TREND"
                         limit1 = potentialLongEntry
@@ -1708,17 +1766,21 @@ def checkRenkoShortEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,l
     absBrickNum = abs(brickNum)
     resistance = shortResistance(row)
 
+    if svpTrendsUp(row):
+        logging.info(f"Skipping Short Entry because SVP is trending up") if isLastRow or cfgIsBackTest else None
+        return (s,entry_price,limit1,limit2,sl1,sl2,logString)
+
     if absBrickNum >= 1:
         if (resistance < (min(close,brickLow)-brickSize)): # at least a brick away from resistance
 
-            if absBrickNum < cfgRenkoNumBricksForTrend:
+            if absBrickNum < getNumBricksForShortTrend(row):
                 if row.Low <= prevLimit1:
                     s = -1
                     entry_price = prevLimit1 if row.High >= prevLimit1 else row.Open
                     logString = "RENKO-SHORT-ENTRY"
                     logging.info(f"Limit order hit at {prevLimit1}. Next row will form next brick.")  if isLastRow else None
                 else:
-                    potentialShortEntry = (brickLow - ((cfgRenkoNumBricksForTrend-absBrickNum) * brickSize))
+                    potentialShortEntry = (brickLow - ((getNumBricksForShortTrend(row)-absBrickNum) * brickSize))
                     if resistance < potentialShortEntry-brickSize:
                         logString = "RENKO-WAITING-FOR-SHORT-TREND"
                         limit1 = -potentialShortEntry
@@ -1745,7 +1807,7 @@ def checkRenkoLongExit(s,row,df,isLastRow, exit_price,limit1,limit2,sl1,sl2,logS
     resistance = longResistance(row)
     support = longSupport(row)
     
-    if not upTrend:
+    if (not upTrend):
         s = 0
         exit_price = prevSL1 if prevSL1<=row.High and prevSL1>=row.Low else row.Open
         logString = "RENKO-LONG-EXIT"
@@ -1763,6 +1825,7 @@ def checkRenkoLongExit(s,row,df,isLastRow, exit_price,limit1,limit2,sl1,sl2,logS
             logging.info(f"Target hit at {prevTarget}") if isLastRow else None
         else:
             sl1 = -max(support*(1-cfgSLPercentageFromSupport), (brickLow - (brickSize*cfgRenkoBrickMultiplierLongSL)))
+            sl1 = sl1 - 10 if row.slpVal >= cfgSVPSlopeThreshold else sl1
             limit1 = -min(resistance*(1-cfgTargetPercentageFromResistance),(close + (brickSize * cfgRenkoBrickMultiplierLongTarget))) if row.renko_brick_diff == 0 else -(brickHigh + (brickSize * 10))
     return (s,exit_price,limit1,limit2,sl1,sl2,logString)
 
@@ -1796,6 +1859,7 @@ def checkRenkoShortExit(s,row,df,isLastRow, exit_price,limit1,limit2,sl1,sl2,log
             logging.info(f"Short Target hit at {prevTarget}")     if isLastRow else None
         else:
             sl1 = min(support*(1+cfgSLPercentageFromSupport), brickHigh + (brickSize*cfgRenkoBrickMultiplierShortSL))
+            sl1 = sl1 + 10 if row.slpVal <= -cfgSVPSlopeThreshold else sl1
             limit1 = max(resistance*(1-cfgTargetPercentageFromResistance), close - (brickSize * cfgRenkoBrickMultiplierShortTarget)) if row.renko_brick_diff == 0 else brickLow - (brickSize * 10)
     return (s,exit_price,limit1,limit2,sl1,sl2,logString)
 
@@ -1846,6 +1910,163 @@ def followRenkoWithOBV(type, signal, isLastRow, row, df,
     logSignal(logString,['RenkoData','ohlv','svp'],signal,s,row,type,isLastRow,f'TrdPrice:{entry_price} LIM:{limit1} SL:{sl1}',logWithNoSignalChange=True)
     return (s,entry_price, limit1, limit2, sl1, sl2)
 
+def checkSVPShortEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,logString):
+    prevSL1 = getTickerSL1(row.symbol) if isShortSL1Order(row.symbol) else float('nan')
+    prevTarget = getTickerLimit1(row.symbol) if isShortLimit1Order(row.symbol) else float('nan')
+
+    logString = 'WAITING-FOR-SHORT-ENTRY'
+
+    if row.Low <= prevSL1:
+        s = -1
+        entry_price = min(prevSL1,row.Open)
+        if prevSL1 - row.Open > 2:
+            entry_price = float('nan')
+            print(f"ERROR: checkSVPShortEntry: Entry price {row.Open} is more than 2 away from SL {prevSL1}")
+            return (s,entry_price, limit1, limit2, sl1, sl2,logString)
+            exit(0)
+
+        logString = "SHORT-ENTRY"
+        logging.info(f"SL order hit at {entry_price}.") if isLastRow else None
+    elif row.High >= prevTarget:
+        s = -1
+        entry_price = max(prevTarget,row.Open)
+        if row.Low > entry_price:
+            print(f"ERROR: checkSVPShortEntry: How can row.Low {row.Low} be greater than limit entry {entry_price}")
+            #possible I guess because our limit order was not actually there, this is just a simulation backtest, if it was there then row high would have taken it out
+            #exit(0)
+
+        logString = "SHORT-ENTRY"
+        logging.info(f"Target Limit order hit at {entry_price}.") if isLastRow else None
+
+    else:
+        (s, limit1, limit2, sl1, sl2,logString) = \
+            signalGenerator.checkShortEntry(s,row,df,isLastRow,limit1,limit2,sl1,sl2,logString)
+
+    return (s,entry_price, limit1, limit2, sl1, sl2,logString)
+
+def checkSVPLongEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,logString):
+    prevSL1 = getTickerSL1(row.symbol) if isLongSL1Order(row.symbol) else float('nan')
+    prevTarget = getTickerLimit1(row.symbol) if isLongLimit1Order(row.symbol) else float('nan')
+    
+    logString = 'WAITING-FOR-LONG-ENTRY'
+    if row.High >= prevSL1:
+        s = 1
+        entry_price = max(prevSL1,row.Open)
+        if row.Open - prevSL1 > 2:
+            print(f"ERROR: checkSVPLongEntry: Entry price {row.Open} is more than 2 away from SL {prevSL1}")
+            # exit(0)
+        logString = "LONG-ENTRY"
+        logging.info(f"SL order hit at {entry_price}.")  if isLastRow else None
+    elif row.Low <= prevTarget:
+        s = 1
+        entry_price = min(prevTarget,row.Open)
+        if row.High < prevTarget:
+            print(f"ERROR: checkSVPLongEntry: How can row high {row.High} be less than limit entry {prevTarget}")
+            #possible I guess because our limit order was not actually there, this is just a simulation backtest, if it was there then row high would have taken it out
+            #exit(0)
+        logString = "LONG-ENTRY"
+        logging.info(f"Target Limit order hit at {entry_price}.")  if isLastRow else None
+
+    else:
+        (s, limit1, limit2, sl1, sl2,logString) = \
+            signalGenerator.checkLongEntry(s,row,df,isLastRow,limit1,limit2,sl1,sl2,logString)
+    return (s,entry_price, limit1, limit2, sl1, sl2,logString)
+
+def checkSVPLongExit(s,row,df,isLastRow, exit_price,limit1,limit2,sl1,sl2,logString):
+    if not tickerHasLongPosition(row.symbol):
+        print(f"ERROR: checkRenkoLongExit called without long position")
+        exit(1)
+    logString = "LONG-CONTINUE"
+    prevSL1 = getTickerSL1(row.symbol) if isShortSL1Order(row.symbol) else float('nan')
+    prevTarget = getTickerLimit1(row.symbol) if isShortLimit1Order(row.symbol) else float('nan')
+    entryPrice = getTickerEntryPrice(row.symbol)    
+    
+    if row.Low <= prevSL1: #SL
+        s = 0
+        exit_price = min(prevSL1,row.Open)
+        logString = "LONG-EXIT"
+        logging.info(f"Stop Loss order hit at {prevSL1}. Next row should reflect exit.")  if isLastRow else None
+    elif row.High >= prevTarget:#Target
+        s = 0
+        exit_price = max(prevTarget,row.Open)
+        logString = "LONG-EXIT"
+        logging.info(f"Target hit at {exit_price}") if isLastRow else None
+    else:
+        (s, limit1, limit2, sl1, sl2,logString) = \
+            signalGenerator.checkLongExit(s,row,df,isLastRow, entryPrice,limit1,limit2,sl1,sl2,logString)
+
+    return (s,exit_price,limit1,limit2,sl1,sl2,logString)
+
+def checkSVPShortExit(s,row,df,isLastRow, exit_price,limit1,limit2,sl1,sl2,logString):
+    if not tickerHasShortPosition(row.symbol):
+        print(f"ERROR: checkRenkoShortExit called without Short position")
+        exit(1)
+    logString = "SHORT-CONTINUE"
+    prevSL1 = getTickerSL1(row.symbol) if isLongSL1Order(row.symbol) else float('nan')
+    prevTarget = getTickerLimit1(row.symbol) if isLongLimit1Order(row.symbol) else float('nan')
+    entryPrice = getTickerEntryPrice(row.symbol)
+        
+    if row.High >= prevSL1:
+        s = 0
+        exit_price = max(prevSL1,row.Open) if prevSL1>=row.Low else row.Open
+        logString = "SHORT-EXIT"
+        logging.info(f"Stop Loss order hit at {exit_price}. Next row should reflect exit.") if isLastRow else None
+    elif row.Low <= prevTarget:
+        s = 0
+        exit_price = min(prevTarget,row.Open)
+        logString = "SHORT-EXIT"
+        logging.info(f"Short Target hit at {exit_price}")     if isLastRow else None
+    else:
+        (s, limit1, limit2, sl1, sl2,logString) = \
+            signalGenerator.checkShortExit(s,row,df,isLastRow, entryPrice,limit1,limit2,sl1,sl2,logString)
+
+    return (s,exit_price,limit1,limit2,sl1,sl2,logString)
+
+
+
+def checkSVPExit(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,logString=''):
+    
+    if tickerHasLongPosition(row.symbol) :
+        (s,entry_price,limit1,limit2,sl1,sl2,logString) = checkSVPLongExit(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,logString)
+    elif tickerHasShortPosition(row.symbol):
+        (s,entry_price,limit1,limit2,sl1,sl2,logString) = checkSVPShortExit(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,logString)
+    else:
+        print(f"ERROR: checkSVPExit called for ticker without position. Position:{getTickerPosition(row.symbol)}")
+        exit(1)
+    return (s,entry_price,limit1,limit2,sl1,sl2,logString)
+
+def checkSVPEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,logString=''):
+    if signalGenerator.OkToEnterLong(row):
+        (s,entry_price,limit1,limit2,sl1,sl2,logString) = checkSVPLongEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,logString)
+    elif signalGenerator.OkToEnterShort(row):
+        (s,entry_price,limit1,limit2,sl1,sl2,logString) = checkSVPShortEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,logString)
+    else: # nan renko_uptrend
+        (s,entry_price,logString) = (float('nan'),float('nan'),"No-SVP-TREND")
+    return (s,entry_price,limit1,limit2,sl1,sl2,logString)
+
+def limitOrderSanityCheck(s,row,df, isLastRow,entry_price,limit1,limit2,sl1,sl2,logString):
+#    if not np.isnan(s):
+    return (s,entry_price,limit1,limit2,sl1,sl2,logString)
+    #(o,h,l,c,l1,sl) = (row.Open,row.High,row.Low,row['Adj Close'],limit1,sl1)
+
+def followSVP(type, signal, isLastRow, row, df, 
+                        last_signal=float('nan'), prev_trade_price=float('nan'),
+                        prev_limit1=float('nan'), prev_limit2=float('nan'),
+                        prev_sl1=float('nan'), prev_sl2=float('nan')):
+    (s,entry_price,entry_price,limit1,limit2,sl1,sl2) = (signal,prev_trade_price,prev_trade_price,prev_limit1,prev_limit2,prev_sl1,prev_sl2)
+    logArray = []
+    if tickerHasPosition(row.symbol):
+        (s,entry_price,limit1,limit2,sl1,sl2,logString) = checkSVPExit(s,row,df, isLastRow,entry_price,limit1,limit2,sl1,sl2)
+        # (s,entry_price,limit1,limit2,sl1,sl2,logString) = limitOrderSanityCheck(s,row,df, isLastRow,entry_price,limit1,limit2,sl1,sl2,logString)
+    elif type == 1:
+        (s,entry_price,limit1,limit2,sl1,sl2,logString) = checkSVPEntry(s,row,df, isLastRow, entry_price,limit1,limit2,sl1,sl2)
+    else:
+         (s,entry_price,logString) = (float('nan'),float('nan'),"NO-NEW-TRADES")
+         
+    if signalChanged(s,signal):
+        setTickerTrend(row.symbol, s)
+    logSignal(logString,signalGenerator.getLogArray(),signal,s,row,type,isLastRow,f"TrdPrice:{entry_price} LIM:{limit1} SL:{sl1} "+signalGenerator.getExtraLogString(), logWithNoSignalChange=True)
+    return (s,entry_price, limit1, limit2, sl1, sl2)
 
 def exitTargetOrSL(type, signal, isLastRow, row, df, 
                         last_signal=float('nan'), prev_trade_price=float('nan'),
@@ -1935,7 +2156,7 @@ def getOverrideSignal(row,ovSignalGenerators, df):
                     # calculated from last traversal of entire DF by signalGenerators
                     s = sigGen(type,s, isLastRow, row, df, last_signal)                          
     else:
-        return s#Should Never happen
+            return s#Should Never happen
           
     return s    
 
@@ -1943,15 +2164,19 @@ def weShouldTrade(row):
     return (row.name >= tradingStartTime) & \
             (row.name.time() >= cfgStartTimeOfDay) & \
                 (row["Adj Close"] > cfgMinPriceForOptions)
-                
+
+def weCanEnterNewTrades(row):
+    return row.name.time() < cfgEndNewTradesTimeOfDay and \
+        (row["Adj Close"] > cfgMinPriceForOptions+6)
+
 def getSignal(row,signalGenerators, df):
     s = trade_price = limit1 = limit2 = sl1 = sl2 = float("nan")
-    isLastRow = row.name == df.index[-1]
+    isLastRow = (row.name == df.index[-1]) or cfgIsBackTest
     row_time = row.name.time()
 
     #Return nan if its not within trading hours
     if weShouldTrade(row):
-            if row.name.time() < cfgEndNewTradesTimeOfDay:
+            if weCanEnterNewTrades(row):
                 type = 1 # Entry or Exit
             elif row.name.time() < cfgEndExitTradesOnlyTimeOfDay:
                 # Last time period before intraday exit; only exit positions
@@ -1993,6 +2218,23 @@ def getSignal(row,signalGenerators, df):
     #     logTickerStatus(row.symbol)
     return (s,trade_price, limit1, limit2, sl1, sl2)
 
+def cacheAnalytics(df):
+    fname = f"Data/analyticsCache/{df['symbol'][0]}-{df.index[0]}-{df.index[-1]}.pickle"
+    with open(fname,"wb") as f:
+        pickle.dump(df,f)
+
+def hasCachedAnalytics(df):
+    # return False
+    fname = f"Data/analyticsCache/{df['symbol'][0]}-{df.index[0]}-{df.index[-1]}.pickle"
+    if os.path.exists(fname):
+        return True
+    else:
+        return False
+def getCachedAnalytics(df):
+    fname = f"Data/analyticsCache/{df['symbol'][0]}-{df.index[0]}-{df.index[-1]}.pickle"
+    with open(fname, "rb") as f:
+        df = pickle.load(f)
+    return df
 ## MAIN APPLY STRATEGY FUNCTION
 def applyIntraDayStrategy(df,analyticsGenerators=[populateBB], signalGenerators=[followRenkoWithOBV],
                         overrideSignalGenerators=[],tradeStartTime=None, \
@@ -2007,20 +2249,23 @@ def applyIntraDayStrategy(df,analyticsGenerators=[populateBB], signalGenerators=
     if tradingStartTime is None:
         tradingStartTime = datetime.datetime(2000,1,1,10,0,0) #Long ago :-)
         tradingStartTime = ist.localize(tradingStartTime)
-    
-    df['signal'] = float("nan")
-    
-    dfWithAnalytics = generateAnalytics(analyticsGenerators,df)
-    
+
+    if hasCachedAnalytics(df):
+        df = getCachedAnalytics(df)
+    else: 
+        df['signal'] = float("nan")
+      
+        dfWithAnalytics = generateAnalytics(analyticsGenerators,df)
+                
+        # Select the columns that are present in dfWithAnalytics but not in df
+        new_cols = [col for col in dfWithAnalytics.columns if col not in df.columns]
+        # Copy the new columns from dfWithAnalytics to df   
+        for col in new_cols:
+            df[col] = dfWithAnalytics[col]
+
+        #cache df with analytics for future
+        cacheAnalytics(df)
     initTickerStatus(df['symbol'][0])
-    
-    # Select the columns that are present in dfWithAnalytics but not in df
-    new_cols = [col for col in dfWithAnalytics.columns if col not in df.columns]
-
-    # Copy the new columns from dfWithAnalytics to df   
-    for col in new_cols:
-        df[col] = dfWithAnalytics[col]
-
     # df['SuperTrendDirection'] = dfWithAnalytics['SuperTrendDirection']
     # df['ma_superTrend_pct_change'] = dfWithAnalytics['ma_superTrend_pct_change']
     # apply the condition function to each row of the DataFrame
@@ -2052,4 +2297,4 @@ def applyIntraDayStrategy(df,analyticsGenerators=[populateBB], signalGenerators=
         df['signal'] = df.apply(getOverrideSignal, 
             args=(overrideSignalGenerators, df), axis=1)
 
-    return tickerIsTrending(df['symbol'][0])
+    return df

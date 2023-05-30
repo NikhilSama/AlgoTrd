@@ -97,16 +97,16 @@ def getTickerPrice(t,zgetTO):
     df = downloader.zget(zgetFROM,zgetTO,'NIFTY 50','minute',includeOptions=False)
     return df.iloc[0]['Adj Close'] 
 
-def getStrike(t):
-    niftyOpen = getTickerPrice(t,datetime.datetime.combine(datetime.date.today(), datetime.time(9,16)))
-    strikeFloor = math.floor(niftyOpen/100)*100
-    strikeCiel = math.ceil(niftyOpen/100)*100
+def getStrike(t,offset=0):
+    niftyOpen = getTickerPrice(t,datetime.datetime.combine(datetime.date.today(), datetime.time(9,16))) #if cfgNiftyOpen == 0 else cfgNiftyOpen 
+    strikeFloor = (math.floor(niftyOpen/100)*100) - offset  
+    strikeCiel = (math.ceil(niftyOpen/100)*100) + offset
 
     #print(f"Strike Floor: {strikeFloor}, Strike Ciel: {strikeCiel}")
     return (strikeFloor,strikeCiel)
     
-def getActiveOptionTickers(t):
-    (strikeFloor,strikeCiel) = getStrike(t)
+def getActiveOptionTickers(t,offset=0):
+    (strikeFloor,strikeCiel) = getStrike(t,offset)
     (itmCall,lot,tick) = db.get_option_ticker(t,0,'CE',None,strike=strikeFloor)
     (otmCall,lot,tick) = db.get_option_ticker(t,0,'CE',None,strike=strikeCiel)
     (otmPut,lot,tick) = db.get_option_ticker(t,0,'PE',None,strike=strikeFloor)
@@ -114,8 +114,8 @@ def getActiveOptionTickers(t):
 #    print(f"ITM Call: {itmCall}, OTM Call: {otmCall}, OTM Put: {otmPut}, ITM Put: {itmPut}")
     return(itmCall,otmCall,otmPut,itmPut)
 
-def get_fo_active_nifty_tickers():
-    (itmCall,otmCall,otmPut,itmPut) = getActiveOptionTickers('NIFTY 50')
+def get_fo_active_nifty_tickers(offset=0):
+    (itmCall,otmCall,otmPut,itmPut) = getActiveOptionTickers('NIFTY 50',offset)
     return [itmCall]
     return ['HDFCBANK', 'ICICIBANK', 'RELIANCE', 'KOTAKBANK']
     return ['NIFTY 50','NIFTY23APRFUT','RELIANCE','INFY','BAJFINANCE','SBIN', 'TCS', 'KOTAKBANK', 'ICICIBANK', 'HDFCBANK', 'MARUTI' ]

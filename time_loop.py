@@ -148,8 +148,9 @@ def buyCondition(df,net_position):
 # UNLESS the signal is 1 or 0 (nan or -1 is ok), in which case we should not, since we are going long this tick anyway
 
 def sellCondition(df,net_position):
-    return (df['signal'][-1] == -1 and df['position'][-1] != -1) or \
-            (df['position'][-1] == -1 and net_position != -1 and df['signal'][-1] != 1 and df['signal'][-1] != 0)
+    return net_position != -1 and \
+        ((df['signal'][-1] == -1 and df['position'][-1] != -1) or \
+            (df['position'][-1] == -1 and df['signal'][-1] != 1 and df['signal'][-1] != 0))
 
 # EXIT CONDITION
 # Exit if there is a current position (net_position != 0) 
@@ -252,11 +253,8 @@ def checkPositionsForConsistency(positions,df):
             logging.info(f"{t}: No Live Kite positions inconsistant with DF ({position})")
     
     return net_position
-def placeEntryOrder(df):
-    if df.empty or not 'limit1' in df.columns or np.isnan(df['limit1'][-1]):
-        return
-
-    slTrigger = df['limit1'][-1] 
+def placeEntrySL1Order(df):
+    slTrigger = df['sl1'][-1] 
     
     if slTrigger > 1: 
         oType = 'BUY'
@@ -277,8 +275,44 @@ def placeEntryOrder(df):
         lot_size = 1
         tick_size = 0.05
         exch = 'NSE'
-    logging.info(f"EntryOrder => {t}:{oType} @ {slTrigger} betsize:{bet_size}")
-    return ki.exec_sl(kite,t,exch,oType,slTrigger,lot_size,tick_size, ltp=ltp, betsize=bet_size)    
+    logging.info(f"EntrySLOrder => {t}:{oType} @ {slTrigger} betsize:{bet_size}")
+    return ki.exec_sl(kite,t,exch,oType,slTrigger,lot_size,tick_size, ltp=ltp, betsize=bet_size,tag='EntrySL1')
+def placeEntryLimit1Order(df):
+    p = df['limit1'][-1] 
+    
+    if p > 1: 
+        oType = 'BUY'
+    elif p < -1:
+        oType = 'SELL'
+        slTrigger = abs(slTrigger)
+    else: # shoulud never happen
+        print("ERROR: limit is 0")
+        exit(-1)
+        
+    t = df['symbol'][0]
+    ltp = df['Adj Close'][-1]
+    
+    if utils.tickerIsFutOrOption(t):
+        tput,lot_size,tick_size = db.get_option_ticker(t, ltp, 'XX')
+        exch = 'NFO'
+    else:
+        lot_size = 1
+        tick_size = 0.05
+        exch = 'NSE'
+    logging.info(f"EntryLimitOrder => {t}:{oType} @ {p} betsize:{bet_size}")
+    (lim1OrderId,SL1OrderId) = ki.exec(kite,t,exch,oType,lot_size=lot_size,tick_size=tick_size,p=0,ltp=ltp,tag='Entry1')
+
+    return lim10rderId
+
+def placeEntryOrder(df):
+    if df.empty or not 'sl1' in df.columns or np.isnan(df['sl1'][-1]):
+        return
+    
+    if 'sl1' in df.columns and not np.isnan(df['sl1'][-1]):
+        entrySLOrderId = placeEntrySL1Order(df)
+    elif 'limit1' in df.columns and not np.isnan(df['limit1'][-1]):
+        placeEntryLimit1Order(df)
+     
 
 def placeExitOrder(df,positions):
     optType = None
@@ -336,10 +370,12 @@ def placeExitOrder(df,positions):
 
         slqt = qt
         targetqt = round(qt*cfgPartialExitPercent/lot_size)*lot_size
-        logging.info(f"ExitOrders => {t}:{oType}  Target:{targetqt} @ {target} SL:{slqt} @ {sl} brick diff:{df['renko_brick_diff'][-1]}")
-
-        (lim1OrderId,SL1OrderId) = ki.exec(kite,ticker,exch,oType,lot_size=lot_size,tick_size=tick_size,
-                q=targetqt,p=target,tag="TargetExit",sl=1,sltrigger=sl,slTxType=oType,slqt=slqt)
+        if targetqt == 0:
+            logging.info(f"Skipping 0 Qt ExitOrders => {t}:{oType}  Target:{targetqt} @ {target} SL:{slqt} @ {sl} brick diff:{df['renko_brick_diff'][-1]}")
+        else:
+            logging.info(f"ExitOrders => {t}:{oType}  Target:{targetqt} @ {target} SL:{slqt} @ {sl} brick diff:{df['renko_brick_diff'][-1]}")
+            (lim1OrderId,SL1OrderId) = ki.exec(kite,ticker,exch,oType,lot_size=lot_size,tick_size=tick_size,
+                    q=targetqt,p=target,tag="Exit1",sl=1,sltrigger=sl,slTxType=oType,slqt=slqt)
     else: #ticker is equity underlying, and we are trading its option
         # df does not have the bb exit price, so we can skip for now
         #TODO: Calculate exit price
@@ -406,7 +442,7 @@ def generateSignalsAndTrade(df,positions,stock,options,tradeStartTime=None,
         ]
     }
     signalGenerators = [    
-                        signals.followRenkoWithOBV
+                        signals.followSVP
                         #signals.followObvAdxMA
                         #signals.followObvMA
                         #,signals.exitOBV
@@ -421,7 +457,7 @@ def generateSignalsAndTrade(df,positions,stock,options,tradeStartTime=None,
 
                         ]
     overrideSignalGenerators = []   
-    tickerIsTrending = \
+    df = \
         signals.applyIntraDayStrategy(df,dataPopulators,signalGenerators, \
                                 overrideSignalGenerators, tradeStartTime=tradingStartTime)
     # update df for any target exits that happened within candle

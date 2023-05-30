@@ -8,7 +8,8 @@ Created on Sun Feb  5 14:26:36 2023
 import sys
 import datetime
 cfgDict = {
-    'cfgIsBackTest': True,
+    'cfgNiftyOpen': 18500,
+    'cfgIsBackTest': False,
     'cfgZGetStartDate': None,
     'cfgZGetEndDate': None,    
     'cfgMaxLotsForTrade' : 36,
@@ -16,10 +17,11 @@ cfgDict = {
     'cfgHistoricalDaysToGet': 0,
     'cfgFreezeGun': False,
     'cfgUseVolumeDataForOptions': True,
-    'cfgMinPriceForOptions': 30,
-    'cfgStartTimeOfDay': datetime.datetime.strptime("10:00+05:30", "%H:%M%z").time(),
+    'cfgMinPriceForOptions': 40,
+    'cfgStartTimeOfDay': datetime.datetime.strptime("9:16+05:30", "%H:%M%z").time(),
     'cfgEndNewTradesTimeOfDay': datetime.datetime.strptime("15:00+05:30", "%H:%M%z").time(),
     'cfgEndExitTradesOnlyTimeOfDay': datetime.datetime.strptime("15:18+05:30", "%H:%M%z").time(),
+    'cfgTimeToCheckDayTrendInfo': datetime.datetime.strptime("11:00+05:30", "%H:%M%z").time(),
     'cfgMinCandlesForMA': 5,
     'cfgStopLoss': 0.03,
     'cfgStopLossFromPeak': 0.03,
@@ -48,7 +50,8 @@ cfgDict = {
     'cfgObvSlopeThresh': 0.01,
     'cfgMaxLookbackCandles': 400,
     'cfgNumConditionsForTrendFollow': 2,
-    'cfgRenkoBrickSize': 8,
+    'cfgMinStaticCandlesForMeanRev':15,
+    'cfgRenkoBrickSize': 10,
     'cfgRenkoBrickMultiplierLongTarget': 2,
     'cfgRenkoBrickMultiplierLongSL': 1,
     'cfgRenkoBrickMultiplierShortTarget': 2,
@@ -56,8 +59,9 @@ cfgDict = {
     'cfgTargetPercentageFromResistance': 0.01,
     'cfgSLPercentageFromSupport': 0.02,
     'cfgRenkoNumBricksForTrend': 2,
-    'cfgSVPSlopeCandles': 6,
+    'cfgSVPSlopeCandles': 2,
     'cfgSVPSlopeProjectionCandles': 10,
+    'cfgSVPSlopeThreshold': 0.3,
     'cfgEnoughReturnForTheDay': 0.2,
     'cfgEnoughLossForTheDay': 1,
     'cfgPartialExitPercent': 0.5,
@@ -82,7 +86,7 @@ cfgDict = {
     'dbpass' : 'trading123',
     'showTradingViewLive' : False,
     'cacheTickData' : False, 
-    'bet_size': 10000
+    'bet_size': 500000
 }
 
 args = sys.argv[1:]

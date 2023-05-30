@@ -142,10 +142,24 @@ def calc_trade_returns (date, trades, ticker_data):
     #therfore returns from that candle should not be included in this trade
     #they will be included in ne 0xt trade.  Therefore set strategy returns for 
     #last candle here to 0
-    ticker_data.iloc[-1, ticker_data.columns.get_loc('strategy_returns')] = 0
-    ticker_data['cum_trade_returns'] =  (1+ticker_data['strategy_returns']).cumprod() - 1
-    trades.loc[date, 'return'] = ticker_data.iloc[-1]['cum_trade_returns']
 
+
+# Theoretically this method below shouuld work, in practice it has some errors
+# when row returns are negative.
+# for Example look at NIFTY WEEKLY OPTION DATA @
+#        27-02 10:01 AM 47 Position: -1.0 @ 125.2        Return:-2.88%   CUM=>-2.88%
+#                11:02:00 AM: EXIT @ 128.80(-3.6 or -2.88%)
+# This cumprod calculation gives a return or -7% for this .. debug later, for now just 
+# use the simpler alternate method belwo
+#
+#    ticker_data.iloc[-1, ticker_data.columns.get_loc('strategy_returns')] = 0
+#    ticker_data['cum_trade_returns'] =  (1+ticker_data['strategy_returns']).cumprod() - 1
+#   trades.loc[date, 'return'] = ticker_data.iloc[-1]['cum_trade_returns']
+
+    tradeEntry = ticker_data.iloc[0, ticker_data.columns.get_loc('Open')]
+    tradeExit  = ticker_data.iloc[-1, ticker_data.columns.get_loc('Open')]
+    tradePNL = (tradeExit - tradeEntry) * ticker_data.iloc[0, ticker_data.columns.get_loc('position')]
+    trades.loc[date, 'return'] = tradePNL/tradeEntry
     return
 
 def get_trades (df):
