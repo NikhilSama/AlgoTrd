@@ -22,7 +22,7 @@ import DownloadHistorical as downloader
 import pytz
 import strategies15m as strat15m
 import ppprint
-from plotting import plot_backtest,plot_stock_and_option,plot_trades,plot_returns_on_nifty
+from plotting import plot_backtest,plot_stock_and_option,plot_trades,plot_returns_on_nifty,plot_option_intrinsic
 import itertools 
 from sqlalchemy import create_engine
 import mysql.connector
@@ -79,13 +79,14 @@ ist = pytz.timezone('Asia/Kolkata')
 tickers = td.get_sp500_tickers()
 nifty = td.get_nifty_tickers()
 index_tickers = td.get_index_tickers()
-firstTradeTime = datetime.datetime(2022,4,1,9,0) if cfgZGetStartDate == None else cfgZGetStartDate
-# firstTradeTime = datetime.datetime(2023,3,14,9,0) if cfgZGetStartDate == None else cfgZGetStartDate
+# firstTradeTime = datetime.datetime(2022,4,1,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
+firstTradeTime = datetime.datetime(2023,6,6,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
 firstTradeTime = ist.localize(firstTradeTime)
 zgetFrom = firstTradeTime - timedelta(days=cfgHistoricalDaysToGet)
-zgetTo = datetime.datetime(2023,4,1,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
-# zgetTo = datetime.datetime(2023,3,14,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+# zgetTo = datetime.datetime(2023,4,1,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+zgetTo = datetime.datetime(2023,6,6,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 zgetTo = ist.localize(zgetTo)
+
 
 
 # def mmReturns(row,df):
@@ -116,6 +117,8 @@ def dbget(t,s,e,offset=None):
     df.drop('Open Interest', axis = 1, inplace = True) if 'Open Interest' in df.columns else None
 
     df['symbol'] = t+(str(offset) if offset is not None else '')
+    df = utils.cleanDF(df)
+
     downloader.loadTickerCache(df,'NIFTYITMCALL{offset}',s,e,'minute')
     return df
     
@@ -306,6 +309,9 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
     if 'options' in plot:
         plot_stock_and_option(df.loc[firstTradeTime:])
         
+    if 'option_intrinsic' in plot:
+        plot_option_intrinsic(df.loc[firstTradeTime:])
+
     if 'adjCloseGraph' in plot:
         plot_backtest(df.loc[firstTradeTime:],tearsheet['trades'] if 'trades' in tearsheet else None)
     
@@ -554,7 +560,7 @@ if isMain:
     #backtest('NIFTY23APRFUT','minute')
     # isMain = False
     t = perfProfiler("Start", time.time())
-    #backtest('NIFTY2351118100CE','minute')
+    # backtest('NIFTY 50','minute')
 
     backtest('NIFTYWEEKLYOPTION','minute',src="db")
     t = perfProfiler("End", t)

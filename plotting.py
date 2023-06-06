@@ -69,6 +69,18 @@ def plot_trades_histogram(df):
     if 'adjCloseGraph' not in plot:
         plt.show()
 
+def plot_option_intrinsic(df):
+    fig, (ax1, ax2, ax3) = \
+        plt.subplots(3, 1, figsize=(8, 8), sharex=True, 
+                    gridspec_kw={'height_ratios': [1,1,1]})
+    df['closelessstrike'] = df['Adj Close'] - df['Strike-C']
+    df['callclose'] = df['Adj Close-P']
+    df['timevalue'] = df['callclose'] - df['closelessstrike']
+    ax1.plot(df['i'], df['closelessstrike'], color='red', linewidth=2)
+    ax2.plot(df['i'], -df['callclose'], color='green', linewidth=2)
+    ax3.plot(df['i'], df['timevalue'], color='yellow', linewidth=2)
+    plt.show()
+    
 def plot_stock_and_option(df):
     fig, (ax1, ax2, ax3) = \
         plt.subplots(3, 1, figsize=(8, 8), sharex=True, 
@@ -130,6 +142,7 @@ def plot_backtest(df,trades=None):
     # ax1.plot(df['i'], df['val'], color='red', linewidth=3)
     ax1.plot(df['i'], df['vah15m'], color='green', linewidth=1)
     ax1.plot(df['i'], df['val15m'], color='red', linewidth=1)
+    ax1.plot(df['i'], abs(df['sl1']), color='red', linewidth=3)
     # ax1.plot(df['i'], df['val']+(df['slpVal']*10), color='red', linewidth=1)
     # ax1.plot(df['i'], df['ma20'], color='orange', linewidth=1)
     # ax1.plot(df['i'], df['MA-FAST'], color='green', linewidth=1)

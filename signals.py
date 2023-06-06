@@ -26,7 +26,7 @@ from candlerankings import candle_rankings
 from signal_generators.svb import svb
 from signal_generators.renko import Renko
 
-signalGenerator = Renko(limitExitOrders=False,limitEntryOrders=False,
+signalGenerator = Renko(limitExitOrders=True,limitEntryOrders=True,
                         slEntryOrders=True,slExitOrders=True,
                         exitStaticBricks=False,useSVPForEntryExitPrices=False)
 
@@ -195,7 +195,7 @@ def renko(DF):
     df = DF.copy()
     df.reset_index(inplace=True)
 
-    df.columns = ["date","i","open","high","low","close","volume","symbol","signal","ATR"]
+    df.columns = ["date","i","open","high","low","close","volume","symbol","signal","ATR"] if 'Volume-P' not in df.columns else ["date","i","open","high","low","close","volume","symbol","Open-P","High-P","Low-P","Adj Close-P","Volume-P","Strike-P","Open-C","High-C","Low-C","Adj Close-C","Volume-C","Strike-C","signal","ATR"]
     
     df2 = Renko(df)
     df2.brick_size = cfgRenkoBrickSize
@@ -245,11 +245,11 @@ def vwap(df):
     df['VWAP_lower'] = df['VWAP'] - 1 * df['VWAP_SD']  # Lower band (2 SD below VWAP)
     
 # Function to calculate POC, VAH, VAL
-def session_volume_profile (DF, type='normal'):
+def session_volume_profile (DF, type='normal', start_time=datetime.time(9, 15)):
     # calculate volume distribution
     if DF.empty:
         return (np.nan, np.nan, np.nan, np.nan, np.nan)
-    df = DF[DF.index.time > datetime.time(9, 31)].copy() # remove pre-market candles as they are huge volume (OI growth) and therefore have an undue influence on SVP
+    df = DF[DF.index.time > start_time].copy() # remove pre-market candles as they are huge volume (OI growth) and therefore have an undue influence on SVP
     if df.empty:
         return (np.nan, np.nan, np.nan, np.nan, np.nan)
 
@@ -865,7 +865,7 @@ def logSignal(msg,reqData,signal,s,row,window,isLastRow,extra='',logWithNoSignal
         "maSlpData" : f"maSlp:{round(row['SLOPE-OSC'],2)} >= {maSlopeThresh}(*{maSlopeThreshYellowMultiplier}) maSlpChng:{round(row['SLOPE-OSC-SLOPE'],2)}>*{numCandlesForSlopeProjection} | " if "SLOPE-OSC" in row else 'No Slope Data',
         "obvData" : f"OBV:{round(row['OBV-OSC'],2)} > {obvOscThresh}(*{obvOscThreshYellowMultiplier}) obvSLP:{round(row['OBV-OSC-PCT-CHNG'],2)}>*{numCandlesForSlopeProjection} | " if "OBV-OSC" in row else 'No Volume Data',
         "RenkoData": f"Renko Trend:{'↑' if row['renko_uptrend'] else '↓'}:{round(row['renko_brick_num'])}({round(row['renko_brick_diff'])}) V:{round(row['renko_brick_volume_osc'],1)} StC:{round(row['renko_static_candles']) if not np.isnan(row['renko_static_candles']) else 'nan'} H:{round(row['renko_brick_high'],1)} L:{round(row['renko_brick_low'],1)} | " if "renko_uptrend" in row and not np.isnan(row.renko_brick_num) else 'No Renko Data',
-        "svp": f"SVP {row['dayHigh']}-{row['vah']}({round(row['slpVah'],1)})-{row['poc']}({round(row['slpPoc'],1)})-{row['val']}({round(row['slpVal'],1)})-{row['dayLow']} VWAP:{row['VWAP']} SVP-15 {round(row['15mHigh'],1)}-{round(row['vah15m'],1)}-{round(row['poc15m'],1)}-{round(row['val15m'],1)}-{round(row['15mLow'],1)} | " if "poc" in row else 'No SVP Data'
+        "svp": f"SVP {row['dayHigh']}-{row['vah']}({round(row['slpVah'],1)})-{row['poc']}({round(row['slpPoc'],1)})-{row['val']}({round(row['slpVal'],1)})-{row['dayLow']} VWAP:{row['VWAP']} SVP-15 {round(row['15mHigh'],1)}-{round(row['vah15m'],1)}({round(row.slp15Vah,1)})-{round(row['poc15m'],1)}-{round(row['val15m'],1)}({round(row.slp15Val,1)})-{round(row['15mLow'],1)} | " if "poc" in row else 'No SVP Data'
     }
     dataString = ''
     for key in reqData:
@@ -976,14 +976,13 @@ def populateSVP(df):
         df.iloc[end, df.columns.get_loc('val15m')] = val
         df.iloc[end, df.columns.get_loc('15mHigh')] = dayHigh
         df.iloc[end, df.columns.get_loc('15mLow')] = dayLow
-        df.iloc[end, df.columns.get_loc('slp15Poc')] = (poc - df.iloc[end-3, df.columns.get_loc('poc15m')])
-        df.iloc[end, df.columns.get_loc('slp15Vah')] = (vah - df.iloc[end-3, df.columns.get_loc('vah15m')])
-        df.iloc[end, df.columns.get_loc('slp15Val')] = (val - df.iloc[end-3, df.columns.get_loc('val15m')])
+        df.iloc[end, df.columns.get_loc('slp15Vah')] = (vah - df.iloc[end-3, df.columns.get_loc('vah15m')])#.rolling(window=5, min_periods=2).mean()
+        df.iloc[end, df.columns.get_loc('slp15Val')] = (val - df.iloc[end-3, df.columns.get_loc('val15m')])#.rolling(window=5, min_periods=2).mean()
 
     for end in range(5, len(df)):
         start = 0
         window_df = df.iloc[start:end]
-        (poc, vah, val,dayHigh,dayLow) = session_volume_profile(window_df)
+        (poc, vah, val,dayHigh,dayLow) = session_volume_profile(window_df,start_time=datetime.time(9,31)) 
         df.iloc[end, df.columns.get_loc('poc')] = poc
         df.iloc[end, df.columns.get_loc('vah')] = vah
         df.iloc[end, df.columns.get_loc('val')] = val        
@@ -1921,7 +1920,7 @@ def checkSVPShortEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,log
         entry_price = min(prevSL1,row.Open)
         if prevSL1 - row.Open > 2:
             entry_price = float('nan')
-            print(f"ERROR: checkSVPShortEntry: Entry price {row.Open} is more than 2 away from SL {prevSL1}")
+            print(f"ERROR: {row.name} checkSVPShortEntry: Entry price {row.Open} is more than 2 away from SL {prevSL1}")
             return (s,entry_price, limit1, limit2, sl1, sl2,logString)
             exit(0)
 
@@ -1931,7 +1930,7 @@ def checkSVPShortEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,log
         s = -1
         entry_price = max(prevTarget,row.Open)
         if row.Low > entry_price:
-            print(f"ERROR: checkSVPShortEntry: How can row.Low {row.Low} be greater than limit entry {entry_price}")
+            print(f"ERROR: {row.name} checkSVPShortEntry: How can row.Low {row.Low} be greater than limit entry {entry_price}")
             #possible I guess because our limit order was not actually there, this is just a simulation backtest, if it was there then row high would have taken it out
             #exit(0)
 
@@ -1953,7 +1952,7 @@ def checkSVPLongEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,logS
         s = 1
         entry_price = max(prevSL1,row.Open)
         if row.Open - prevSL1 > 2:
-            print(f"ERROR: checkSVPLongEntry: Entry price {row.Open} is more than 2 away from SL {prevSL1}")
+            print(f"ERROR: {row.name} checkSVPLongEntry: Entry price {row.Open} is more than 2 away from SL {prevSL1}")
             # exit(0)
         logString = "LONG-ENTRY"
         logging.info(f"SL order hit at {entry_price}.")  if isLastRow else None
@@ -1961,7 +1960,7 @@ def checkSVPLongEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,logS
         s = 1
         entry_price = min(prevTarget,row.Open)
         if row.High < prevTarget:
-            print(f"ERROR: checkSVPLongEntry: How can row high {row.High} be less than limit entry {prevTarget}")
+            print(f"ERROR: {row.name} checkSVPLongEntry: How can row high {row.High} be less than limit entry {prevTarget}")
             #possible I guess because our limit order was not actually there, this is just a simulation backtest, if it was there then row high would have taken it out
             #exit(0)
         logString = "LONG-ENTRY"
@@ -1986,6 +1985,7 @@ def checkSVPLongExit(s,row,df,isLastRow, exit_price,limit1,limit2,sl1,sl2,logStr
         exit_price = min(prevSL1,row.Open)
         logString = "LONG-EXIT"
         logging.info(f"Stop Loss order hit at {prevSL1}. Next row should reflect exit.")  if isLastRow else None
+        
     elif row.High >= prevTarget:#Target
         s = 0
         exit_price = max(prevTarget,row.Open)

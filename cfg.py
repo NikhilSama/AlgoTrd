@@ -18,9 +18,9 @@ cfgDict = {
     'cfgFreezeGun': False,
     'cfgUseVolumeDataForOptions': True,
     'cfgMinPriceForOptions': 40,
-    'cfgStartTimeOfDay': datetime.datetime.strptime("9:16+05:30", "%H:%M%z").time(),
-    'cfgEndNewTradesTimeOfDay': datetime.datetime.strptime("15:00+05:30", "%H:%M%z").time(),
-    'cfgEndExitTradesOnlyTimeOfDay': datetime.datetime.strptime("15:18+05:30", "%H:%M%z").time(),
+    'cfgStartTimeOfDay': datetime.datetime.strptime("9:20+05:30", "%H:%M%z").time(),
+    'cfgEndNewTradesTimeOfDay': datetime.datetime.strptime("15:15+05:30", "%H:%M%z").time(),
+    'cfgEndExitTradesOnlyTimeOfDay': datetime.datetime.strptime("15:19+05:30", "%H:%M%z").time(),
     'cfgTimeToCheckDayTrendInfo': datetime.datetime.strptime("11:00+05:30", "%H:%M%z").time(),
     'cfgMinCandlesForMA': 5,
     'cfgStopLoss': 0.03,
@@ -50,7 +50,7 @@ cfgDict = {
     'cfgObvSlopeThresh': 0.01,
     'cfgMaxLookbackCandles': 400,
     'cfgNumConditionsForTrendFollow': 2,
-    'cfgMinStaticCandlesForMeanRev':15,
+    'cfgMinStaticCandlesForMeanRev':120,
     'cfgRenkoBrickSize': 10,
     'cfgRenkoBrickMultiplierLongTarget': 2,
     'cfgRenkoBrickMultiplierLongSL': 1,
@@ -60,20 +60,22 @@ cfgDict = {
     'cfgSLPercentageFromSupport': 0.02,
     'cfgRenkoNumBricksForTrend': 2,
     'cfgSVPSlopeCandles': 2,
-    'cfgSVPSlopeProjectionCandles': 10,
-    'cfgSVPSlopeThreshold': 0.3,
+    'cfgSVPSlopeProjectionCandles': 1,
+    'cfgSVPSlopeThreshold': 5,
     'cfgEnoughReturnForTheDay': 0.2,
     'cfgEnoughLossForTheDay': 1,
-    'cfgPartialExitPercent': 0.5,
-    'includeOptions': False,
+    'cfgPartialExitPercent': 1,
+    'includeOptions': True,
     'plot': [
         
         # 'trade_returns'
         # ,
-          'adjCloseGraph'
+        #  'adjCloseGraph'
         #  ,
         #  'plot_returns_on_nifty'
         # ,
+        'option_intrinsic'
+        #,
         # 'options'
         ],
 # google cloud specific stuff 

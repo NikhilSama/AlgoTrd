@@ -86,7 +86,7 @@ def tickerlog(s):
 
 
 def getTickersToTrack():
-    tickers = td.get_fo_active_nifty_tickers()
+    tickers = td.get_fo_active_nifty_tickers(offset=100)
     #tickers = ['RELIANCE']
 
     for t in tickers:

@@ -26,10 +26,10 @@ def getStrike():
     
 def getTickers():
     (strikeFloor,strikeCiel) = getStrike()
-    (itmCall,lot,tick) = db.get_option_ticker('NIFTY 50',0,'CE',None,strike=strikeFloor)
-    (otmCall,lot,tick) = db.get_option_ticker('NIFTY 50',0,'CE',None,strike=strikeCiel)
-    (otmPut,lot,tick) = db.get_option_ticker('NIFTY 50',0,'PE',None,strike=strikeFloor)
-    (itmPut,lot,tick) = db.get_option_ticker('NIFTY 50',0,'PE',None,strike=strikeCiel)
+    (itmCall,lot,tick,strike) = db.get_option_ticker('NIFTY 50',0,'CE',None,strike=strikeFloor)
+    (otmCall,lot,tick,strike) = db.get_option_ticker('NIFTY 50',0,'CE',None,strike=strikeCiel)
+    (otmPut,lot,tick,strike) = db.get_option_ticker('NIFTY 50',0,'PE',None,strike=strikeFloor)
+    (itmPut,lot,tick,strike) = db.get_option_ticker('NIFTY 50',0,'PE',None,strike=strikeCiel)
 #    print(f"ITM Call: {itmCall}, OTM Call: {otmCall}, OTM Put: {otmPut}, ITM Put: {itmPut}")
     return(itmCall,otmCall,otmPut,itmPut)
 

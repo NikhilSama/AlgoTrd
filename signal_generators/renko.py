@@ -16,6 +16,104 @@ class Renko(SignalGenerator):
     exitStaticBricks = False
     useSVPForEntryExitPrices = False
     def __init__(self, limitExitOrders=False, limitEntryOrders=False, slEntryOrders=False, slExitOrders=False,exitStaticBricks=False,useSVPForEntryExitPrices=False,**kwargs):
+        # Backtest 4/1/2022 - 4/1/2023
+        #  All False: 
+# Total Return: 1332.56%
+# Drawdown from Prev Peak: -267.92%
+# Sharpe:  2.9797768868890513
+# Calamar:  -0.3462998383863521
+# Num Trades:  754
+# Avg Return per day: 3.99%    
+
+        # SLExitOrders:
+#         Total Return: 1513.45%
+# Drawdown from Prev Peak: -235.99%
+# Sharpe:  3.546399417087138
+# Calamar:  -0.44651128975117554
+# Num Trades:  997
+# Avg Return per day: 4.53%
+# Worst Day (2023-02-08): -107.81%
+# Best Day (2022-08-30): 145.78%
+# No CFG for NIFTYWEEKLYOPTION. Reverting to default CFG
+# End took 229913.71ms
+        # SLEXIT + SL Entry Orders:
+#         Total Return: 1664.96%
+# Drawdown from Prev Peak: -280.58%
+# Sharpe:  3.703480180058392
+# Calamar:  -0.4113533782779639
+# Num Trades:  972
+# Avg Return per day: 4.98%
+# Worst Day (2022-09-19): -103.04%
+# Best Day (2022-08-30): 146.69%
+# LimitExitOrders w SLEntry/Exit @ high+1brick w no limitEntry or svp:
+#         Total Return: 1428.98%
+# Drawdown from Prev Peak: -271.99%
+# Sharpe:  3.2509694951617596
+# Calamar:  -0.3641962175161762
+# Num Trades:  3193
+# Avg Return per day: 4.28%
+# Worst Day (2023-02-08): -102.59%
+# Best Day (2023-02-22): 154.75%
+# No CFG for NIFTYWEEKLYOPTION. Reverting to default CFG
+
+# LimitExitOrders w SLEntry/Exit @ high+2xbrick (hits!)w no limitEntry or svp:
+# Total Return: 1710.82%
+# Drawdown from Prev Peak: -271.13%
+# Sharpe:  3.925853394706633
+# Calamar:  -0.43741055933826223
+# Num Trades:  1070
+# Avg Return per day: 5.12%
+# Worst Day (2022-09-19): -103.04%
+# Best Day (2022-08-30): 111.83%
+# No CFG for NIFTYWEEKLYOPTION. Reverting to default CFG
+# End took 181827.44ms
+
+# # LimitExitOrders w SLEntry/Exit @ high+2xbrick w limitEntry at brick low (no svp):
+# l Return: 1699.99%
+# Drawdown from Prev Peak: -234.71%
+# Sharpe:  4.020836418708987
+# Calamar:  -0.5020782891156211
+# Num Trades:  996
+# Avg Return per day: 5.09%
+# Worst Day (2022-09-19): -83.23%
+
+# # LimitExitOrders w SLEntry/Exit @ high+1.5xbrick w limitEntry at brick low (no svp):
+#  SVP SLP only to switch limit orders for market for flying/crashing tickers (slope 1)
+# Total Return: 1729.07%
+# Drawdown from Prev Peak: -291.07%
+# Sharpe:  3.9742024184294245
+# Calamar:  -0.41179976648402455
+# Num Trades:  1484
+# Avg Return per day: 5.18%
+# Worst Day (2022-09-19): -95.71%
+# Best Day (2023-02-22): 124.41%
+
+# # LimitExitOrders w SLEntry/Exit @ high+1.5xbrick w limitEntry at brick low (no svp):
+#  SVP SLP only to skip limit orders for flying/crashing tickers (cfgSVPSlopeThreshold 5), limit exit price 1.4xbrick + brick high, no exit at static candles
+# Total Return: 1896.59%
+# Drawdown from Prev Peak: -291.25%
+# Sharpe:  4.366464139404451
+# Calamar:  -0.45141395649617566
+# Num Trades:  1494
+
+# CleanDF starts at 9:17
+# Total Return: 1879.14%
+# Drawdown from Prev Peak: -243.82%
+# Sharpe:  4.517621577814576
+# Calamar:  -0.5366068774062591
+# Num Trades:  1485
+# Avg Return per day: 5.63%
+# Worst Day (2023-02-08): -93.67%
+
+# 931 start
+# Total Return: 1563.08%
+# Drawdown from Prev Peak: -203.32%
+# Sharpe:  3.913589396728039
+# Calamar:  -0.5423920070602197
+# Num Trades:  1291
+# Avg Return per day: 4.68%
+# Worst Day (2023-02-08): -110.16%
+# Best Day (2023-02-22): 112.84%
         self.limitExitOrders = limitExitOrders
         self.limitEntryOrders = limitEntryOrders
         self.slEntryOrders = slEntryOrders
@@ -122,22 +220,35 @@ class Renko(SignalGenerator):
     def getSLPrice (self,row,type):
         (brickNum,brickSize,brickHigh,brickLow,close) = \
             (row['renko_brick_num'],row['renko_brick_high'] - row['renko_brick_low'],row['renko_brick_high'],row['renko_brick_low'],row['Adj Close'])
-        lowSL = brickLow - ((self.getNumBricksForShortTrend(row,type)-abs(brickNum)) * brickSize)
-        highSL = brickHigh + ((self.getNumBricksForLongTrend(row, type)-abs(brickNum)) * brickSize)
+        lowEntrySL = brickLow - ((self.getNumBricksForShortTrend(row,type)-abs(brickNum)) * brickSize)
+        highEntrySL = brickHigh + ((self.getNumBricksForLongTrend(row, type)-abs(brickNum)) * brickSize)
+        lowExitSL = max(brickLow-brickSize,row["15mLow"]-(brickSize/2)) if self.useSVPForEntryExitPrices else brickLow-brickSize
+        highExitSL = min(brickHigh + brickSize,row["15mHigh"] + (brickSize/2)) if self.useSVPForEntryExitPrices else brickHigh+brickSize
+        ## SL are not aggressive enough for exit when fllying high above brick_high -- edit those to be val less brickSize, and also dont enter long if close < val (crashing)
+        ## also add in some intel about round support levels .. nifty @ 100 multiple etc .. best to exit at 95 on shorts, and 105 on longs, and wait to enter on conclusive break
+        
         if type == 'longEntrySL':
-            return highSL
+            return highEntrySL
         elif type == 'longExitSL':
-            return -lowSL
+            return -lowExitSL
         elif type == 'shortEntrySL':
-            return -lowSL
+            return -lowEntrySL
         elif type == 'shortExitSL':
-            return highSL
+            return highExitSL
         else:
             print(f"Unkonwn SL type {type} in getHighSL")
             exit(-1)
+    def tickerIsMovingUpFast(self,row):
+        return row.slp15Vah >= cfgSVPSlopeThreshold
+        return abs(row['renko_brick_num']) < (cfgRenkoNumBricksForTrend + 2)#row.slpPoc >= cfgSVPSlopeThreshold
+    def tickerIsMovingDownFast(self,row):   
+        return row.slp15Val <= -cfgSVPSlopeThreshold
+        return abs(row['renko_brick_num']) < (cfgRenkoNumBricksForTrend + 2)#row.slpPoc <= -cfgSVPSlopeThreshold
     def getLimit1Price(self,row,type):
         (brickNum,brickSize,brickHigh,brickLow,staticCandles,close) = \
             (row['renko_brick_num'],row['renko_brick_high'] - row['renko_brick_low'],row['renko_brick_high'],row['renko_brick_low'],row['renko_static_candles'],row['Adj Close'])
+        h = 1000
+        l = 0 
         
         if self.exitStaticBricks and staticCandles >= cfgMinStaticCandlesForMeanRev :
             
@@ -145,17 +256,23 @@ class Renko(SignalGenerator):
                 h = self.getImmidiateResistance(row)
                 l = self.getImmidiateSupport(row)
             else:
-                h = (max(close,brickHigh))
-                l = min(close,brickLow)
-        elif 'Entry' in type:
-            if abs(brickNum) < (cfgRenkoNumBricksForTrend + 2):
-                h = l = float('nan') # immidiate entry if candles are not static
-            else: # We limit exited, and now need to re-enter at a good price
-                h = max(brickHigh,close) #if not self.useSVPForEntryExitPrices else self.getImmidiateResistance(row)
-                l = min(brickLow,close) #if not self.useSVPForEntryExitPrices else self.getImmidiateSupport(row)
+                h = (max(close,brickHigh) + (0.5*brickSize))
+                l = min(close,brickLow - (0.5*brickSize))
+        elif type == 'longEntryLimit1':
+                if self.tickerIsMovingUpFast(row):
+                    l = float('nan')
+                else:
+                    l = min(brickLow,close) if not self.useSVPForEntryExitPrices else self.getImmidiateSupport(row)
+        elif type == 'shortEntryLimit1':
+                if self.tickerIsMovingDownFast(row):
+                    h = float('nan')
+                else:
+                    h = max(brickHigh,close) if not self.useSVPForEntryExitPrices else self.getImmidiateResistance(row)
         else: # Exit limit when candles are non-static or we are not using exiStaticBricks
-            h = (max(brickHigh,close) + 10*brickSize)
-            l = min(brickLow,close) - 10*brickSize
+            h = brickHigh + (1.4*brickSize)
+            l = brickLow - (1.4*brickSize)
+            h = h + brickSize if self.tickerIsMovingUpFast(row) else h
+            l = l - brickSize if self.tickerIsMovingDownFast(row) else l
 
             if self.useSVPForEntryExitPrices:
                 h = close - 2 if row.slpVah <= 0 and staticCandles > 2 else h
@@ -191,6 +308,16 @@ class Renko(SignalGenerator):
             return True
         else:
             return False
+    # def isStatic(self,row):
+    #     (brickNum,brickSize,brickHigh,brickLow,close,staticCandles) = (row['renko_brick_num'],row['renko_brick_high'] - row['renko_brick_low'],row['renko_brick_high'],row['renko_brick_low'],row['Adj Close'],row['renko_static_candles'])
+
+    #     if  staticCandles >= cfgMinStaticCandlesForMeanRev
+    #         return True
+    #     else:
+    #         if close > brickHigh and staticCandles < 5:
+    #             #Newly entered candle, check the static candles of prev brick
+    #             prevStaticCandles = row['renko_static_candles_prev']
+            
     #MAIN
     def OkToEnterLong(self,row):
         return row['renko_uptrend']
@@ -200,13 +327,19 @@ class Renko(SignalGenerator):
         (brickNum,brickSize,brickHigh,brickLow,close) = (row['renko_brick_num'],row['renko_brick_high'] - row['renko_brick_low'],row['renko_brick_high'],row['renko_brick_low'],row['Adj Close'])
         
         self.wontTrendToday(row,df)
+        
+        if close < row.val15m:
+            logging.info(f"Skipping Renko Long Entry for crashing ticker, as close {close} < val15m {row.val15m}") if isLastRow else None
+            return (s, limit1, limit2, sl1, sl2,logString)
+
         if brickNum >= self.getNumBricksForLongTrend(row):
             # if self.meanRevAtStaticCandles and staticCandles > cfgMinStaticCandlesForMeanRev:
             limit1 = self.getLimit1Price(row,'longEntryLimit1') if self.limitEntryOrders else float('nan')
             if np.isnan(limit1):
                 s = 1
                 logString = "RENKO-LONG-ENTRY"
-            # sl1 = (brickHigh + brickSize) if not np.isnan(limit1) else sl1
+            # else:
+            #     sl1 = min((brickHigh + brickSize),self.getImmidiateResistance(row)+5)
         elif self.slEntryOrders and brickNum >= 1:
             sl1 = self.getSLPrice(row,'longEntrySL') 
         return (s, limit1, limit2, sl1, sl2,logString)
@@ -215,12 +348,17 @@ class Renko(SignalGenerator):
         (brickNum,brickSize,brickHigh,brickLow,close) = (row['renko_brick_num'],row['renko_brick_high'] - row['renko_brick_low'],row['renko_brick_high'],row['renko_brick_low'],row['Adj Close'])
         self.wontTrendToday(row,df)
 
+        if close > row.vah15m:
+            logging.info(f"Skipping Renko Short Entry for rising ticker, as close {close} > vah15m {row.vah15m}") if isLastRow else None
+            return (s, limit1, limit2, sl1, sl2,logString)
+
         if brickNum <= -self.getNumBricksForShortTrend(row):
             limit1 = self.getLimit1Price(row,'shortEntryLimit1') if self.limitEntryOrders else float('nan')
-            # sl1 = -(brickLow - brickSize) if not np.isnan(limit1) else sl1
             if np.isnan(limit1):
                 s = -1 
                 logString = "RENKO-SHORT-ENTRY"
+            # else:
+            #     sl1 = -max((brickLow - brickSize),self.getImmidiateSupport(row)-5)
 
         elif self.slEntryOrders and brickNum <= -1:
             sl1 = self.getSLPrice(row,'shortEntrySL') 

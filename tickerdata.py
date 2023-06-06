@@ -98,7 +98,7 @@ def getTickerPrice(t,zgetTO):
     return df.iloc[0]['Adj Close'] 
 
 def getStrike(t,offset=0):
-    niftyOpen = getTickerPrice(t,datetime.datetime.combine(datetime.date.today(), datetime.time(9,16))) #if cfgNiftyOpen == 0 else cfgNiftyOpen 
+    niftyOpen = getTickerPrice(t,datetime.datetime.combine(datetime.date.today(), datetime.time(9,31))) #if cfgNiftyOpen == 0 else cfgNiftyOpen 
     strikeFloor = (math.floor(niftyOpen/100)*100) - offset  
     strikeCiel = (math.ceil(niftyOpen/100)*100) + offset
 
@@ -107,10 +107,10 @@ def getStrike(t,offset=0):
     
 def getActiveOptionTickers(t,offset=0):
     (strikeFloor,strikeCiel) = getStrike(t,offset)
-    (itmCall,lot,tick) = db.get_option_ticker(t,0,'CE',None,strike=strikeFloor)
-    (otmCall,lot,tick) = db.get_option_ticker(t,0,'CE',None,strike=strikeCiel)
-    (otmPut,lot,tick) = db.get_option_ticker(t,0,'PE',None,strike=strikeFloor)
-    (itmPut,lot,tick) = db.get_option_ticker(t,0,'PE',None,strike=strikeCiel)
+    (itmCall,lot,tick,strike) = db.get_option_ticker(t,0,'CE',None,strike=strikeFloor)
+    (otmCall,lot,tick,strike) = db.get_option_ticker(t,0,'CE',None,strike=strikeCiel)
+    (otmPut,lot,tick,strike) = db.get_option_ticker(t,0,'PE',None,strike=strikeFloor)
+    (itmPut,lot,tick,strike) = db.get_option_ticker(t,0,'PE',None,strike=strikeCiel)
 #    print(f"ITM Call: {itmCall}, OTM Call: {otmCall}, OTM Put: {otmPut}, ITM Put: {itmPut}")
     return(itmCall,otmCall,otmPut,itmPut)
 

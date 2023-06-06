@@ -143,9 +143,9 @@ def zget_basic(from_date, to_date, symbol,interval='minute',
 
 def zAddOptionsData(df,symbol,from_date,to_date,interval='minute',continuous=False):
     # Add options data
-    (put_option_ticker,lot_size,tick_size) =db.get_option_ticker(symbol,df['Adj Close'].iloc[-1], 'PE',kite,0)
+    (put_option_ticker,lot_size,tick_size,strike_p) =db.get_option_ticker(symbol,df['Adj Close'].iloc[-1], 'PE',kite,0)
     p_df = zget_basic(from_date,to_date,put_option_ticker,interval,continuous)
-    (call_option_ticker,lot_size,tick_size) =db.get_option_ticker(symbol,df['Adj Close'].iloc[-1], 'CE',kite,0)
+    (call_option_ticker,lot_size,tick_size,strike_c) =db.get_option_ticker(symbol,df['Adj Close'].iloc[-1], 'CE',kite,0)
     c_df = zget_basic(from_date,to_date,call_option_ticker,interval,continuous)
 
     
@@ -158,6 +158,7 @@ def zAddOptionsData(df,symbol,from_date,to_date,interval='minute',continuous=Fal
     df['Low-P'] = p_df['Low']
     df['Adj Close-P'] = p_df['Adj Close']
     df['Volume-P'] = p_df['Volume']
+    df['Strike-P'] = strike_p
     # df[['Open-P', 'High-P', 'Low-P', 'Adj Close-P', 'Volume-P']] = \
     #     df[['Open-P', 'High-P', 'Low-P', 'Adj Close-P', 'Volume-P']].ffill().bfill()
 
@@ -166,6 +167,8 @@ def zAddOptionsData(df,symbol,from_date,to_date,interval='minute',continuous=Fal
     df['Low-C'] = c_df['Low']
     df['Adj Close-C'] = c_df['Adj Close']
     df['Volume-C'] = c_df['Volume']
+    df['Strike-C'] = strike_c
+
     # df[['Open-C', 'High-C', 'Low-C', 'Adj Close-C', 'Volume-C']] = \
     #     df[['Open-C', 'High-C', 'Low-C', 'Adj Close-C', 'Volume-C']].ffill().bfill()
     return df

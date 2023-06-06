@@ -151,18 +151,20 @@ class DBBasic:
                 price = price -150 #TODO HACK - futures are 150 points off on avg; ideally get the ltp of the future and use that
         if not tickerType:
             if strike == 0:
-                q = f"SELECT tradingsymbol,lot_size,tick_size FROM trading.instruments_zerodha where instrument_type = '{type}' and underlying_ticker = '{ticker}' AND expiry >= '{date.today()}' ORDER BY ABS( strike - {price} ) ASC, expiry ASC LIMIT 1"
+                extra = f' AND strike < {price}' if type == 'CE' else f' AND strike > {price}'
+                q = f"SELECT tradingsymbol,lot_size,tick_size,strike FROM trading.instruments_zerodha where instrument_type = '{type}' and underlying_ticker = '{ticker}' AND expiry >= '{date.today()}' {extra} ORDER BY ABS( strike - {price} ) ASC, expiry ASC LIMIT 1"
+                print(q)
             else: # strike is provided, find the option with this strike only
-                q = f"SELECT tradingsymbol,lot_size,tick_size FROM trading.instruments_zerodha where instrument_type = '{type}' and underlying_ticker = '{ticker}' AND expiry >= '{date.today()}' AND strike = {strike} ORDER BY ABS( strike - {price} ) ASC, expiry ASC LIMIT 1"
+                q = f"SELECT tradingsymbol,lot_size,tick_size,strike FROM trading.instruments_zerodha where instrument_type = '{type}' and underlying_ticker = '{ticker}' AND expiry >= '{date.today()}' AND strike = {strike} ORDER BY ABS( strike - {price} ) ASC, expiry ASC LIMIT 1"
         else:
             #ticker is alreadu an option; just return the same ticker, with lot_size and tick_size
-            q = f"SELECT tradingsymbol,lot_size,tick_size FROM trading.instruments_zerodha where tradingsymbol = '{ticker}' ORDER BY expiry ASC LIMIT 1"    
+            q = f"SELECT tradingsymbol,lot_size,tick_size,strike FROM trading.instruments_zerodha where tradingsymbol = '{ticker}' ORDER BY expiry ASC LIMIT 1"    
         # else:#Ticker is PE and request is CE or vice versa
         #     inverseTicker = utils.convertPEtoCEAndViceVersa(ticker)
         #     q = f"SELECT tradingsymbol,lot_size,tick_size FROM trading.instruments_zerodha where instrument_type = '{type}' and tradingsymbol = '{inverseTicker}' AND expiry > '{date.today()}' ORDER BY ABS( strike - {price} ) ASC, expiry ASC LIMIT 1"    
         df = pd.read_sql(q, con=self.engine)
         if len(df) > 0:
-            return df.iloc[0,0],df.iloc[0,1],df.iloc[0,2]
+            return df.iloc[0,0],df.iloc[0,1],df.iloc[0,2],df.iloc[0,3]
         else:
             return -1
     

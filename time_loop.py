@@ -112,7 +112,7 @@ def get_positions():
     for t in positions:
         for pos in positions[t]['positions']:
             if utils.isOption(pos['tradingsymbol']):
-                optionTicker,lot_size,tick_size = db.get_option_ticker(pos['tradingsymbol'], None, None,None) #if t is an option other arguments are not looked at
+                optionTicker,lot_size,tick_size,strike = db.get_option_ticker(pos['tradingsymbol'], None, None,None) #if t is an option other arguments are not looked at
                 pos['lot_size'] = lot_size
                 pos['tick_size'] = tick_size
             else:
@@ -269,7 +269,7 @@ def placeEntrySL1Order(df):
     ltp = df['Adj Close'][-1]
     
     if utils.tickerIsFutOrOption(t):
-        tput,lot_size,tick_size = db.get_option_ticker(t, ltp, 'XX')
+        tput,lot_size,tick_size,strike = db.get_option_ticker(t, ltp, 'XX')
         exch = 'NFO'
     else:
         lot_size = 1
@@ -293,7 +293,7 @@ def placeEntryLimit1Order(df):
     ltp = df['Adj Close'][-1]
     
     if utils.tickerIsFutOrOption(t):
-        tput,lot_size,tick_size = db.get_option_ticker(t, ltp, 'XX')
+        tput,lot_size,tick_size,strike = db.get_option_ticker(t, ltp, 'XX')
         exch = 'NFO'
     else:
         lot_size = 1
@@ -310,7 +310,7 @@ def placeEntryOrder(df):
     
     if 'sl1' in df.columns and not np.isnan(df['sl1'][-1]):
         entrySLOrderId = placeEntrySL1Order(df)
-    elif 'limit1' in df.columns and not np.isnan(df['limit1'][-1]):
+    if 'limit1' in df.columns and not np.isnan(df['limit1'][-1]):
         placeEntryLimit1Order(df)
      
 
@@ -369,7 +369,7 @@ def placeExitOrder(df,positions):
                 print("ERROR: Limit1 is negative(sell) when we have a short position")
 
         slqt = qt
-        targetqt = round(qt*cfgPartialExitPercent/lot_size)*lot_size
+        targetqt = max(round(qt*cfgPartialExitPercent/lot_size)*lot_size,lot_size)
         if targetqt == 0:
             logging.info(f"Skipping 0 Qt ExitOrders => {t}:{oType}  Target:{targetqt} @ {target} SL:{slqt} @ {sl} brick diff:{df['renko_brick_diff'][-1]}")
         else:
@@ -434,9 +434,9 @@ def generateSignalsAndTrade(df,positions,stock,options,tradeStartTime=None,
             # signals.populateSuperTrend,
             # signals.populateOBV,
             signals.vwap,
-            signals.populateSVP
+            signals.populateSVP,
 
-            # signals.populateCandleStickPatterns
+            signals.populateCandleStickPatterns
         ], 
         'hourly': [
         ]
@@ -484,7 +484,7 @@ def generateSignalsAndTrade(df,positions,stock,options,tradeStartTime=None,
         if stock:
             ki.nse_buy(kite,t,qToExit=qToExit,tag='main') 
         if options:
-            tput,tput_lot_size,tput_tick_size = db.get_option_ticker(t, ltp, 'PE',kite)
+            tput,tput_lot_size,tput_tick_size,strike = db.get_option_ticker(t, ltp, 'PE',kite)
             if utils.isOption(t):
                 #ticker is itself an option; just buy it
                 print(f"Buying {t} with {qToExit} additional to Exit")
@@ -511,7 +511,7 @@ def generateSignalsAndTrade(df,positions,stock,options,tradeStartTime=None,
             # No need to check utils.isOption() here.  If it is an option, then 
             #get_option_ticker() will return the same ticker and we need to sell it to 
             #go short anyway
-            tcall,tcall_lot_size,tcall_tick_size = db.get_option_ticker(t, ltp, 'CE',kite)
+            tcall,tcall_lot_size,tcall_tick_size,strike = db.get_option_ticker(t, ltp, 'CE',kite)
             print(f"Selling {t} with {qToExit} additional to Exit")
             ki.nfo_sell(kite,tcall,lot_size=tcall_lot_size,
                         tick_size=tcall_tick_size,qToExit=qToExit,betsize=bet_size, tag='main-short')

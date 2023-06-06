@@ -107,7 +107,7 @@ def cleanDF(df):
     # affect our analytics and signals for a long time.  So we filter
     # fileter out these junk values
 
-    df = df.between_time('09:15:00+05:30', '15:29:00+05:30')    
+    df = df.between_time('09:17:00+05:30', '15:29:00+05:30')    
     df = df[df.index.weekday<5] # remove weekends
     
     # Remove holiday data from the DataFrame
