@@ -314,7 +314,7 @@ def supertrend(df, multiplier=3, atr_period=10):
     
     for i in range(1, len(df.index)):
         curr, prev = i, i-1
-                # if current close price crosses above upperband
+        # if current close price crosses above upperband
         if close[curr] > final_upperband[prev]:
             supertrend[curr] = True
         # if current close price crosses below lowerband
@@ -865,7 +865,7 @@ def logSignal(msg,reqData,signal,s,row,window,isLastRow,extra='',logWithNoSignal
         "maSlpData" : f"maSlp:{round(row['SLOPE-OSC'],2)} >= {maSlopeThresh}(*{maSlopeThreshYellowMultiplier}) maSlpChng:{round(row['SLOPE-OSC-SLOPE'],2)}>*{numCandlesForSlopeProjection} | " if "SLOPE-OSC" in row else 'No Slope Data',
         "obvData" : f"OBV:{round(row['OBV-OSC'],2)} > {obvOscThresh}(*{obvOscThreshYellowMultiplier}) obvSLP:{round(row['OBV-OSC-PCT-CHNG'],2)}>*{numCandlesForSlopeProjection} | " if "OBV-OSC" in row else 'No Volume Data',
         "RenkoData": f"Renko Trend:{'↑' if row['renko_uptrend'] else '↓'}:{round(row['renko_brick_num'])}({round(row['renko_brick_diff'])}) V:{round(row['renko_brick_volume_osc'],1)} StC:{round(row['renko_static_candles']) if not np.isnan(row['renko_static_candles']) else 'nan'} H:{round(row['renko_brick_high'],1)} L:{round(row['renko_brick_low'],1)} | " if "renko_uptrend" in row and not np.isnan(row.renko_brick_num) else 'No Renko Data',
-        "svp": f"SVP {row['dayHigh']}-{row['vah']}({round(row['slpVah'],1)})-{row['poc']}({round(row['slpPoc'],1)})-{row['val']}({round(row['slpVal'],1)})-{row['dayLow']} VWAP:{row['VWAP']} SVP-15 {round(row['15mHigh'],1)}-{round(row['vah15m'],1)}({round(row.slp15Vah,1)})-{round(row['poc15m'],1)}-{round(row['val15m'],1)}({round(row.slp15Val,1)})-{round(row['15mLow'],1)} | " if "poc" in row else 'No SVP Data'
+        "svp": f"SVP {row['dayHigh']}-{row['vah']}({round(row['slpVah'],1)})-{row['poc']}({round(row['slpPoc'],1)})-{row['val']}({round(row['slpVal'],1)})-{row['dayLow']} VWAP:{row['VWAP']} SVP-15 {round(row['ShrtTrmHigh'],1)}-{round(row['vahShrtTrm'],1)}({round(row.slpSTVah,1)})-{round(row['pocShrtTrm'],1)}-{round(row['valShrtTrm'],1)}({round(row.slpSTVal,1)})-{round(row['ShrtTrmLow'],1)} | " if "poc" in row else 'No SVP Data'
     }
     dataString = ''
     for key in reqData:
@@ -964,20 +964,20 @@ def populateRenko(df):
     df.drop(["Date"],inplace=True,axis=1)
     df.to_csv('renko.csv')
 def populateSVP(df):
-    window_size = 15  # 15-minute window size in terms of number of rows
-    df['poc15m'] = df['vah15m'] = df['val15m'] = df['poc'] = df['vah'] = df['val']  = df['slpPoc'] = df['slpVah'] = df['slpVal'] = df['slp15Poc'] = df['slp15Vah'] = df['slp15Val'] = df['dayHigh']  = df['dayLow'] = df['15mHigh']  = df['15mLow'] = np.nan
+    window_size = cfgFastSVPWindowSize  # 15-minute window size in terms of number of rows
+    df['pocShrtTrm'] = df['vahShrtTrm'] = df['valShrtTrm'] = df['poc'] = df['vah'] = df['val']  = df['slpPoc'] = df['slpVah'] = df['slpVal'] = df['slpSTPoc'] = df['slpSTVah'] = df['slpSTVal'] = df['dayHigh']  = df['dayLow'] = df['ShrtTrmHigh']  = df['ShrtTrmLow'] = np.nan
 
     for end in range(window_size, len(df)):
         start = end-window_size
         window_df = df.iloc[start:end]
         (poc, vah, val,dayHigh,dayLow) = session_volume_profile(window_df,type='normal')
-        df.iloc[end, df.columns.get_loc('poc15m')] = poc
-        df.iloc[end, df.columns.get_loc('vah15m')] = vah
-        df.iloc[end, df.columns.get_loc('val15m')] = val
-        df.iloc[end, df.columns.get_loc('15mHigh')] = dayHigh
-        df.iloc[end, df.columns.get_loc('15mLow')] = dayLow
-        df.iloc[end, df.columns.get_loc('slp15Vah')] = (vah - df.iloc[end-3, df.columns.get_loc('vah15m')])#.rolling(window=5, min_periods=2).mean()
-        df.iloc[end, df.columns.get_loc('slp15Val')] = (val - df.iloc[end-3, df.columns.get_loc('val15m')])#.rolling(window=5, min_periods=2).mean()
+        df.iloc[end, df.columns.get_loc('pocShrtTrm')] = poc
+        df.iloc[end, df.columns.get_loc('vahShrtTrm')] = vah
+        df.iloc[end, df.columns.get_loc('valShrtTrm')] = val
+        df.iloc[end, df.columns.get_loc('ShrtTrmHigh')] = dayHigh
+        df.iloc[end, df.columns.get_loc('ShrtTrmLow')] = dayLow
+        df.iloc[end, df.columns.get_loc('slpSTVah')] = (vah - df.iloc[end-3, df.columns.get_loc('vahShrtTrm')])#.rolling(window=5, min_periods=2).mean()
+        df.iloc[end, df.columns.get_loc('slpSTVal')] = (val - df.iloc[end-3, df.columns.get_loc('valShrtTrm')])#.rolling(window=5, min_periods=2).mean()
 
     for end in range(5, len(df)):
         start = 0

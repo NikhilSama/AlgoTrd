@@ -213,17 +213,17 @@ class Renko(SignalGenerator):
             return cfgRenkoNumBricksForTrend #if getSVPquadrant(row) != 'High' or row['slpPoc'] >= cfgSVPSlopeThreshold else cfgRenkoNumBricksForTrend-1
     def getImmidiateResistance(self,row):
         #Use SVP
-        return row.vah15m if row.slp15Vah < cfgSVPSlopeThreshold else row['Adj Close'] + 10
+        return row.vahShrtTrm if row.slpSTVah < cfgSVPSlopeThreshold else row['Adj Close'] + 10
     def getImmidiateSupport(self,row):
         #Use SVP
-        return row.val15m if row.slp15Val > -cfgSVPSlopeThreshold else row['Adj Close'] - 10
+        return row.valShrtTrm if row.slpSTVal > -cfgSVPSlopeThreshold else row['Adj Close'] - 10
     def getSLPrice (self,row,type):
         (brickNum,brickSize,brickHigh,brickLow,close) = \
             (row['renko_brick_num'],row['renko_brick_high'] - row['renko_brick_low'],row['renko_brick_high'],row['renko_brick_low'],row['Adj Close'])
         lowEntrySL = brickLow - ((self.getNumBricksForShortTrend(row,type)-abs(brickNum)) * brickSize)
         highEntrySL = brickHigh + ((self.getNumBricksForLongTrend(row, type)-abs(brickNum)) * brickSize)
-        lowExitSL = max(brickLow-brickSize,row["15mLow"]-(brickSize/2)) if self.useSVPForEntryExitPrices else brickLow-brickSize
-        highExitSL = min(brickHigh + brickSize,row["15mHigh"] + (brickSize/2)) if self.useSVPForEntryExitPrices else brickHigh+brickSize
+        lowExitSL = max(brickLow-brickSize,row["ShrtTrmLow"]-(brickSize/2)) if self.useSVPForEntryExitPrices else brickLow-brickSize
+        highExitSL = min(brickHigh + brickSize,row["ShrtTrmHigh"] + (brickSize/2)) if self.useSVPForEntryExitPrices else brickHigh+brickSize
         ## SL are not aggressive enough for exit when fllying high above brick_high -- edit those to be val less brickSize, and also dont enter long if close < val (crashing)
         ## also add in some intel about round support levels .. nifty @ 100 multiple etc .. best to exit at 95 on shorts, and 105 on longs, and wait to enter on conclusive break
         
@@ -239,10 +239,10 @@ class Renko(SignalGenerator):
             print(f"Unkonwn SL type {type} in getHighSL")
             exit(-1)
     def tickerIsMovingUpFast(self,row):
-        return row.slp15Vah >= cfgSVPSlopeThreshold
+        return row.slpSTVah >= cfgSVPSlopeThreshold
         return abs(row['renko_brick_num']) < (cfgRenkoNumBricksForTrend + 2)#row.slpPoc >= cfgSVPSlopeThreshold
     def tickerIsMovingDownFast(self,row):   
-        return row.slp15Val <= -cfgSVPSlopeThreshold
+        return row.slpSTVal <= -cfgSVPSlopeThreshold
         return abs(row['renko_brick_num']) < (cfgRenkoNumBricksForTrend + 2)#row.slpPoc <= -cfgSVPSlopeThreshold
     def getLimit1Price(self,row,type):
         (brickNum,brickSize,brickHigh,brickLow,staticCandles,close) = \
@@ -326,10 +326,10 @@ class Renko(SignalGenerator):
     def checkLongEntry(self,s,row,df,isLastRow,limit1,limit2,sl1,sl2,logString):
         (brickNum,brickSize,brickHigh,brickLow,close) = (row['renko_brick_num'],row['renko_brick_high'] - row['renko_brick_low'],row['renko_brick_high'],row['renko_brick_low'],row['Adj Close'])
         
-        self.wontTrendToday(row,df)
-        
-        if close < row.val15m:
-            logging.info(f"Skipping Renko Long Entry for crashing ticker, as close {close} < val15m {row.val15m}") if isLastRow else None
+        # self.wontTrendToday(row,df)
+        # print(row)
+        if close < row.valShrtTrm:
+            logging.info(f"Skipping Renko Long Entry for crashing ticker, as close {close} < valShrtTrm {row.valShrtTrm}") if isLastRow else None
             return (s, limit1, limit2, sl1, sl2,logString)
 
         if brickNum >= self.getNumBricksForLongTrend(row):
@@ -348,8 +348,8 @@ class Renko(SignalGenerator):
         (brickNum,brickSize,brickHigh,brickLow,close) = (row['renko_brick_num'],row['renko_brick_high'] - row['renko_brick_low'],row['renko_brick_high'],row['renko_brick_low'],row['Adj Close'])
         self.wontTrendToday(row,df)
 
-        if close > row.vah15m:
-            logging.info(f"Skipping Renko Short Entry for rising ticker, as close {close} > vah15m {row.vah15m}") if isLastRow else None
+        if close > row.vahShrtTrm:
+            logging.info(f"Skipping Renko Short Entry for rising ticker, as close {close} > vahShrtTrm {row.vahShrtTrm}") if isLastRow else None
             return (s, limit1, limit2, sl1, sl2,logString)
 
         if brickNum <= -self.getNumBricksForShortTrend(row):

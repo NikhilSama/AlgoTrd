@@ -117,6 +117,21 @@ def cleanDF(df):
     # Set the seconds values to 0 in the DateTimeIndex
     df.index = df.index.floor('T')
     df.rename(columns={"Ticker":"symbol"},inplace=True)
+    
+    # Remove the '.NFO' suffix from the 'symbol' column
+    df['symbol'] = df['symbol'].str.replace('.NFO', '')
+
+    # Extract 'option_type' from the 'symbol' column
+    df['option_type'] = df['symbol'].str[-2:]
+
+    # Extract 'strike' from the 'symbol' column
+    df['strike'] = df['symbol'].str[12:-2]
+
+    # Convert 'expiry' column to date object
+    print(df['symbol'])
+    df['expiry'] = pd.to_datetime(df['symbol'].str[5:12], format='%d%b%y')
+    df['expiry'] = pd.to_datetime(df['expiry'], format='%d%b%y')
+
     df.rename(columns={"Close":"Adj Close"},inplace=True)
     # Drop the original Date and Time columns
     df.drop(columns=['Date', 'Time'], inplace=True)
@@ -137,5 +152,76 @@ def constructDF(offset=0):
     db = DBBasic()
     db.toDB(f'niftyITMCall{offset if offset !=0 else None}',df)
     df.to_csv(f'Data/NIFTYOPTIONSDATA/contNiftyWeeklyOptionDF{offset if offset !=0 else None}.csv')
+
+def splitDatesIntoChunks(s,e):
+    # Calculate the total number of days between the two dates
+    total_days = (e - s).days
+
+    # Calculate the number of 60-day chunks
+    num_chunks = total_days // 60
+
+    # Initialize a list to store the chunks
+    date_chunks = []
+
+    # Split the date range into 60-day chunks
+    for i in range(num_chunks):
+        start_date = s + datetime.timedelta(days=i * 60)
+        end_date = start_date + datetime.timedelta(days=60)
+        date_chunks.append((start_date, end_date))
+
+    # Handle the remaining days (if any)
+    remaining_days = total_days % 60
+    if remaining_days > 0:
+        start_date = s + datetime.timedelta(days=num_chunks * 60)
+        end_date = start_date + datetime.timedelta(days=remaining_days)
+        date_chunks.append((start_date, end_date))
+    return date_chunks
+
+def optionFileToDB(file_path):
+    # Read the csv file into a dataframe
+    try:
+        data = pd.read_csv(file_path)
+    except FileNotFoundError:
+        print(f"File not found: {file_path}")
+        #exit(0)
+        return None
+    if (data.empty):
+        print(f"No data found  in {file_path}")
+        exit(0)        
+        return None
+    data = cleanDF(data)
+    db = DBBasic()
+    db.toDB(f'nifty_options',data)
     
-constructDF(100)
+
+def niftyDFToDB():
+    df = pd.DataFrame()
+    dateChunks = splitDatesIntoChunks(zgetFrom,zgetTo)
+    for (s,e) in dateChunks:
+        df = df.append(zget('NIFTY 50', s,e,'minute'))
+    df['Volume'] = 1
+    db = DBBasic()
+    db.toDB(f'nifty',df)
+
+# Recursive function to find all files in a directory
+def find_files(directory):
+    file_list = []
+    for root, _, files in os.walk(directory):
+        for file in files:
+            if file.endswith('.csv'):
+                file_path = os.path.join(root, file)
+                file_list.append(file_path)
+    return file_list
+
+def migrateCSVToDb():
+    files = find_files('Data/NIFTYOPTIONSDATA/2022')
+    files.extend(find_files('Data/NIFTYOPTIONSDATA/2023'))
+    for file in files:
+        print(file)
+        optionFileToDB(file)
+# print(find_files('Data/NIFTYOPTIONSDATA/2022'))
+# # niftyDFToDB()
+# exit()
+# niftyDF = zget('NIFTY 50',zgetFrom,zgetTo,'minute') # Get NIFTY Data
+
+migrateCSVToDb()

@@ -403,7 +403,7 @@ def checkAndUpdateTargetExits(df, targetClosedPositions):
         #     logging.info(f"Did not add Target Exit order. signal is {df.loc[closedPositionTime, 'signal']} => not nan")
     return df
 
-def generateSignalsAndTrade(df,positions,stock,options,tradeStartTime=None,
+def generateSignalsAndTrade(df,positions,stock,options,tradeStartTime=None, dataPopulators=None, signalGenerators=None,
                             targetClosedPositions=None):
     global tradingStartTime
     
@@ -440,7 +440,7 @@ def generateSignalsAndTrade(df,positions,stock,options,tradeStartTime=None,
         ], 
         'hourly': [
         ]
-    }
+    } if dataPopulators is None else dataPopulators
     signalGenerators = [    
                         signals.followSVP
                         #signals.followObvAdxMA
@@ -455,7 +455,7 @@ def generateSignalsAndTrade(df,positions,stock,options,tradeStartTime=None,
                         # ,signals.exitTrendFollowing
                         #,signals.exitTargetOrSL
 
-                        ]
+                        ] if signalGenerators is None else signalGenerators
     overrideSignalGenerators = []   
     df = \
         signals.applyIntraDayStrategy(df,dataPopulators,signalGenerators, \

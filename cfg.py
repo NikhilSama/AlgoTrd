@@ -59,6 +59,7 @@ cfgDict = {
     'cfgTargetPercentageFromResistance': 0.01,
     'cfgSLPercentageFromSupport': 0.02,
     'cfgRenkoNumBricksForTrend': 2,
+    'cfgFastSVPWindowSize': 15,
     'cfgSVPSlopeCandles': 2,
     'cfgSVPSlopeProjectionCandles': 1,
     'cfgSVPSlopeThreshold': 5,
@@ -70,11 +71,11 @@ cfgDict = {
         
         # 'trade_returns'
         # ,
-        #  'adjCloseGraph'
+         'adjCloseGraph'
         #  ,
         #  'plot_returns_on_nifty'
         # ,
-        'option_intrinsic'
+        #'option_intrinsic'
         #,
         # 'options'
         ],
