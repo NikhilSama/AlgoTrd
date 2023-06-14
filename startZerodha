@@ -1,3 +1,5 @@
-./autologin.py
-./Download\ Instruments.py
-./time_loop.py
+#!/bin/zsh
+
+source /Users/nikhilsama/opt/anaconda3/bin/activate AlgoTrading
+python3 Download\ Instruments.py
+python3 KiteTicker.py

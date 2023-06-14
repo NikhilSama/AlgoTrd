@@ -72,19 +72,18 @@ def mark_task_complete():
 import cfg
 globals().update(vars(cfg))
 
-
 # set timezone to IST
 ist = pytz.timezone('Asia/Kolkata')
 
 tickers = td.get_sp500_tickers()
 nifty = td.get_nifty_tickers()
 index_tickers = td.get_index_tickers()
-# firstTradeTime = datetime.datetime(2022,4,1,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
-firstTradeTime = datetime.datetime(2023,6,6,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
+firstTradeTime = datetime.datetime(2022,5,1,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
+# firstTradeTime = datetime.datetime(2023,3,20,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
 firstTradeTime = ist.localize(firstTradeTime)
 zgetFrom = firstTradeTime - timedelta(days=cfgHistoricalDaysToGet)
-# zgetTo = datetime.datetime(2023,4,1,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
-zgetTo = datetime.datetime(2023,6,6,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+# zgetTo = datetime.datetime(2023,3,20,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+zgetTo = datetime.datetime(2023,4,1,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 zgetTo = ist.localize(zgetTo)
 
 
@@ -106,20 +105,32 @@ zgetTo = ist.localize(zgetTo)
 
 
     
-def dbget(t,s,e,offset=None):
-    df = downloader.getCachedTikerData(f'NIFTYITMCALL{offset if offset is not None else ""}',s,e,'minute')
+def dbget(t,s,e,offset=None,type='Call'):
+    df = downloader.getCachedTikerData(f'NIFTYITMN{type}{offset if offset is not None else ""}',s,e,'minute')
     if not df.empty:
+        print("got from cache db")
+        print(df)
         return df 
     print("getting from db")
     db = DBBasic()
-    q = f'select * from niftyITMCall{offset if offset is not None else ""} where date between "'+s.strftime('%Y-%m-%d %H:%M:%S')+'" and "'+e.strftime('%Y-%m-%d %H:%M:%S')+'"'
+    q = f'select * from niftyITMN{type}{offset if offset is not None else ""} where date between "'+s.strftime('%Y-%m-%d %H:%M:%S')+'" and "'+e.strftime('%Y-%m-%d %H:%M:%S')+'"'
     df = db.frmDB(q)
-    df.drop('Open Interest', axis = 1, inplace = True) if 'Open Interest' in df.columns else None
+    # df.drop('Open Interest', axis = 1, inplace = True) if 'Open Interest' in df.columns else None
+    # df.drop('expiry', axis = 1, inplace = True) if 'expiry' in df.columns else None
+    # df.drop('expirty', axis = 1, inplace = True) if 'expirty' in df.columns else None
+    # df.drop('option_type', axis = 1, inplace = True) if 'option_type' in df.columns else None
+    # df.drop('strike', axis = 1, inplace = True) if 'strike' in df.columns else None
 
-    df['symbol'] = t+(str(offset) if offset is not None else '')
+    df['symbol'] = t+type+(str(offset) if offset is not None else '')
+    
+    # Add NiftyData
+    q = f'select * from nifty where date between "'+s.strftime('%Y-%m-%d %H:%M:%S')+'" and "'+e.strftime('%Y-%m-%d %H:%M:%S')+'"'
+    niftydf= db.frmDB(q)
+    df['nifty'] = niftydf['Adj Close']
+    
     df = utils.cleanDF(df)
 
-    downloader.loadTickerCache(df,'NIFTYITMCALL{offset}',s,e,'minute')
+    downloader.loadTickerCache(df,f'NIFTYITMN{type}{offset if offset is not None else ""}',s,e,'minute')
     return df
     
 def zget(t,s,e,i):
@@ -171,34 +182,44 @@ def perfProfiler(name,t):
     print (f"{name} took {round((time.time() - t)*1000,2)}ms")
     return time.time()
 
-def printTearsheet(tearsheet):
+def printTearsheet(tearsheet,df):
     if tearsheet is None or tearsheet['num_trades'] == 0:
         print("No trades")
         return
-    print("TRADES: ")
     prevPos = 0
-    for index,trade in tearsheet['trades'].iterrows():
-        if trade['position'] == 0:
-            diff = round(trade['Open'] - entry_price,2)*prevPos
-            print(f"\t\t{utils.timeToString(index,date=False,time=True)}: EXIT @ {trade['Open']:.2f}({diff} or {diff/entry_price:.2%})")
-        else:
-            entry_price = trade['Open']
-            print(f"\t{utils.timeToString(index,date=True)} {trade['i']} Position: {trade['position']} @ {trade['Open']} \tReturn:{trade['return']:.2%} \tCUM=>{trade['sum_return']:.2%}")
-        prevPos = trade['position']
-    print("Days: ")
     daily_returns = tearsheet['trades']['return'].resample('D').sum()
-    dailyDF = pd.DataFrame(columns=['Date','Day','Open','dayReturn','return'])
-    for index,day in daily_returns.iteritems():
-        if day == 0:
-            continue
-        trades_on_d = tearsheet['trades'].loc[tearsheet['trades'].index.date == index.date()]
-        first_row = trades_on_d.iloc[0]
-        last_row = trades_on_d.iloc[-1]
-        dayOpen = first_row['Open']
-        dayClose = last_row['Open']
-        dailyDF.loc[len(dailyDF)] = [index,index.strftime('%a'),dayOpen,(dayClose-dayOpen)/dayOpen,day]
-        print(f"\t {utils.timeToString(index,date=True,time=False)}({index.strftime('%a')}) Open:{dayOpen} Close:{dayClose} ({(dayClose-dayOpen)/dayOpen:.1%}) Return:{day:.2%}") if day != 0 else None
-    dailyDF.to_csv("dailyReturns.csv")
+
+    if daily_returns.shape[0] <= 1:
+        print("TRADES: ")
+        for index,trade in tearsheet['trades'].iterrows():
+            if trade['position'] == 0:
+                diff = round(trade['Open'] - entry_price,2)*prevPos
+                print(f"\t\t{utils.timeToString(index,date=False,time=True)}: EXIT @ {trade['Open']:.2f}({diff} or {diff/entry_price:.2%})")
+            else:
+                entry_price = trade['Open']
+                print(f"\t{utils.timeToString(index,date=True)} {trade['i']} Position: {trade['position']} @ {trade['Open']} \tReturn:{trade['return']:.2%} \tCUM=>{trade['sum_return']:.2%}")
+            prevPos = trade['position']
+    else:
+        print("Days: ")
+        dailyDF = pd.DataFrame(columns=['Date','Day','Open','dayReturn','return'])
+        for index,day in daily_returns.iteritems():
+            if day == 0:
+                continue
+            trades_on_d = tearsheet['trades'].loc[tearsheet['trades'].index.date == index.date()]
+            dayDate = trades_on_d.index[0].date()
+            dayStartIndex = datetime.datetime(dayDate.year, dayDate.month, dayDate.day, 9, 31)
+            dayEndIndex = datetime.datetime(dayDate.year, dayDate.month, dayDate.day, 15, 29)
+            dayStartIndex = ist.localize(dayStartIndex)
+            dayEndIndex = ist.localize(dayEndIndex)
+            dayOpen = df.loc[dayStartIndex]['Open']
+            dayClose = df.loc[dayEndIndex]['Adj Close']
+            # first_row = trades_on_d.iloc[0]
+            # last_row = trades_on_d.iloc[-1]
+            # dayOpen = first_row['Open']
+            # dayClose = last_row['Open']
+            dailyDF.loc[len(dailyDF)] = [index,index.strftime('%a'),dayOpen,(dayClose-dayOpen)/dayOpen,day]
+            print(f"\t {utils.timeToString(index,date=True,time=False)}({index.strftime('%a')}) Open:{dayOpen} Close:{dayClose} ({(dayClose-dayOpen)/dayOpen:.1%}) Return:{day:.2%}") if day != 0 else None
+            dailyDF.to_csv("dailyReturns.csv")
     print(f"Total Return: {tearsheet['return']:.2%}")
     # print(f"Drawdown: {tearsheet['max_drawdown_from_0_sum']:.2%}")
     print(f"Drawdown from Prev Peak: {tearsheet['max_drawdown_from_prev_peak_sum']:.2%}")
@@ -212,11 +233,11 @@ def printTearsheet(tearsheet):
 def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
             exportCSV=True, tradingStartTime = firstTradeTime, \
             applyTickerSpecificConfig = True, signalGenerators = None,
-            src = 'z'):
+            src = 'z', type="Call"):
     perfTIME = time.time()    
     startingTime = perfTIME
     if src == 'db':
-        df = dbget(t,start,end)
+        df = dbget(t,start,end,type=type)
     else:
         df = zget(t,start,end,i=i)
     if df.empty:
@@ -245,8 +266,8 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
             # signals.populateADX, 
             # signals.populateSuperTrend,
             # signals.populateOBV,
-            signals.vwap,
-            signals.populateSVP
+            # signals.vwap,
+            # signals.populateSVP,
             # signals.populateCandleStickPatterns
         ], 
         'hourly': [
@@ -286,7 +307,7 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
 
 
     tearsheet,tearsheetdf = perf.tearsheet(df)
-    printTearsheet(tearsheet) if isMain else None
+    printTearsheet(tearsheet,df) if isMain else None
     # print(f'Total Return: {tearsheet["return"]*100}%')
     # print(f'Sharpe: {tearsheet["sharpe_ratio"]}')
     #print(f'Num Trades: {tearsheet["num_trades"]}')
@@ -320,6 +341,7 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
 
     if 'plot_returns_on_nifty' in plot:
         plot_returns_on_nifty(df)
+    
     # print (f"END Complete {datetime.datetime.now(ist)}")
     return tearsheetdf
 
@@ -562,7 +584,7 @@ if isMain:
     t = perfProfiler("Start", time.time())
     # backtest('NIFTY 50','minute')
 
-    backtest('NIFTYWEEKLYOPTION','minute',src="db")
+    backtest('NIFTYWEEKLYOPTION','minute',src="db", type='Call')
     t = perfProfiler("End", t)
 
     #oneThousandRandomTests()

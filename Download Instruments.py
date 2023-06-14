@@ -48,4 +48,4 @@ df = download_instruments('NSE')
 db.toDB('instruments_zerodha',df)
 df = download_instruments('NFO')
 db.toDB('instruments_zerodha',df)
-
+print("Done Downloading Intruments")

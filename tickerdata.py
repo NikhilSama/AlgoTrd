@@ -92,18 +92,18 @@ def get_sp500_tickers():
 
     return tickers
 
-def getTickerPrice(t,zgetTO):
+def getTickerPrice(t='NIFTY 50',zgetTO=datetime.datetime.now()):
     zgetFROM = zgetTO - datetime.timedelta(minutes=1)
-    df = downloader.zget(zgetFROM,zgetTO,'NIFTY 50','minute',includeOptions=False)
+    df = downloader.zget(zgetFROM,zgetTO,t,'minute',includeOptions=False)
     return df.iloc[0]['Adj Close'] 
 
 def getStrike(t,offset=0):
-    niftyOpen = getTickerPrice(t,datetime.datetime.combine(datetime.date.today(), datetime.time(9,31))) #if cfgNiftyOpen == 0 else cfgNiftyOpen 
-    strikeFloor = (math.floor(niftyOpen/100)*100) - offset  
-    strikeCiel = (math.ceil(niftyOpen/100)*100) + offset
+    niftyOpen = getTickerPrice(t,datetime.datetime.combine(datetime.date.today(), datetime.time(9,18))) #if cfgNiftyOpen == 0 else cfgNiftyOpen 
+    callStrike = math.floor(niftyOpen/100)*100
+    putStrike = math.ceil(niftyOpen/100)*100
 
     #print(f"Strike Floor: {strikeFloor}, Strike Ciel: {strikeCiel}")
-    return (strikeFloor,strikeCiel)
+    return (callStrike+offset,putStrike-offset)
     
 def getActiveOptionTickers(t,offset=0):
     (strikeFloor,strikeCiel) = getStrike(t,offset)
@@ -115,7 +115,24 @@ def getActiveOptionTickers(t,offset=0):
     return(itmCall,otmCall,otmPut,itmPut)
 
 def get_fo_active_nifty_tickers(offset=0):
+    offset = 0 
     (itmCall,otmCall,otmPut,itmPut) = getActiveOptionTickers('NIFTY 50',offset)
+    callPrice = getTickerPrice(itmCall,datetime.datetime.combine(datetime.date.today(), datetime.time(9,18)))
+    targetOptClose = 200 if datetime.date.today().weekday() != 4 else 150
+    print(f"target is {targetOptClose}, callPrice is {callPrice}")
+    if callPrice < targetOptClose:
+        while callPrice < targetOptClose:
+            print(f"Call Price: {callPrice}, Target: {targetOptClose}")
+            offset = offset - 100
+            (itmCall,otmCall,otmPut,itmPut) = getActiveOptionTickers('NIFTY 50',offset)
+            callPrice = getTickerPrice(itmCall,datetime.datetime.combine(datetime.date.today(), datetime.time(9,18)))
+    elif callPrice > targetOptClose+100:
+        while callPrice > targetOptClose+100:
+            print(f"Call Price: {callPrice}, Target: {targetOptClose}")
+            offset = offset + 100
+            (itmCall,otmCall,otmPut,itmPut) = getActiveOptionTickers('NIFTY 50',offset)
+            callPrice = getTickerPrice(itmCall,datetime.datetime.combine(datetime.date.today(), datetime.time(9,18)))
+    print(f"Option is {itmCall}, price is {callPrice}, target is {targetOptClose}")
     return [itmCall]
     return ['HDFCBANK', 'ICICIBANK', 'RELIANCE', 'KOTAKBANK']
     return ['NIFTY 50','NIFTY23APRFUT','RELIANCE','INFY','BAJFINANCE','SBIN', 'TCS', 'KOTAKBANK', 'ICICIBANK', 'HDFCBANK', 'MARUTI' ]

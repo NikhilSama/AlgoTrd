@@ -460,16 +460,32 @@ def exitNFOPositionsONLY(kite,positions):
     for position in positions:
         if position['exchange'] == 'NFO':
             exit_given_position(kite, position)
-
+prevPositions = {}
+failCount = 0 
 def get_positions (kite):
+    global prevPositions    
+    global failCount
     p = {}
+    
     try:
         positions = kite.positions()
     except Exception as e:
+        # if failCount > 5:
+        #     print(f'Get Positions FAILED {failCount} times.  Exiting')
+        #     logging.error(f'Get Positions FAILED {failCount} times')
+
+        #     exit()
+        # else:
+        failCount += 1
         print(f'Get Positions FAILED.')
         print(e.args[0])
-        return p
-       
+        print(f"Using previous positions")
+        logging.error(f'Get Positions FAILED. Using previous positions. {e.args[0]} {prevPositions}')
+        return prevPositions
+    if failCount > 0:
+        failCount = 0   
+        logging.error(f'Get Positions Succeeded after {failCount} failures')
+        logging.error(positions)
     for position in positions['day']:
         
         if position['quantity'] != 0 and position['product'] == 'MIS' :
@@ -499,7 +515,7 @@ def get_positions (kite):
                         logging.error(other_positions)
                         logging.error(pos)
             p[t]['positions'].append(pos)
-            
+    prevPositions = p
     return p
 
 # kite = initKite()

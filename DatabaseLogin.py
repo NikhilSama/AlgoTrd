@@ -109,6 +109,7 @@ class DBBasic:
             df = df.set_index('date')
             df.index = pd.to_datetime(df.index)
             df.index = df.index.tz_localize(ist, ambiguous='infer', nonexistent='shift_forward')
+            df.drop('i', axis = 1, inplace = True) if 'i' in df.columns else None
 
             df.insert(0, 'i', range(1, 1 + len(df)))
 

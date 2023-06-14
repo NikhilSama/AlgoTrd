@@ -37,8 +37,10 @@ def getStrikeForDate(dt,offset=0):
     else:
         last_row_before_dt = niftyDF.iloc[0]
     open_value = last_row_before_dt['Adj Close'] 
-    # print(f"open_value: {open_value} offset: {offset} strike: {math.floor(open_value/100)*100 - offset}")  
-    return math.floor(open_value/100)*100 - offset
+    # print(f"open_value: {open_value} offset: {offset} strike: {math.floor(open_value/100)*100 - offset}")
+    callStrike = math.floor(open_value/100)*100
+    putStrike = math.ceil(open_value/100)*100
+    return (callStrike - offset,putStrike + offset)
 
 # def getNiftyYear():
 #     df = zget('NIFTY 50',zgetFrom,zgetTo,'60minute')
@@ -63,10 +65,11 @@ def getExpiry(date):
     return expiry
 
 def getWeeklyTicker(date,offset=0):
-    strike = getStrikeForDate(date,offset)
+    (call_strike,put_strike) = getStrikeForDate(date,offset)
     expiry = getExpiry(date)
-    optionTicker = f'NIFTY{expiry.strftime("%d%b%y").upper()}{strike}CE'
-    return optionTicker
+    call_optionTicker = f'NIFTY{expiry.strftime("%d%b%y").upper()}{call_strike}CE'
+    put_optionTicker = f'NIFTY{expiry.strftime("%d%b%y").upper()}{put_strike}PE'
+    return (call_optionTicker,put_optionTicker)
 def getDFFromCSV(t,date):
     # Convert the given date to datetime object and extract day, month, and year
     #date = pd.to_datetime(date.date(), format='%d/%m/%Y')
@@ -103,9 +106,9 @@ def getDFFromCSV(t,date):
         return None
     return filtered_data
 
-def getOptionDF(day,offset=0):
-    t=getWeeklyTicker(day,offset)
-    return getDFFromCSV(t,day)
+def getOptionDF(day,offset=0,type='Call'):
+    (t_call,t_put)=getWeeklyTicker(day,offset)
+    return getDFFromCSV(t_call,day) if type == 'Call' else getDFFromCSV(t_put,day)
 
 def cleanDF(df):
     df['date'] = df['Date'] + ' ' + df['Time']
@@ -137,21 +140,37 @@ def cleanDF(df):
     df.drop(columns=['Date', 'Time'], inplace=True)
     return df
 
-def constructDF(offset=0):
+def constructDF(offset=0,type='Call'):
     global niftyDF
     niftyDF = zget('NIFTY 50',zgetFrom,zgetTo,'60minute') # Get NIFTY Data
     thisDay = zgetFrom
     df = pd.DataFrame()
     while thisDay<zgetTo:
+        targetOptClose = 200 if thisDay.date().weekday() != 4 else 150
+        offset = 0
         if  utils.isTradingDay(thisDay):
             #for each day 
-            day_df = getOptionDF(thisDay,offset)
+            day_df = getOptionDF(thisDay,offset,type)
+            close = day_df.iloc[2]["Close"]
+            if close < targetOptClose:
+                # print(f"offsetting {thisDay} by 100, Adj Close is {close}")
+                while day_df.iloc[2]["Close"] < targetOptClose:
+                    offset = offset + 100
+                    day_df = getOptionDF(thisDay,offset=offset,type=type) 
+
+                # print(f"New close is {day_df.iloc[2]['Close']}")
+            elif close > targetOptClose+100:
+                while day_df.iloc[2]["Close"] > targetOptClose+100:
+                    offset = offset - 100
+                    day_df = getOptionDF(thisDay,offset=offset,type=type)
+            print(f"Close is {day_df.iloc[2]['Close']}")
             df = df.append(day_df)
         thisDay = thisDay + timedelta(days=1)
     df = cleanDF(df)
     db = DBBasic()
-    db.toDB(f'niftyITMCall{offset if offset !=0 else None}',df)
-    df.to_csv(f'Data/NIFTYOPTIONSDATA/contNiftyWeeklyOptionDF{offset if offset !=0 else None}.csv')
+    print(f"saving to DB niftyITMN{type}{offset if offset !=0 else ''}")
+    db.toDB(f'niftyITMN{type}{offset if offset !=0 else ""}',df)
+    df.to_csv(f'Data/NIFTYOPTIONSDATA/contNiftyWeeklyOptionDF{offset if offset !=0 else ""}.csv')
 
 def splitDatesIntoChunks(s,e):
     # Calculate the total number of days between the two dates
@@ -224,4 +243,6 @@ def migrateCSVToDb():
 # exit()
 # niftyDF = zget('NIFTY 50',zgetFrom,zgetTo,'minute') # Get NIFTY Data
 
-migrateCSVToDb()
+# migrateCSVToDb()
+
+constructDF(type='Call')

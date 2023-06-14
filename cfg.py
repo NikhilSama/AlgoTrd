@@ -17,11 +17,13 @@ cfgDict = {
     'cfgHistoricalDaysToGet': 0,
     'cfgFreezeGun': False,
     'cfgUseVolumeDataForOptions': True,
-    'cfgMinPriceForOptions': 40,
+    'cfgMinPriceForOptions': 10,
     'cfgStartTimeOfDay': datetime.datetime.strptime("9:20+05:30", "%H:%M%z").time(),
     'cfgEndNewTradesTimeOfDay': datetime.datetime.strptime("15:15+05:30", "%H:%M%z").time(),
     'cfgEndExitTradesOnlyTimeOfDay': datetime.datetime.strptime("15:19+05:30", "%H:%M%z").time(),
     'cfgTimeToCheckDayTrendInfo': datetime.datetime.strptime("11:00+05:30", "%H:%M%z").time(),
+    'cfgMeanRevStartTime': datetime.datetime.strptime("11:00+05:30", "%H:%M%z").time(),
+    'cfgMeanRevEndTime': datetime.datetime.strptime("15:00+05:30", "%H:%M%z").time(),
     'cfgMinCandlesForMA': 5,
     'cfgStopLoss': 0.03,
     'cfgStopLossFromPeak': 0.03,
@@ -59,10 +61,11 @@ cfgDict = {
     'cfgTargetPercentageFromResistance': 0.01,
     'cfgSLPercentageFromSupport': 0.02,
     'cfgRenkoNumBricksForTrend': 2,
-    'cfgFastSVPWindowSize': 15,
+    'cfgFastSVPWindowSize': 60,
     'cfgSVPSlopeCandles': 2,
     'cfgSVPSlopeProjectionCandles': 1,
-    'cfgSVPSlopeThreshold': 5,
+    'cfgSVPSlopeThreshold': 1,
+    'cfgSVPSessionSlopeThreshold': 0.1,
     'cfgEnoughReturnForTheDay': 0.2,
     'cfgEnoughLossForTheDay': 1,
     'cfgPartialExitPercent': 1,
@@ -89,7 +92,7 @@ cfgDict = {
     'dbpass' : 'trading123',
     'showTradingViewLive' : False,
     'cacheTickData' : False, 
-    'bet_size': 500000
+    'bet_size': 200000
 }
 
 args = sys.argv[1:]
