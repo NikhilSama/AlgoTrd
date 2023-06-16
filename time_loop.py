@@ -212,7 +212,7 @@ def tradeNotification(type, t,ltp,signal,position,net_position):
         liveTVThread.start()
             #liveCharts.loadChart(t)
 
-def checkPositionsForConsistency(positions,df):
+def checkPositionsForConsistency(positions,df):    
     ## DF Position can mismatch with kit positions for several reasons
     # 1) We missed the previous tick -- Either softare was slow, or kite 
     #  historical data api failed ephemerally, or in some cases it is is 
@@ -284,7 +284,6 @@ def placeEntryLimit1Order(df):
         oType = 'BUY'
     elif p < -1:
         oType = 'SELL'
-        slTrigger = abs(slTrigger)
     else: # shoulud never happen
         print("ERROR: limit is 0")
         exit(-1)
@@ -300,12 +299,14 @@ def placeEntryLimit1Order(df):
         tick_size = 0.05
         exch = 'NSE'
     logging.info(f"EntryLimitOrder => {t}:{oType} @ {p} betsize:{bet_size}")
-    (lim1OrderId,SL1OrderId) = ki.exec(kite,t,exch,oType,lot_size=lot_size,tick_size=tick_size,p=0,ltp=ltp,tag='Entry1')
+    (lim1OrderId,SL1OrderId) = ki.exec(kite,t,exch,oType,lot_size=lot_size,tick_size=tick_size,p=abs(p),ltp=ltp,tag='Entry1')
 
-    return lim10rderId
+    return lim1OrderId
 
 def placeEntryOrder(df):
-    if df.empty or not 'sl1' in df.columns or np.isnan(df['sl1'][-1]):
+    if df.empty or \
+        ((not 'sl1' in df.columns or np.isnan(df['sl1'][-1])) and \
+            (not 'limit1' in df.columns or np.isnan(df['limit1'][-1]))):
         return
     
     if 'sl1' in df.columns and not np.isnan(df['sl1'][-1]):

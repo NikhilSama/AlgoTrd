@@ -17,6 +17,8 @@ class SignalGenerator:
     extraLogString = ''
     def __init__(self, ):
         pass
+    def timeWindow(self,row):
+        return True
     def OkToEnterLong(self,row):
         return True
     def OkToEnterShort(self,row):

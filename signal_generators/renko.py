@@ -263,8 +263,13 @@ class Renko(SignalGenerator):
             
     def shortResistance(self,row):
         return self.longSupport(row)
-    def getNumBricksForLongTrend(self,row):
-        return cfgRenkoNumBricksForTrend + 1#if getSVPquadrant(row) != 'Low' or row['slpPoc'] <= -cfgSVPSlopeThreshold else cfgRenkoNumBricksForTrend-1
+    def noPrevDownTrend(self,row,df):
+        df2 = df.loc[:row.name]
+        last_negative_value = df2['renko_brick_num'].dropna().astype(int).where(lambda x: x < 0).dropna()
+        return last_negative_value.empty
+    def getNumBricksForLongTrend(self,row,df):
+        noPrevDownTrend = self.noPrevDownTrend(row,df)    
+        return cfgRenkoNumBricksForTrend +1 #+ (1 if noPrevDownTrend else 0)#if getSVPquadrant(row) != 'Low' or row['slpPoc'] <= -cfgSVPSlopeThreshold else cfgRenkoNumBricksForTrend-1
     def getNumBricksForShortTrend(self,row):
         return cfgRenkoNumBricksForTrend #if getSVPquadrant(row) != 'High' or row['slpPoc'] >= cfgSVPSlopeThreshold else cfgRenkoNumBricksForTrend-1
     def getImmidiateResistance(self,row):
@@ -273,13 +278,13 @@ class Renko(SignalGenerator):
     def getImmidiateSupport(self,row):
         #Use SVP
         return row.valShrtTrm if row.slpSTVal > -cfgSVPSlopeThreshold else row['Adj Close'] - 10
-    def getSLPrice (self,row,type):
+    def getSLPrice (self,row,type,df):
         (brickNum,brickSize,brickHigh,brickLow,close) = \
             (row['renko_brick_num'],row['renko_brick_high'] - row['renko_brick_low'],row['renko_brick_high'],row['renko_brick_low'],row['Adj Close'])
         lowEntrySL = brickLow - ((self.getNumBricksForShortTrend(row)-abs(brickNum)) * brickSize)-1
-        highEntrySL = brickHigh + ((self.getNumBricksForLongTrend(row)-abs(brickNum)) * brickSize)+1
-        lowExitSL = max(brickLow-brickSize,row["ShrtTrmLow"]-(brickSize/2)) if self.useSVPForEntryExitPrices else brickLow-brickSize
-        highExitSL = min(brickHigh + brickSize,row["ShrtTrmHigh"] + (brickSize/2)) if self.useSVPForEntryExitPrices else brickHigh+brickSize
+        highEntrySL = brickHigh + ((self.getNumBricksForLongTrend(row,df)-abs(brickNum)) * brickSize)+1
+        lowExitSL = max(brickLow-brickSize,row["ShrtTrmLow"]-(brickSize/2)) - 1 if self.useSVPForEntryExitPrices else brickLow-brickSize
+        highExitSL = min(brickHigh + brickSize,row["ShrtTrmHigh"] + (brickSize/2)) +1 if self.useSVPForEntryExitPrices else brickHigh+brickSize
         
         #In case we entered brick 2 via stop loss on candle high/Low, but didnt close in the new brick, 
         # we should exit since new brick is not really formed
@@ -409,9 +414,11 @@ class Renko(SignalGenerator):
             
     #MAIN
     def OkToEnterLong(self,row):
+        # return False
         # return False if row.name.date().weekday() != 0 else row['renko_uptrend']
         return row['renko_uptrend']
     def OkToEnterShort(self,row):
+        # return False
         # return False if row.name.date().weekday() != 0 else row['renko_uptrend']
         return not row['renko_uptrend']
     def skipLongEntry(self,row,isLastRow):
@@ -434,7 +441,7 @@ class Renko(SignalGenerator):
             return (s, limit1, limit2, sl1, sl2,logString)
         
         # logging.info("Ticker is Moving Up Fast") if self.tickerIsMovingUpFast(row) and isLastRow else None
-        if brickNum >= self.getNumBricksForLongTrend(row):
+        if brickNum >= self.getNumBricksForLongTrend(row,df):
             # if self.meanRevAtStaticCandles and staticCandles > cfgMinStaticCandlesForMeanRev:
             limit1 = self.getLimit1Price(row,'longEntryLimit1') if self.limitEntryOrders else float('nan')
             if np.isnan(limit1):
@@ -443,7 +450,7 @@ class Renko(SignalGenerator):
             # else:
             #     sl1 = min((brickHigh + brickSize),self.getImmidiateResistance(row)+5)
         elif self.slEntryOrders and brickNum >= 1:
-            sl1 = self.getSLPrice(row,'longEntrySL') 
+            sl1 = self.getSLPrice(row,'longEntrySL',df) 
         return (s, limit1, limit2, sl1, sl2,logString)
 
     def checkShortEntry(self,s,row,df,isLastRow,limit1,limit2,sl1,sl2,logString):
@@ -464,7 +471,7 @@ class Renko(SignalGenerator):
             #     sl1 = -max((brickLow - brickSize),self.getImmidiateSupport(row)-5)
 
         elif self.slEntryOrders and brickNum <= -1:
-            sl1 = self.getSLPrice(row,'shortEntrySL') 
+            sl1 = self.getSLPrice(row,'shortEntrySL',df) 
         return (s, limit1, limit2, sl1, sl2,logString)
 
     def checkLongExit(self,s,row,df,isLastRow, entryPrice,limit1,limit2,sl1,sl2,logString):
@@ -479,7 +486,7 @@ class Renko(SignalGenerator):
                 logString = "RENKO-LONG-EXIT"
         else:
             if self.slExitOrders:
-                sl1 = self.getSLPrice(row,'longExitSL') 
+                sl1 = self.getSLPrice(row,'longExitSL',df) 
             if self.limitExitOrders:
                 limit1 = self.getLimit1Price(row,'longExitLimit1')
         return (s, limit1, limit2, sl1, sl2,logString)
@@ -496,7 +503,7 @@ class Renko(SignalGenerator):
                 logString = "RENKO-SHORT-EXIT"
         else:
             if self.slExitOrders:
-                sl1 = self.getSLPrice(row,'shortExitSL') 
+                sl1 = self.getSLPrice(row,'shortExitSL',df) 
             if self.limitExitOrders:
                 limit1 = self.getLimit1Price(row,'shortExitLimit1')
         return (s, limit1, limit2, sl1, sl2,logString)

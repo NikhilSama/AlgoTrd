@@ -875,7 +875,10 @@ def logRenko(row):
     return f"Renko Trend:{'↑' if row['renko_uptrend'] else '↓'}:{round(row['renko_brick_num'])}({round(row['renko_brick_diff'])}) V:{round(row['renko_brick_volume_osc'],1)} StC:{round(row['renko_static_candles']) if not np.isnan(row['renko_static_candles']) else 'nan'} L:{round(row['renko_brick_low'],1)} H:{round(row['renko_brick_high'],1)} | " \
         if "renko_uptrend" in row and not np.isnan(row.renko_brick_num) else 'No Renko Data'
 def logSVP(row):
-    return f"SVP {row['dayHigh']}-{row['vah']}({round(row['slpVah'],1)})-{row['poc']}({round(row['slpPoc'],1)})-{row['val']}({round(row['slpVal'],1)})-{row['dayLow']} VWAP:{row['VWAP']} SVP-15 {round(row['ShrtTrmHigh'],1)}-{round(row['vahShrtTrm'],1)}({round(row.slpSTVah,1)})-{round(row['pocShrtTrm'],1)}-{round(row['valShrtTrm'],1)}({round(row.slpSTVal,1)})-{round(row['ShrtTrmLow'],1)} | " \
+    return f"SVP {row['dayHigh']}-{row['vah']}({round(row['slpVah'],1)})-{row['poc']}({round(row['slpPoc'],1)})-{row['val']}({round(row['slpVal'],1)})-{row['dayLow']}  | " \
+        if "poc" in row else 'No SVP Data'
+def logSVPST(row):
+    return f"SVP-ST {round(row['ShrtTrmHigh'],1)}-{round(row['vahShrtTrm'],1)}({round(row.slpSTVah,1)})-{round(row['pocShrtTrm'],1)}-{round(row['valShrtTrm'],1)}({round(row.slpSTVal,1)})-{round(row['ShrtTrmLow'],1)} | " \
         if "poc" in row else 'No SVP Data'
 def logCandlestick(row):
     return f"Candlestick {row['candlestick_pattern']} | CndlCnt {row.candlestick_match_count} | CndlSignal {row.candlestick_signal}" \
@@ -893,6 +896,7 @@ def logSignal(msg,reqData,signal,s,row,window,isLastRow,extra='',logWithNoSignal
         "obvData" : logOBV(row),
         "RenkoData": logRenko(row),
         "svp": logSVP(row),
+        "svpST": logSVPST(row),
         "candlestick": logCandlestick(row)
     }
     dataString = ''
@@ -1023,7 +1027,9 @@ def populateSVP(df):
     df['slpPoc'] = df['slpPoc'].ewm(span=cfgSVPSlopeCandles,min_periods=cfgSVPSlopeCandles).mean()
     df['slpVah'] = df['slpVah'].ewm(span=cfgSVPSlopeCandles,min_periods=cfgSVPSlopeCandles).mean()
     df['slpVal'] = df['slpVal'].ewm(span=cfgSVPSlopeCandles,min_periods=cfgSVPSlopeCandles).mean()
-    # df['slpPoc'].clip(lower=1, upper=-1, inplace=True)
+    df['slpSTPoc'] = df['slpSTPoc'].rolling(window=10).mean()
+    df['slpSDSTPoc'] = df['slpSTPoc'].rolling(window=10).std()
+    df['slpSTPoc'].clip(lower=-3, upper=3, inplace=True)
     # df['slpVah'].clip(lower=0, upper=2, inplace=True)
     # df['slpVal'].clip(lower=-2, upper=0, inplace=True)
 
@@ -1937,6 +1943,44 @@ def followRenkoWithOBV(type, signal, isLastRow, row, df,
     logSignal(logString,['RenkoData','ohlv','svp'],signal,s,row,type,isLastRow,f'TrdPrice:{entry_price} LIM:{limit1} SL:{sl1}',logWithNoSignalChange=True)
     return (s,entry_price, limit1, limit2, sl1, sl2)
 
+def checkPrevOrderEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,logString):
+    prevSL1 = getTickerSL1(row.symbol)  
+    prevTarget = getTickerLimit1(row.symbol) 
+
+    if isLongLimit1Order(row.symbol) and row.Low <= prevTarget:
+        s = 1
+        entry_price = prevTarget
+        if row.High < prevTarget:
+            print(f"ERROR: {row.name} checkSVPLongEntry: How can row high {row.High} be less than limit entry {prevTarget}")
+            #possible I guess because our limit order was not actually there, this is just a simulation backtest, if it was there then row high would have taken it out
+            #exit(0)
+        logString = "LONG-ENTRY"
+        logging.info(f"Target Limit order hit at {entry_price}.")  if isLastRow else None
+    if isShortLimit1Order(row.symbol) and row.High >= prevTarget:
+        s = -1
+        entry_price = prevTarget
+        logString = "SHORT-ENTRY"
+        logging.info(f"Short Target Limit order hit at {entry_price}.") if isLastRow else None
+        return (s,entry_price, limit1, limit2, sl1, sl2,logString)
+    if isShortSL1Order(row.symbol) and row.Low <= prevSL1:
+        s = -1
+        entry_price = min(prevSL1,row.Open)
+        logString = "SHORT-ENTRY"
+        logging.info(f"SL order hit at {entry_price}.") if isLastRow else None
+        return (s,entry_price, limit1, limit2, sl1, sl2,logString)
+
+    if isLongSL1Order(row.symbol) and row.High >= prevSL1:
+        s = 1
+        entry_price = max(prevSL1,row.Open)
+        if row.Open - prevSL1 > 2:
+            print(f"ERROR: {row.name} checkSVPLongEntry: Entry price {row.Open} is more than 2 away from SL {prevSL1}")
+            # exit(0)
+        logString = "LONG-ENTRY"
+        logging.info(f"SL order hit at {entry_price}.")  if isLastRow else None
+        return (s,entry_price, limit1, limit2, sl1, sl2,logString)
+    return (s,entry_price, limit1, limit2, sl1, sl2,logString)
+
+            
 def checkSVPShortEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,logString):
     prevSL1 = getTickerSL1(row.symbol) if isShortSL1Order(row.symbol) else float('nan')
     prevTarget = getTickerLimit1(row.symbol) if isShortLimit1Order(row.symbol) else float('nan')
@@ -1950,15 +1994,14 @@ def checkSVPShortEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,log
             entry_price = float('nan')
             print(f"ERROR: {row.name} checkSVPShortEntry: Entry price {row.Open} is more than 2 away from SL {prevSL1}")
             return (s,entry_price, limit1, limit2, sl1, sl2,logString)
-            exit(0)
-
+        
         logString = "SHORT-ENTRY"
         logging.info(f"SL order hit at {entry_price}.") if isLastRow else None
     elif row.High >= prevTarget:
         s = -1
         entry_price = prevTarget
-        if row.Low > entry_price:
-            print(f"ERROR: {row.name} checkSVPShortEntry: How can row.Low {row.Low} be greater than limit entry {entry_price}")
+        # if row.Low > entry_price:
+            # print(f"ERROR: {row.name} checkSVPShortEntry: How can row.Low {row.Low} be greater than limit entry {entry_price}")
             #possible I guess because our limit order was not actually there, this is just a simulation backtest, if it was there then row high would have taken it out
             #exit(0)
 
@@ -2070,6 +2113,8 @@ def checkSVPEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,logStrin
         (s,entry_price,limit1,limit2,sl1,sl2,logString) = checkSVPShortEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,logString)
     else: # nan renko_uptrend
         (s,entry_price,logString) = (float('nan'),float('nan'),"No-SVP-TREND")
+        (s,entry_price,limit1,limit2,sl1,sl2,logString) = checkPrevOrderEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,logString)
+
     return (s,entry_price,limit1,limit2,sl1,sl2,logString)
 
 def limitOrderSanityCheck(s,row,df, isLastRow,entry_price,limit1,limit2,sl1,sl2,logString):

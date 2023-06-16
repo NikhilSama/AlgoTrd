@@ -87,17 +87,6 @@ def getDFFromCSV(t,date):
     file_path = os.path.join("Data/NIFTYOPTIONSDATA",year, month_year, file_name)
 
     # Read the csv file into a dataframe
-    try:
-        data = pd.read_csv(file_path)
-    except FileNotFoundError:
-        print(f"File not found: {file_path}")
-        #exit(0)
-        return None
-    if (data.empty):
-        print(f"No data found  in {file_path}")
-        exit(0)        
-        return None
-
     # Filter the dataframe for the given ticker and date
     filtered_data = data[(data['Ticker'] == t+'.NFO') & (data['Date'] == date.strftime('%d/%m/%Y'))]
     if (filtered_data.empty):
@@ -146,7 +135,10 @@ def constructDF(offset=0,type='Call'):
     thisDay = zgetFrom
     df = pd.DataFrame()
     while thisDay<zgetTo:
-        targetOptClose = 200 if thisDay.date().weekday() != 4 else 150
+        targetCallOptClose = 200 if thisDay.date().weekday() != 4 else 150
+        targetPutOptClose = 200 if thisDay.date().weekday() != 4 else 150
+        targetOptClose = targetCallOptClose if type == 'Call' else targetPutOptClose
+        targetOptClose = 100
         offset = 0
         if  utils.isTradingDay(thisDay):
             #for each day 
@@ -169,7 +161,7 @@ def constructDF(offset=0,type='Call'):
     df = cleanDF(df)
     db = DBBasic()
     print(f"saving to DB niftyITMN{type}{offset if offset !=0 else ''}")
-    db.toDB(f'niftyITMN{type}{offset if offset !=0 else ""}',df)
+    db.toDB(f'niftyITMN{type}100{offset if offset !=0 else ""}',df)
     df.to_csv(f'Data/NIFTYOPTIONSDATA/contNiftyWeeklyOptionDF{offset if offset !=0 else ""}.csv')
 
 def splitDatesIntoChunks(s,e):

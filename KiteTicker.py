@@ -25,11 +25,13 @@ import math
 import threading
 import signals 
 import utils
+import subprocess
 
 import time_loop as tl
 import DownloadHistorical as downloader
 import tickerdata as td
 from DatabaseLogin import DBBasic
+import sendemail as email
 
 import cfg
 globals().update(vars(cfg))
@@ -255,6 +257,7 @@ def tick(tokens):
                                    False,True,tradeStartTime=tradingStartTime,
                                    targetClosedPositions=targetExitAchieved)
         placeLimitOrders(df,tokenData['orders'])
+    email.ping()
 def processTicks(ticks):
     #add the tick to the tick df
     global tickThreadBacklog
@@ -371,6 +374,8 @@ def on_connect(ws, response):
    #getHistoricalTickerData()
     subscribeToTickerData()
     #tick(tickersToTrack.keys()) #First tick with historical data
+    subprocess.call(["afplay", '/System/Library/Sounds/Glass.aiff'])
+    email.send_email("AlgoTrading Restarted", "AlgoTrading Restarted") if datetime.datetime.now(ist).hour > 9 else None
 
 def on_close(ws, code, reason):
     tickerlog(f"Close called Code: {code}  Reason:{reason}")
@@ -390,6 +395,13 @@ kws.on_message = on_message
 
 # Infinite loop on the main thread. Nothing after this will run.
 # You have to use the pre-defined callbacks to manage subscriptions.
+
+while datetime.datetime.now(ist).time() < cfgStartTimeOfDay:
+    email.ping()
+    time.sleep(1)
+    tickerlog("Waiting for 9:20")
+
+tickerlog("Its 9:20 ! Starting algo")
 
 kws.connect()
 ########## END KITE TICKER CONFIG AND START ##########

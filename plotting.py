@@ -112,8 +112,8 @@ def plot_backtest(df,trades=None):
     if 'adjCloseGraph' not in plot:
         return
         ## PLOTTING CODE FOLLOWS 
-    if len(df) > 500 :
-        return
+    # if len(df) > 500 :
+    #     return
     #pprint.pprint(tearsheet, indent=4)
     #df[['ma_superTrend', 'ma_slow', 'ma_fast']].plot(grid=True, figsize=(12, 8))
 #    fig, (ax1, ax2, ax3, ax4, ax5, ax7) = plt.subplots(6, 1, figsize=(8, 8))
@@ -131,25 +131,27 @@ def plot_backtest(df,trades=None):
         
     df['OBV-OSC-PCT-CHNG'].fillna(0, inplace=True)
 
+    iv = abs(df['nifty'] - int(df['strike'][-1]))
     # plot the first series in the first subplot
     #ax1.plot(df['i'], df['ma_superTrend'], color='green', linewidth=3)
     # ax1.plot(df['i'], df['VWAP'], color='gold', linewidth=2)
     ax1.plot(df['i'], df['Adj Close'], color='black', linewidth=2)
+    ax1.plot(df['i'], iv, color='red', linewidth=2)
     # ax1.plot(df['i'], df['renko_brick_high'], color='green', linewidth=1)
     # ax1.plot(df['i'], df['renko_brick_low'], color='red', linewidth=1)
-    #  ax1.plot(df['i'], df['pocShrtTrm'], color='black', linewidth=1)
-    # ax1.plot(df['i'], df['vahShrtTrm'], color='green', linewidth=1)
-    # ax1.plot(df['i'], df['valShrtTrm'], color='red', linewidth=1)
+    # ax1.plot(df['i'], df['pocShrtTrm'], color='black', linewidth=1)
+    # ax1.plot(df['i'], df['ShrtTrmHigh'], color='green', linewidth=1)
+    # ax1.plot(df['i'], df['ShrtTrmLow'], color='red', linewidth=1)
     # ax1.plot(df['i'], abs(df['sl1']), color='red', linewidth=3)
     # ax1.plot(df['i'], df['val']+(df['slpVal']*10), color='red', linewidth=1)
     # ax1.plot(df['i'], df['ma20'], color='orange', linewidth=1)
     # ax1.plot(df['i'], df['MA-FAST'], color='green', linewidth=1)
 
     #Draw horizontal lines at renko bricks
-    start = df['renko_brick_low'].min()
-    end = df['renko_brick_high'].max()
-    for y in range(int(start), int(end), 8):
-        ax1.axhline(y, color='grey', linestyle='--')  # adjust color and linestyle as necessary
+    # start = df['renko_brick_low'].min()
+    # end = df['renko_brick_high'].max()
+    # for y in range(int(start), int(end), 8):
+    #     ax1.axhline(y, color='grey', linestyle='--')  # adjust color and linestyle as necessary
 
     # plot the second series in the second subplot
     #ax2.plot(df['i'], df['ma_superTrend_pct_change'], color='red', linewidth=2)
@@ -163,10 +165,10 @@ def plot_backtest(df,trades=None):
     # ax2.axhline((round(df['nifty'][-1]/100)*100) -100, color='grey', linestyle='--')  # adjust color and linestyle as necessary
     # ax2.axhline((round(df['nifty'][-1]/100)*100) +100, color='grey', linestyle='--')  # adjust color and linestyle as necessary
 
-    ax3.plot(df['i'], df['position'], color='green', linewidth=2)
+    # ax3.plot(df['i'], df['position'], color='green', linewidth=2)
     ax3.set_title('Position↓', loc='right')
     # df['ADX'] .fillna(0, inplace=True)
-    # ax4.plot(df['i'], df['slpPoc'], color='black', linewidth=2)
+    ax4.plot(df['i'], abs(df['Adj Close'] - iv), color='black', linewidth=2)
     # ax4.plot(df['i'], df['+di'], color='green', linewidth=1)
     # ax4.plot(df['i'], df['-di'], color='red', linewidth=1)
     # draw a threshold line at y=0.5
@@ -178,20 +180,20 @@ def plot_backtest(df,trades=None):
     # ax4.axhline(y=2, color='blue', linestyle='--')
     ax4.axhline(y=.1, color='green', linestyle='--')
     ax4.axhline(y=.2, color='blue', linestyle='--')
-    ax4.set_title('POC Slp ST↓', loc='right')
+    ax4.set_title('IV Less Close↓', loc='right')
 
     ax5.plot(df['i'], df['Volume'], color='red', linewidth=1)
-    # ax5.plot(df['i'], df['slpPoc'], color='yellow', linewidth=1)
+    # ax5.plot(df['i'], df['slpSTPoc'], color='black', linewidth=1)
     # ax5.plot(df['i'], df['slpVah'], color='green', linewidth=1)
     # ax5.plot(df['i'], df['slpVal'], color='red', linewidth=1)
     ax5.set_title('Vol Candle↓', loc='right')
-    # # ax5.axhline(y=adxSlopeThresh, color='red', linestyle='--')
-    # # ax5.axhline(y=-adxSlopeThresh, color='red', linestyle='--')
+    ax5.axhline(y=1, color='red', linestyle='--')
+    ax5.axhline(y=-1, color='red', linestyle='--')
 
-    # ax6.plot(df['i'], df['slpSTPoc'], color='green', linewidth=2)
-    ax6.set_title('SLP ST POC ↓', loc='right')
-    # ax6.axhline(y=maSlopeThresh, color='red', linestyle='--')
-    # ax6.axhline(y=-maSlopeThresh, color='red', linestyle='--')
+    # ax6.plot(df['i'], df['slpSDSTPoc'], color='green', linewidth=2)
+    # ax6.set_title('SLP ST POC ↓', loc='right')
+    # ax6.axhline(y=.5, color='red', linestyle='--')
+    # ax6.axhline(y=-.5, color='red', linestyle='--')
 
     # ax7.plot(df['i'], df['SLOPE-OSC-SLOPE'], color='green', linewidth=2)
     # ax7.set_title('SLOPE-OSC-SLOPE sq ↓', loc='right')

@@ -19,6 +19,8 @@ import pandas as pd
 import numpy as np
 import utils
 import math 
+import sendemail as email
+
 # import time_loop as tl
 
 #cfg has all the config parameters make them all globals here
@@ -174,6 +176,9 @@ def get_ltp(kite,t,exchange):
         ltp = kite.ltp([f"{exchange}:{t}"])
     except:
         logging.error(f"Error getting ltp for {exchange}:{t}. Skipping")
+        email.send_email("AlgoTrading GetLTP FAILED", 
+                f"Error getting ltp for {exchange}:{t}. Skipping")
+
         return 0
     if f"{exchange}:{t}" in ltp.keys():
         ltp = ltp[f"{exchange}:{t}"]['last_price']
@@ -481,6 +486,8 @@ def get_positions (kite):
         print(e.args[0])
         print(f"Using previous positions")
         logging.error(f'Get Positions FAILED. Using previous positions. {e.args[0]} {prevPositions}')
+        email.send_email("AlgoTrading GetPositions FAILED", 
+                         f'Get Positions FAILED. Using previous positions. {e.args[0]} {prevPositions}')
         return prevPositions
     if failCount > 0:
         failCount = 0   

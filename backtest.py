@@ -79,10 +79,10 @@ tickers = td.get_sp500_tickers()
 nifty = td.get_nifty_tickers()
 index_tickers = td.get_index_tickers()
 firstTradeTime = datetime.datetime(2022,5,1,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
-# firstTradeTime = datetime.datetime(2023,3,20,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
+# firstTradeTime = datetime.datetime(2023,6,15,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
 firstTradeTime = ist.localize(firstTradeTime)
 zgetFrom = firstTradeTime - timedelta(days=cfgHistoricalDaysToGet)
-# zgetTo = datetime.datetime(2023,3,20,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+# zgetTo = datetime.datetime(2023,6,15,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 zgetTo = datetime.datetime(2023,4,1,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 zgetTo = ist.localize(zgetTo)
 
@@ -102,7 +102,6 @@ zgetTo = ist.localize(zgetTo)
 #     df = dbget('NIFTYWEEKLYOPTION',firstTradeTime,zgetTo)
 #     df['signal'] = df.apply(mmReturns, 
 #         args=(df), axis=1)
-
 
     
 def dbget(t,s,e,offset=None,type='Call'):
