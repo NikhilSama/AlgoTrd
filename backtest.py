@@ -22,7 +22,7 @@ import DownloadHistorical as downloader
 import pytz
 import strategies15m as strat15m
 import ppprint
-from plotting import plot_backtest,plot_stock_and_option,plot_trades,plot_returns_on_nifty,plot_option_intrinsic
+from plotting import plot_backtest,plot_stock_and_option,plot_trades,plot_returns_on_nifty,plot_option_intrinsic,plot_option_vs_stock
 import itertools 
 from sqlalchemy import create_engine
 import mysql.connector
@@ -78,12 +78,28 @@ ist = pytz.timezone('Asia/Kolkata')
 tickers = td.get_sp500_tickers()
 nifty = td.get_nifty_tickers()
 index_tickers = td.get_index_tickers()
+
+# 2019 - 2021
+# firstTradeTime = datetime.datetime(2019,3,2,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
+# zgetTo = datetime.datetime(2021,12,31,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+
+
+# zgetTo = datetime.datetime(2021,12,31,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+
+#default
 firstTradeTime = datetime.datetime(2022,5,1,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
-# firstTradeTime = datetime.datetime(2023,6,15,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
+zgetTo = datetime.datetime(2023,4,1,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+
+
+# firstTradeTime = datetime.datetime(2023,3,21,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
+# zgetTo = datetime.datetime(2023,3,21,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+
+#3S 
+# firstTradeTime = datetime.datetime(2023,5,2,9,30) if cfgZGetStartDate == None else cfgZGetStartDate
+# zgetTo = datetime.datetime(2023,5,2,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+
 firstTradeTime = ist.localize(firstTradeTime)
 zgetFrom = firstTradeTime - timedelta(days=cfgHistoricalDaysToGet)
-# zgetTo = datetime.datetime(2023,6,15,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
-zgetTo = datetime.datetime(2023,4,1,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 zgetTo = ist.localize(zgetTo)
 
 
@@ -103,16 +119,18 @@ zgetTo = ist.localize(zgetTo)
 #     df['signal'] = df.apply(mmReturns, 
 #         args=(df), axis=1)
 
-    
-def dbget(t,s,e,offset=None,type='Call'):
-    df = downloader.getCachedTikerData(f'NIFTYITMN{type}{offset if offset is not None else ""}',s,e,'minute')
+
+
+def dbget(t,s,e,offset=None,type='Call',interval=''):
+    df = downloader.getCachedTikerData(f'NIFTYITMN{type}{interval}{offset if offset is not None else ""}',s,e,'minute')
     if not df.empty:
         print("got from cache db")
         print(df)
+        
         return df 
     print("getting from db")
     db = DBBasic()
-    q = f'select * from niftyITMN{type}{offset if offset is not None else ""} where date between "'+s.strftime('%Y-%m-%d %H:%M:%S')+'" and "'+e.strftime('%Y-%m-%d %H:%M:%S')+'"'
+    q = f'select * from niftyITMN{type}{interval}{offset if offset is not None else ""} where date between "'+s.strftime('%Y-%m-%d %H:%M:%S')+'" and "'+e.strftime('%Y-%m-%d %H:%M:%S')+'"'
     df = db.frmDB(q)
     # df.drop('Open Interest', axis = 1, inplace = True) if 'Open Interest' in df.columns else None
     # df.drop('expiry', axis = 1, inplace = True) if 'expiry' in df.columns else None
@@ -125,11 +143,14 @@ def dbget(t,s,e,offset=None,type='Call'):
     # Add NiftyData
     q = f'select * from nifty where date between "'+s.strftime('%Y-%m-%d %H:%M:%S')+'" and "'+e.strftime('%Y-%m-%d %H:%M:%S')+'"'
     niftydf= db.frmDB(q)
-    df['nifty'] = niftydf['Adj Close']
+    df['nifty'] = niftydf['Adj Close'] if 'nifty' not in df.columns else df['nifty']
+    df['niftyHigh'] = niftydf['High'] if 'niftyHigh' not in df.columns else df['niftyHigh']
+    df['niftyLow'] = niftydf['Low'] if 'niftyLow' not in df.columns else df['niftyLow']
+    
     
     df = utils.cleanDF(df)
 
-    downloader.loadTickerCache(df,f'NIFTYITMN{type}{offset if offset is not None else ""}',s,e,'minute')
+    downloader.loadTickerCache(df,f'NIFTYITMN{type}{interval}{offset if offset is not None else ""}',s,e,'minute')
     return df
     
 def zget(t,s,e,i):
@@ -206,12 +227,12 @@ def printTearsheet(tearsheet,df):
                 continue
             trades_on_d = tearsheet['trades'].loc[tearsheet['trades'].index.date == index.date()]
             dayDate = trades_on_d.index[0].date()
-            dayStartIndex = datetime.datetime(dayDate.year, dayDate.month, dayDate.day, 9, 31)
-            dayEndIndex = datetime.datetime(dayDate.year, dayDate.month, dayDate.day, 15, 29)
+            dayStartIndex = datetime.datetime(dayDate.year, dayDate.month, dayDate.day, 9, 38)
+            dayEndIndex = datetime.datetime(dayDate.year, dayDate.month, dayDate.day, 15, 28)
             dayStartIndex = ist.localize(dayStartIndex)
             dayEndIndex = ist.localize(dayEndIndex)
-            dayOpen = df.loc[dayStartIndex]['Open']
-            dayClose = df.loc[dayEndIndex]['Adj Close']
+            dayOpen = df.loc[dayStartIndex]['Open'] if dayStartIndex in df.index else 0
+            dayClose = df.loc[dayEndIndex]['Adj Close'] if dayEndIndex in df.index else 0
             # first_row = trades_on_d.iloc[0]
             # last_row = trades_on_d.iloc[-1]
             # dayOpen = first_row['Open']
@@ -232,11 +253,11 @@ def printTearsheet(tearsheet,df):
 def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
             exportCSV=True, tradingStartTime = firstTradeTime, \
             applyTickerSpecificConfig = True, signalGenerators = None,
-            src = 'z', type="Call"):
+            src = 'z', type="Call", interval=''):
     perfTIME = time.time()    
     startingTime = perfTIME
     if src == 'db':
-        df = dbget(t,start,end,type=type)
+        df = dbget(t,start,end,type=type,interval=interval)
     else:
         df = zget(t,start,end,i=i)
     if df.empty:
@@ -323,6 +344,7 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
    # perfTIME = perfProfiler("to CSV", perfTIME)expo
     #perfTIME = perfProfiler("Backtest:", startingTime)
   
+    plot_option_vs_stock(df)
     if (plot == []):
         return tearsheetdf
     
@@ -583,7 +605,7 @@ if isMain:
     t = perfProfiler("Start", time.time())
     # backtest('NIFTY 50','minute')
 
-    backtest('NIFTYWEEKLYOPTION','minute',src="db", type='Call')
+    backtest('NIFTYWEEKLYOPTION','minute',src="db", type='Call', interval='')
     t = perfProfiler("End", t)
 
     #oneThousandRandomTests()

@@ -114,9 +114,9 @@ def getTickersToTrack():
         tickersToTrack[token]['df'] = pd.DataFrame(columns=columns, index=index)
         tickersToTrack[token]['ticks'] = pd.DataFrame(columns=columns, index=index)
         tickersToTrack[token]['targetExitAchieved'] = []
-def trimMinuteDF(t):
-    #trim the minute df to last cfgMaxLookbackCandles minutes
-    tickersToTrack[t]['df'] = tickersToTrack[t]['df'].iloc[-cfgMaxLookbackCandles:]
+# def trimMinuteDF(t):
+#     #trim the minute df to last cfgMaxLookbackCandles minutes
+#     tickersToTrack[t]['df'] = tickersToTrack[t]['df'].iloc[-cfgMaxLookbackCandles:]
 
 def getHistoricalTickerData():
     #This code is intended to run before start of trading on day of
@@ -130,7 +130,9 @@ def getHistoricalTickerData():
         tickersToTrack[t]['df']= downloader.zget \
         (start,now,tickersToTrack[t]['ticker'],'minute',
          includeOptions=False,instrumentToken=t)
-        trimMinuteDF(t)
+        if tickersToTrack[t]['df'].empty:
+            tickerlog(f"Error:  getHistoricalTickerData: returned empty df for {t} from {start} to {now}")
+        # trimMinuteDF(t)
     return
 def subscribeToTickerData():
     if cfgFreezeGun: # not live overloaded
@@ -229,8 +231,10 @@ def resampleToMinDF():
                 tickersToTrack[token]['df']= downloader.zget \
                     (historicalStart,historicalEnd,tickersToTrack[token]['ticker'],'minute',
                     includeOptions=False,instrumentToken=token)
+                if tickersToTrack[token]['df'].empty:
+                    tickerlog(f"Error: zget returned empty df for {token} from {historicalStart} to {historicalEnd}")
                 #trim to cfgMaxLookbackCandles rows/minutes
-                trimMinuteDF(token)
+                # trimMinuteDF(token)
             else:
                 # Append the new minute candle rows to the minute candle df
                             #Add in symbol and index to make it at par with the Historical data candles
@@ -249,14 +253,18 @@ def resampleToMinDF():
 
 def tick(tokens):
     positions = tl.get_positions()
+    tickerlog("Tick thread started")
     for token in tokens:
         tokenData = tickersToTrack[token]
         targetExitAchieved = tokenData['targetExitAchieved']
         tickerlog(f"tickThread generating signals for: token {token} {tokenData['ticker']}")
+        tickerlog(f"positions: {positions} df: {tokenData['df']}")
         df = tl.generateSignalsAndTrade(tokenData['df'].copy(),positions,
                                    False,True,tradeStartTime=tradingStartTime,
                                    targetClosedPositions=targetExitAchieved)
+        tickerlog(f"tickThread done generating signals for {token}.  Placing limit orders now")
         placeLimitOrders(df,tokenData['orders'])
+    tickerlog("Tick thread done")
     email.ping()
 def processTicks(ticks):
     #add the tick to the tick df
@@ -374,15 +382,18 @@ def on_connect(ws, response):
    #getHistoricalTickerData()
     subscribeToTickerData()
     #tick(tickersToTrack.keys()) #First tick with historical data
-    subprocess.call(["afplay", '/System/Library/Sounds/Glass.aiff'])
-    email.send_email("AlgoTrading Restarted", "AlgoTrading Restarted") if datetime.datetime.now(ist).hour > 9 else None
 
 def on_close(ws, code, reason):
-    tickerlog(f"Close called Code: {code}  Reason:{reason}")
+    tickerlog(f"Close called Code: {code}  Reason:{reason} Reconnecting")
 
     # On connection close stop the event loop.
     # Reconnection will not happen after executing `ws.stop()`
-    ws.stop()
+    # ws.stop()
+    
+# Callback when connection closed with error.
+def on_error(ws, code, reason):
+    tickerlog("Connection error: {code} - {reason}".format(code=code, reason=reason))
+
 ##########END KITE TICKER CALLBACKS ##########
 
 ########## KITE TICKER CONFIG AND START ##########
@@ -392,18 +403,21 @@ kws.on_connect = on_connect
 kws.on_close = on_close
 kws.on_order_update = on_order_update
 kws.on_message = on_message
-
+kws.on_error = on_error
 # Infinite loop on the main thread. Nothing after this will run.
 # You have to use the pre-defined callbacks to manage subscriptions.
 
 while datetime.datetime.now(ist).time() < cfgStartTimeOfDay:
     email.ping()
-    time.sleep(1)
+    sleep(60)
     tickerlog("Waiting for 9:20")
 
 tickerlog("Its 9:20 ! Starting algo")
 
 kws.connect()
+subprocess.call(["afplay", '/System/Library/Sounds/Glass.aiff'])
+email.send_email("AlgoTrading Restarted", "AlgoTrading Restarted") if datetime.datetime.now(ist).hour > 9 else None
+
 ########## END KITE TICKER CONFIG AND START ##########
 
 # def testTicks():

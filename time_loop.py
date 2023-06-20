@@ -48,9 +48,10 @@ if showTradingViewLive:
 def sigterm_handler(_signo, _stack_frame):
     # Raises SystemExit(0):
     print("SIGTERM -- EXITING POSITIONS")
-    ki.exit_positions(kite)            
-    sys.exit(0)
-signal.signal(signal.SIGTERM, sigterm_handler)
+    logging.info("SIGTERM -- EXITING POSITIONS, and EXITINT ALGO")
+    ki.exit_positions(kite)
+    sys.exit(0) 
+# signal.signal(signal.SIGTERM, sigterm_handler)
 
 ## TEST FREEZESR START
 
@@ -263,6 +264,7 @@ def placeEntrySL1Order(df):
         slTrigger = abs(slTrigger)
     else: # shoulud never happen
         print("ERROR: slTrigger is 0")
+        logging.error("ERROR: slTrigger is 0.  Exiting")
         exit(-1)
         
     t = df['symbol'][0]
@@ -286,6 +288,7 @@ def placeEntryLimit1Order(df):
         oType = 'SELL'
     else: # shoulud never happen
         print("ERROR: limit is 0")
+        logging.error("ERROR: limit is 0.  Exiting")
         exit(-1)
         
     t = df['symbol'][0]
@@ -434,8 +437,8 @@ def generateSignalsAndTrade(df,positions,stock,options,tradeStartTime=None, data
             # signals.populateADX, 
             # signals.populateSuperTrend,
             # signals.populateOBV,
-            signals.vwap,
-            signals.populateSVP,
+            # signals.vwap,
+            # signals.populateSVP,
 
             signals.populateCandleStickPatterns
         ], 

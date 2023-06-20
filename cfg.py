@@ -42,7 +42,7 @@ cfgDict = {
     'cfgAdxThreshExitMultiplier': 0.5,
     'adxThreshYellowMultiplier': 0.6,
     'numCandlesForSlopeProjection':2,
-    'maSlopeThresh': 0,
+    'maSlopeThresh': 0.02,
     'cfgMASlopePeriods': 3,
     'maSlopeThreshYellowMultiplier': 0.6,
     'cfgObvMaLen': 20,
@@ -92,7 +92,7 @@ cfgDict = {
     'dbpass' : 'trading123',
     'showTradingViewLive' : False,
     'cacheTickData' : False, 
-    'bet_size': 200000
+    'bet_size': 10000
 }
 
 args = sys.argv[1:]

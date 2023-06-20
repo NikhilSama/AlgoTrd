@@ -26,6 +26,7 @@ from candlerankings import candle_rankings
 from signal_generators.svb import svb
 from signal_generators.renko import Renko
 from signal_generators.meanrev import MeanRev
+from signal_generators.supertrend import SuperTrend
 
 # signalGenerator = svb()
 #cfg has all the config parameters make them all globals here
@@ -37,6 +38,7 @@ ist = pytz.timezone('Asia/Kolkata')
 
 tickerStatus = {}
 def getSignalGenerator():
+    # return SuperTrend()
     # return MeanRev()
     return Renko(limitExitOrders=True,limitEntryOrders=True,
                 slEntryOrders=True,slExitOrders=True,
@@ -200,7 +202,8 @@ def renko(DF):
     df = df.rename(columns={'Open': 'open', 'High': 'high', 'Low': 'low', 'Adj Close': 'close'})
     # df.columns.values[:10] = ["date", "i", "symbol", "open", "high", "low", "close", "volume", "signal", "ATR"]
     # df.columns = ["date","i","symbol","open","high","low","close","volume","signal","ATR"] if 'Volume-P' not in df.columns else ["date","i","open","high","low","close","volume","symbol","Open-P","High-P","Low-P","Adj Close-P","Volume-P","Strike-P","Open-C","High-C","Low-C","Adj Close-C","Volume-C","Strike-C","signal","ATR"]
-    
+    df = df.fillna(method='ffill')
+
     df2 = Renko(df)
     df2.brick_size = cfgRenkoBrickSize
     renko_df = df2.get_ohlc_data() #if using older version of the library please use get_bricks() instead
@@ -293,21 +296,21 @@ def tenAMToday (now=0):
     tenAMToday = datetime.datetime.combine(now.date(), tenAM)
     return tenAMToday
 
-def ATR(DF,n=atrLen):
+def ATR(DF,n=atrLen, type='option'):
     df = DF.copy()
-    df['H-L'] = df['High'] - df['Low']
-    df['H-PC'] = df['High'] - df['Adj Close'].shift(1)
-    df['L-PC'] = df['Low'] - df['Adj Close'].shift(1)
+    df['H-L'] = (df['niftyHigh'] - df['niftyLow']) if type == 'nifty' else (df['High'] - df['Low'])
+    df['H-PC'] = (df['niftyHigh'] - df['nifty'].shift(1)) if type == 'nifty' else (df['High'] - df['Adj Close'].shift(1))
+    df['L-PC'] = (df['niftyLow'] - df['nifty'].shift(1)) if type == 'nifty' else (df['Low'] - df['Adj Close'].shift(1))
 
     df['TR'] = df[['H-L','H-PC','L-PC']].max(axis=1)
     df['ATR'] = df['TR'].ewm(com=n,min_periods=cfgMinCandlesForMA).mean()
     return df['ATR']
 
-def supertrend(df, multiplier=3, atr_period=10):
-    high = df['High']
-    low = df['Low']
-    close = df['Adj Close']
-    atr = df['ATR']
+def supertrend(df, multiplier=10, atr_period=10, type='option'):
+    high = df['niftyHigh'] if type ==  'nifty' else df['High']
+    low = df['niftyLow'] if type ==  'nifty' else df['Low']
+    close = df['nifty'] if type ==  'nifty' else df['Adj Close']
+    atr = df['niftyATR'] if type ==  'nifty' else df['ATR']
     # HL2 is simply the average of high and low prices
     hl2 = (high + low) / 2
     # upperband and lowerband calculation
@@ -343,8 +346,17 @@ def supertrend(df, multiplier=3, atr_period=10):
         
         if supertrend[curr] and (not supertrend[prev]):
             supertrend_signal[curr] = 1
+            
+            # get an extra candle for the signal
+            #cause our code is hacky.  If you use one signal to exit, then the next one need to also
+            #contain the signal for us to enter
+            if curr+2 < len(df):
+                supertrend_signal[curr+1] = 1
+            
         elif (not supertrend[curr]) and supertrend[prev]:
             supertrend_signal[curr] = -1 
+            if curr+2 < len(df):
+                supertrend_signal[curr+1] = -1  # get an extra candle for the signal
     return supertrend_signal,supertrend, final_upperband,final_lowerband
 
 
@@ -883,7 +895,15 @@ def logSVPST(row):
 def logCandlestick(row):
     return f"Candlestick {row['candlestick_pattern']} | CndlCnt {row.candlestick_match_count} | CndlSignal {row.candlestick_signal}" \
         if "candlestick_pattern" in row else 'No Candlestick Data'
-        
+def logSuperTrend(row):
+    if 'SuperTrend' in row:
+        if np.isnan(row.SuperTrendLower):
+            st = f"↓{round(row.SuperTrendUpper)}" if not np.isnan(row.SuperTrendUpper) else 'nan'
+        else:
+            st = f"↑{round(row.SuperTrendLower)}"
+        return f"SuperTrend {st}" 
+    else:
+        return 'No SuperTrend Data'
 def logSignal(msg,reqData,signal,s,row,window,isLastRow,extra='',logWithNoSignalChange=False):
     # return
     rowInfo = f'{row.symbol}:{row.i} '
@@ -897,7 +917,8 @@ def logSignal(msg,reqData,signal,s,row,window,isLastRow,extra='',logWithNoSignal
         "RenkoData": logRenko(row),
         "svp": logSVP(row),
         "svpST": logSVPST(row),
-        "candlestick": logCandlestick(row)
+        "candlestick": logCandlestick(row),
+        "supertrend": logSuperTrend(row)
     }
     dataString = ''
     for key in reqData:
@@ -932,6 +953,7 @@ def populateBB (df):
 
 def populateATR(df):
     df['ATR'] = ATR(df,atrLen)
+    df['niftyATR'] = ATR(df,atrLen,'nifty')
     
 def populateADX (df):
     (df['ADX'],df['ADX-PCT-CHNG']) = ADX(df,adxLen)
@@ -1753,6 +1775,7 @@ def getNumBricksForShortTrend(row):
 def checkRenkoLongEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,logString):
     if isRenkoUpTrend(row) != True or tickerHasPosition(row.symbol):
         print(f"ERROR: checkRenkoLongEntry called with position or without uptrend.  Trend:{row['renko_uptrend']} Position:{tickerHasPosition(row.symbol)}")
+        logging.error(f"ERROR: checkRenkoLongEntry called with position or without uptrend.  Trend:{row['renko_uptrend']} Position:{tickerHasPosition(row.symbol)}")
         exit(1)
     (brickNum,brickSize,brickHigh,brickLow,close) = (row['renko_brick_num'],row['renko_brick_high'] - row['renko_brick_low'],row['renko_brick_high'],row['renko_brick_low'],row['Adj Close'])
     prevLimit1 = getTickerLimit1(row.symbol) if isLongLimit1Order(row.symbol) else float('nan')
@@ -1790,7 +1813,9 @@ def checkRenkoLongEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,lo
 
 def checkRenkoShortEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,logString):
     if isRenkoUpTrend(row) != False or tickerHasPosition(row.symbol):
-        print(f"ERROR: checkRenkoShortEntry called with position or without downtrend.  Trend:{row['renko_uptrend']} Position:{tickerHasPosition(row.symbol)}")
+        errString = f"ERROR: checkRenkoShortEntry called with position or without downtrend.  Trend:{row['renko_uptrend']} Position:{tickerHasPosition(row.symbol)}"
+        print(errString)
+        logging.erorr(errString)
         exit(1)
         
     (brickNum,brickSize,brickHigh,brickLow, close) = (row['renko_brick_num'],row['renko_brick_high'] - row['renko_brick_low'],row['renko_brick_high'],row['renko_brick_low'], row['Adj Close'])
@@ -1832,6 +1857,7 @@ def checkRenkoShortEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,l
 def checkRenkoLongExit(s,row,df,isLastRow, exit_price,limit1,limit2,sl1,sl2,logString):
     if not tickerHasLongPosition(row.symbol):
         print(f"ERROR: checkRenkoLongExit called without long position")
+        logging.error(f"ERROR: checkRenkoLongExit called without long position")
         exit(1)
     (upTrend,brickNum,brickSize,brickHigh,brickLow,close) = (isRenkoUpTrend(row),row['renko_brick_num'],row['renko_brick_high'] - row['renko_brick_low'],row['renko_brick_high'],row['renko_brick_low'],row['Adj Close'])
     logString = "RENKO-LONG-CONTINUE"
@@ -1865,6 +1891,7 @@ def checkRenkoLongExit(s,row,df,isLastRow, exit_price,limit1,limit2,sl1,sl2,logS
 def checkRenkoShortExit(s,row,df,isLastRow, exit_price,limit1,limit2,sl1,sl2,logString):
     if not tickerHasShortPosition(row.symbol):
         print(f"ERROR: checkRenkoShortExit called without Short position")
+        logging.error(f"ERROR: checkRenkoShortExit called without Short position")
         exit(1)
     (upTrend,brickNum,brickSize,brickHigh,brickLow,close) = (isRenkoUpTrend(row),row['renko_brick_num'],row['renko_brick_high'] - row['renko_brick_low'],row['renko_brick_high'],row['renko_brick_low'],row['Adj Close'])
     logString = "RENKO-SHORT-CONTINUE"
@@ -1911,6 +1938,7 @@ def checkRenkoExit(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,logStri
         (s,entry_price,limit1,limit2,sl1,sl2,logString) = checkRenkoShortExit(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,logString)
     else:
         print(f"ERROR: checkRenkoExit called for ticker without position. Position:{getTickerPosition(row.symbol)}")
+        logging.error(f"ERROR: checkRenkoExit called for ticker without position. Position:{getTickerPosition(row.symbol)}")
         exit(1)
     return (s,entry_price,limit1,limit2,sl1,sl2,logString)
 def checkRenkoEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,logString=''):
@@ -1952,6 +1980,7 @@ def checkPrevOrderEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,lo
         entry_price = prevTarget
         if row.High < prevTarget:
             print(f"ERROR: {row.name} checkSVPLongEntry: How can row high {row.High} be less than limit entry {prevTarget}")
+            logging.error(f"ERROR: {row.name} checkSVPLongEntry: How can row high {row.High} be less than limit entry {prevTarget}")
             #possible I guess because our limit order was not actually there, this is just a simulation backtest, if it was there then row high would have taken it out
             #exit(0)
         logString = "LONG-ENTRY"
@@ -1974,6 +2003,7 @@ def checkPrevOrderEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,lo
         entry_price = max(prevSL1,row.Open)
         if row.Open - prevSL1 > 2:
             print(f"ERROR: {row.name} checkSVPLongEntry: Entry price {row.Open} is more than 2 away from SL {prevSL1}")
+            logging.error(f"ERROR: {row.name} checkSVPLongEntry: Entry price {row.Open} is more than 2 away from SL {prevSL1}")
             # exit(0)
         logString = "LONG-ENTRY"
         logging.info(f"SL order hit at {entry_price}.")  if isLastRow else None
@@ -1993,6 +2023,7 @@ def checkSVPShortEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,log
         if prevSL1 - row.Open > 2:
             entry_price = float('nan')
             print(f"ERROR: {row.name} checkSVPShortEntry: Entry price {row.Open} is more than 2 away from SL {prevSL1}")
+            logging.error(f"ERROR: {row.name} checkSVPShortEntry: Entry price {row.Open} is more than 2 away from SL {prevSL1}")
             return (s,entry_price, limit1, limit2, sl1, sl2,logString)
         
         logString = "SHORT-ENTRY"
@@ -2024,6 +2055,7 @@ def checkSVPLongEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,logS
         entry_price = max(prevSL1,row.Open)
         if row.Open - prevSL1 > 2:
             print(f"ERROR: {row.name} checkSVPLongEntry: Entry price {row.Open} is more than 2 away from SL {prevSL1}")
+            logging.error(f"ERROR: {row.name} checkSVPLongEntry: Entry price {row.Open} is more than 2 away from SL {prevSL1}")
             # exit(0)
         logString = "LONG-ENTRY"
         logging.info(f"SL order hit at {entry_price}.")  if isLastRow else None
@@ -2045,6 +2077,7 @@ def checkSVPLongEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,logS
 def checkSVPLongExit(s,row,df,isLastRow, exit_price,limit1,limit2,sl1,sl2,logString):
     if not tickerHasLongPosition(row.symbol):
         print(f"ERROR: checkRenkoLongExit called without long position")
+        logging.error(f"ERROR: checkRenkoLongExit called without long position")
         exit(1)
     logString = "LONG-CONTINUE"
     prevSL1 = getTickerSL1(row.symbol) if isShortSL1Order(row.symbol) else float('nan')
@@ -2071,6 +2104,7 @@ def checkSVPLongExit(s,row,df,isLastRow, exit_price,limit1,limit2,sl1,sl2,logStr
 def checkSVPShortExit(s,row,df,isLastRow, exit_price,limit1,limit2,sl1,sl2,logString):
     if not tickerHasShortPosition(row.symbol):
         print(f"ERROR: checkRenkoShortExit called without Short position")
+        logging.error(f"ERROR: checkRenkoShortExit called without Short position")
         exit(1)
     logString = "SHORT-CONTINUE"
     prevSL1 = getTickerSL1(row.symbol) if isLongSL1Order(row.symbol) else float('nan')
@@ -2103,6 +2137,7 @@ def checkSVPExit(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,logString
         (s,entry_price,limit1,limit2,sl1,sl2,logString) = checkSVPShortExit(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,logString)
     else:
         print(f"ERROR: checkSVPExit called for ticker without position. Position:{getTickerPosition(row.symbol)}")
+        logging.error(f"ERROR: checkSVPExit called for ticker without position. Position:{getTickerPosition(row.symbol)}")
         exit(1)
     return (s,entry_price,limit1,limit2,sl1,sl2,logString)
 
@@ -2135,10 +2170,11 @@ def followSVP(type, signal, isLastRow, row, df,
         (s,entry_price,limit1,limit2,sl1,sl2,logString) = checkSVPEntry(s,row,df, isLastRow, entry_price,limit1,limit2,sl1,sl2)
     else:
          (s,entry_price,logString) = (float('nan'),float('nan'),"NO-NEW-TRADES")
-         
+    
     if signalChanged(s,signal):
         setTickerTrend(row.symbol, s)
-    logSignal(logString,getSignalGenerator().getLogArray(),signal,s,row,type,isLastRow,f"TrdPrice:{entry_price} LIM:{limit1} SL:{sl1} "+getSignalGenerator().getExtraLogString(), logWithNoSignalChange=True)
+        
+    logSignal(logString,getSignalGenerator().getLogArray(),signal,s,row,type,isLastRow,f"TrdPrice:{entry_price} LIM:{round(limit1,1)} SL:{round(sl1,1)} "+getSignalGenerator().getExtraLogString(), logWithNoSignalChange=True)
     return (s,entry_price, limit1, limit2, sl1, sl2)
 
 def exitTargetOrSL(type, signal, isLastRow, row, df, 
@@ -2271,6 +2307,8 @@ def getSignal(row,signalGenerators, df):
                 if (trade_price < 0):
                     print(f"trade price({trade_price}) less than 0. Signal:{s}")
                     print(row)
+                    logging.error(f"trade price({trade_price}) less than 0. Signal:{s}")
+                    logging.error(row)
                     exit(0)
                 if not np.isnan(s) and not np.isnan(trade_price) and (trade_price*0.95 > row.High or trade_price*1.05 < row.Low):
                     logging.error(f"!!! ERRORR !!!! trade price {trade_price} is outside of high/low range {row.High}/{row.Low}")

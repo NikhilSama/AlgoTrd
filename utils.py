@@ -90,6 +90,44 @@ def getTickerCfg(ticker):
     
 def getNSEHolidays():
     nse_holidays = [
+            "January 26, 2018", "February 13, 2018", "March 02, 2018", "March 29, 2018",
+        "March 30, 2018", "April 30, 2018", "May 01, 2018", "August 15, 2018",
+        "August 22, 2018", "September 13, 2018", "September 20, 2018", "October 02, 2018",
+        "October 18, 2018", "November 07, 2018", "November 08, 2018", "November 23, 2018",
+        "December 25, 2018", "March 04, 2019", "March 21, 2019", "April 17, 2019",
+        "April 19, 2019", "May 01, 2019", "May 06, 2019", "June 05, 2019",
+        "August 12, 2019", "August 15, 2019", "August 23, 2019", "October 02, 2019",
+        "October 08, 2019", "October 21, 2019", "November 12, 2019", "December 25, 2019",
+        
+        "January 26, 2019",  # Republic Day
+        "February 4, 2019",  # Maha Shivratri
+        "March 29, 2019",  # Holi
+        "April 14, 2019",  # Dr. Babasaheb Ambedkar Jayanti
+        "April 29, 2019", # Good Friday
+        "May 1, 2019",  # May Day
+        "May 12, 2019",  # Mahavir Jayanti
+        "August 15, 2019",  # Independence Day
+        "October 2, 2019",  # Gandhi Jayanti
+        "December 25, 2019",  # Christmas
+        "January 26, 2020",  # Republic Day
+        "March 25, 2020",  # Holi
+        "April 10, 2020",  # Good Friday
+        "April 14, 2020",  # Dr. Babasaheb Ambedkar Jayanti
+        "May 1, 2020",  # May Day
+        "May 12, 2020",  # Mahavir Jayanti
+        "August 15, 2020",  # Independence Day
+        "October 2, 2020",  # Gandhi Jayanti
+        "December 25, 2020",  # Christmas
+        "September 2, 2019",#ganesh chaturthi
+        "September 10, 2019",#muharram
+        "October 28, 2019",#diwali pre-diwali
+        "January 26, 2020", "February 21, 2020", "March 10, 2020", "March 25, 2020",
+        "April 02, 2020", "April 06, 2020", "April 10, 2020", "May 01, 2020",
+        "May 25, 2020", "October 02, 2020", "November 16, 2020", "November 30, 2020",
+        "December 25, 2020", "26 January, 2021", "March 11, 2021", "March 29, 2021", "April 02, 2021",
+        "April 14, 2021", "April 21, 2021", "April 28, 2021", "May 13, 2021", "July 21, 2021",
+        "August 19, 2021", "September 10, 2021", "October 15, 2021", "November 04, 2021",
+        "November 05, 2021", "November 19, 2021", "December 06, 2021", "December 25, 2021",
         "January 26, 2022", "March 01, 2022", "March 18, 2022", "April 14, 2022", "April 15, 2022",
         "May 03, 2022", "August 09, 2022", "August 15, 2022", "August 31, 2022", "October 05, 2022", 
         "October 24, 2022", "October 26, 2022", "November 08, 2022",
@@ -118,3 +156,4 @@ def isTradingDay(date):
     is_weekend = date.weekday() >= 5
     is_holiday = date.date() in getNSEHolidays()
     return not (is_weekend or is_holiday)
+
