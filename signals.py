@@ -1068,7 +1068,6 @@ def populateSVP(df):
     # df['slpVal'].clip(lower=-2, upper=0, inplace=True)
 
 def populateVolDelta(df):
-    df['VolDelta'] = df['buyVol'] - df['sellVol']
     df['maSellVol'] = df['sellVol'].rolling(window=1000,min_periods=1).mean()
     df['maBuyVol'] = df['buyVol'].rolling(window=1000,min_periods=1).mean()
     df['volDeltaThreshold'] = (df['maSellVol'] + df['maBuyVol']) * cfgVolDeltaThresholdMultiplier

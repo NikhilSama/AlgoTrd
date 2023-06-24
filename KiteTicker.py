@@ -109,7 +109,7 @@ def getTickersToTrack():
         
         #Create an empty DataFrame with column names and index
         # Initialize the tick DF, so we can assign an index to it
-        columns = ['Open', 'High', 'Low', 'Adj Close', 'Volume','buyVol','sellVol','bid','ask','buyQt', 'sellQt', 'volDelta1', 'volDeltaRatio1', 'buyQtLvl2', 'sellQtLvl2', 'volDelta2', 'volDeltaRatio2']
+        columns = ['Open', 'High', 'Low', 'Adj Close', 'Volume','buyVol','sellVol','volDelta', 'bid','ask','buyQt', 'sellQt', 'volDelta1', 'volDeltaRatio1', 'buyQtLvl2', 'sellQtLvl2', 'volDelta2', 'volDeltaRatio2']
         index = pd.date_range('2023-01-01', periods=0, freq='D')
         tickersToTrack[token]['df'] = pd.DataFrame(columns=columns, index=index)
         tickersToTrack[token]['ticks'] = pd.DataFrame(columns=columns, index=index)
@@ -217,9 +217,14 @@ def addTicksToTickDF(ticks):
         for o in sellOrders:
             sellQt2 += o['quantity']
 
-        lastOrderBookMidPrice = (tickersToTrack[token]['ticks']['bid'][-1] + tickersToTrack[token]['ticks']['ask'][-1])/2
-        buyVol = tick_volume if tick['average_traded_price'] >= lastOrderBookMidPrice else 0
-        sellVol = tick_volume if tick['average_traded_price'] <= lastOrderBookMidPrice else 0
+        if tickersToTrack[token]['ticks'].empty:
+            buyVol = sellVol = volDelta = 0
+        else:
+            lastOrderBookMidPrice = (tickersToTrack[token]['ticks']['bid'][-1] + tickersToTrack[token]['ticks']['ask'][-1])/2
+            buyVol = tick_volume if tick['average_traded_price'] >= lastOrderBookMidPrice else 0
+            sellVol = tick_volume if tick['average_traded_price'] <= lastOrderBookMidPrice else 0
+            volDelta = buyVol - sellVol
+            volDelta += tickersToTrack[token]['ticks']['volDelta'][-1]
         #Sample tick Data
         # 09:33:01 AM Ticks:[{'tradable': True, 'mode': 'full', 'instrument_token': 14762754, 'last_price': 272.2, 'last_traded_quantity': 50, 'average_traded_price': 255.83, 'volume_traded': 528650, 'total_buy_quantity': 149100, 'total_sell_quantity': 77150, 'ohlc': {'open': 250.1, 'high': 278.7, 'low': 227.0, 'close': 263.05}, 'change': 3.4784261547234276, 'last_trade_time': datetime.datetime(2023, 6, 22, 9, 33), 'oi': 611400, 'oi_day_high': 613900, 'oi_day_low': 574800, 'exchange_timestamp': datetime.datetime(2023, 6, 22, 9, 33, 1), 'depth': {'buy': [{'quantity': 350, 'price': 272.25, 'orders': 2}, {'quantity': 600, 'price': 272.2, 'orders': 2}, {'quantity': 500, 'price': 272.15, 'orders': 1}, {'quantity': 1250, 'price': 272.1, 'orders': 5}, {'quantity': 200, 'price': 272.05, 'orders': 2}], 'sell': [{'quantity': 50, 'price': 272.85, 'orders': 1}, {'quantity': 1150, 'price': 272.9, 'orders': 4}, {'quantity': 1250, 'price': 272.95, 'orders': 3}, {'quantity': 2650, 'price': 273.0, 'orders': 6}, {'quantity': 800, 'price': 273.05, 'orders': 3}]}}]
 
@@ -232,6 +237,7 @@ def addTicksToTickDF(ticks):
             'Volume': tick_volume,
             'buyVol': buyVol,
             'sellVol': sellVol,
+            'volDelta': volDelta,
             'bid': buyOrders[0]['price'] if len(buyOrders) > 0 else 0,
             'ask': sellOrders[0]['price'] if len(sellOrders) > 0 else 0,
             'buyQt': tick['total_buy_quantity'],
@@ -243,7 +249,7 @@ def addTicksToTickDF(ticks):
             'volDelta2': buyQt2 - sellQt2,
             'volDeltaRatio2': buyQt2/sellQt2
         }
-        tickerlog(f"Tick: VolDelta:{buyVol - sellVol} OrderQtDelta1: {tick['total_buy_quantity'] - tick['total_sell_quantity']} OrderQtDelta2: {buyQt2 - sellQt2}")
+        tickerlog(f"Tick: VolDelta:{buyVol - sellVol} cumVolDelta: {volDelta} OrderQtImbalance1: {tick['total_buy_quantity'] - tick['total_sell_quantity']} OrderQtImbalance2: {buyQt2 - sellQt2}")
         tickersToTrack[token]['ticks'].loc[tick_time] = tick_df_row  
 
 def resampleToMinDF():
@@ -287,6 +293,7 @@ def resampleToMinDF():
               'Volume': 'sum',
               'buyVol': 'sum',
               'sellVol': 'sum',
+              'volDelta': 'last',
               'bid': 'last',
               'ask': 'last',
               'buyQt': 'mean',
@@ -298,15 +305,17 @@ def resampleToMinDF():
               'volDelta2': 'mean',
               'volDeltaRatio2': 'mean'  
             })
-            ratio = resampled_ticks_upto_this_minute['buyQtLvl2']/resampled_ticks_upto_this_minute['sellQtLvl2']
-            tickerlog(f"Resampled VolDelta: {ratio}")
+            resampled_ticks_upto_this_minute['maxVolDelta'] = ticks_upto_this_minute['volDelta'].max()
+            resampled_ticks_upto_this_minute['minVolDelta'] = ticks_upto_this_minute['volDelta'].min()
+            # ratio = resampled_ticks_upto_this_minute['buyQtLvl2']/resampled_ticks_upto_this_minute['sellQtLvl2']
+            # tickerlog(f"Resampled VolDelta: {ratio}")
             # tickerlog(f"Resampled {resampled_ticks_upto_this_minute['buyQtLvl2']} s:{resampled_ticks_upto_this_minute['sellQtLvl2']} ratio:{resampled_ticks_upto_this_minute['buyQtLvl2']/resampled_ticks_upto_this_minute['sellQtLvl2']}")
             #For now drop all minute_candle df's other than OCHLV and i and symbol
             #Analytics will recreate them, we dont want to confure analytics
             #TODO: Fix this, figure out how to keep that data and just do analytics on the 
             #new minute candle; this will make the tick much faster
             
-            keep_columns = ['Open', 'High', 'Low', 'Adj Close', 'Volume','symbol','i','buyVol','sellVol','bid','ask','buyQt', 'sellQt', 'volDelta1', 'volDeltaRatio1', 'buyQtLvl2', 'sellQtLvl2', 'volDelta2', 'volDeltaRatio2']
+            keep_columns = ['Open', 'High', 'Low', 'Adj Close', 'Volume','symbol','i','buyVol','sellVol','volDelta','maxVolDelta','minVolDelta','bid','ask','buyQt', 'sellQt', 'volDelta1', 'volDeltaRatio1', 'buyQtLvl2', 'sellQtLvl2', 'volDelta2', 'volDeltaRatio2']
             drop_columns = list(set(minute_candle_df.columns) - set(keep_columns))
             minute_candle_df.drop(columns=drop_columns, inplace=True)
             

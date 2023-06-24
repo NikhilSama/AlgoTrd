@@ -208,6 +208,7 @@ def addVolDelta(df):
     df['midPrice'] = (df['BuyPrice'] + df['SellPrice'])/2
     df['buyVol'] = np.where(df['Adj Close'] >= df['midPrice'].shift(), df['Volume'], 0)
     df['sellVol'] = np.where(df['Adj Close'] <= df['midPrice'].shift(), df['Volume'], 0)
+    df['VolDelta'] = df['buyVol'] - df['sellVol']
     df.drop(columns=['midPrice'], inplace=True)
     df.drop(columns=['BuyPrice', 'BuyQty', 'SellPrice', 'SellQty'], inplace=True)
 
