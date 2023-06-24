@@ -104,8 +104,6 @@ logging.debug(f">>>>>>>>DEBUG IS ON>>>>>>>")
 
 db = DBBasic() 
 
-nifty = td.get_fo_active_nifty_tickers()
-
 kite = ki.initKite()
 
 def get_positions():
@@ -128,6 +126,9 @@ def get_ltp(t,exch):
 def placeOrder(t,exchange,tx_type,q,ltp,p,tag,order_type):
     ki.exec(kite,t,exchange,tx_type,q=q,ltp=ltp,p=p,tag=tag,
             order_type=order_type)
+def getFullQuote(t,exch):
+    return ki.get_quote(kite,'NIFTY2362218600CE','NFO')
+
 # BUY CONDITION
 # Buy if current signal is 1 and position is not 1, 
 # or if position is 1 and net position is not 1 as long as signal is not -1
@@ -393,7 +394,7 @@ def checkAndUpdateTargetExits(df, targetClosedPositions):
     #Mark it as such so that our kite positions are
     #consistent with df
     #df.loc[df.index.isin(targetClosedPositions), 'signal'] = 0
-    return df
+    # return df
     if targetClosedPositions is None:
         return df
     for closedPositionTime in targetClosedPositions:
@@ -629,7 +630,7 @@ def Tick(stock,options):
     
     #if (frm_db >= now):
      #   return
-    
+
     for t in nifty:
 
         logging.debug(f"Looping for {t}. frm:{frm} to:{now} ")
@@ -645,7 +646,6 @@ def Tick(stock,options):
     return positions
     
 ### MAIN LOOP RUNS 9:15 AM to 3:00 @ 3 PM MIS orders will be auto closed anyway (bad pricing)###
-
 if isTimeLoop:
     while (now.time() >= cfgStartTimeOfDay and now.time() < cfgEndExitTradesOnlyTimeOfDay):
         nxt_tick = now + timedelta(minutes=1) - timedelta(seconds=now.second)

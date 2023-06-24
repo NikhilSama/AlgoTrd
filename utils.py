@@ -157,3 +157,8 @@ def isTradingDay(date):
     is_holiday = date.date() in getNSEHolidays()
     return not (is_weekend or is_holiday)
 
+def priceWithSlippage(slPrice, type='longEntry'):
+    if type == 'longEntry' or type == 'shortExit':
+        return slPrice*(1+cfgSlippage)
+    elif type == 'shortEntry' or type == 'longExit':
+        return slPrice*(1-cfgSlippage)

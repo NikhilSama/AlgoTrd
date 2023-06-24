@@ -95,17 +95,16 @@ zgetTo = datetime.datetime(2023,4,1,15,30) if cfgZGetStartDate == None else cfgZ
 # zgetTo = datetime.datetime(2023,3,21,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 
 #3S 
-# firstTradeTime = datetime.datetime(2023,5,2,9,30) if cfgZGetStartDate == None else cfgZGetStartDate
-# zgetTo = datetime.datetime(2023,5,2,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+# firstTradeTime = datetime.datetime(2023,5,23,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
+# zgetTo = datetime.datetime(2023,5,23,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 
 firstTradeTime = ist.localize(firstTradeTime)
 zgetFrom = firstTradeTime - timedelta(days=cfgHistoricalDaysToGet)
 zgetTo = ist.localize(zgetTo)
 
-
-
 # def mmReturns(row,df):
 #     i = df.index.get_loc(row.name)
+
 
 #     lastCandleHigh = df.iloc[i-1, df.columns.get_loc('High')]
 #     lastCandleLow = df.iloc[i-1, df.columns.get_loc('Low')]
@@ -122,11 +121,10 @@ zgetTo = ist.localize(zgetTo)
 
 
 def dbget(t,s,e,offset=None,type='Call',interval=''):
-    df = downloader.getCachedTikerData(f'NIFTYITMN{type}{interval}{offset if offset is not None else ""}',s,e,'minute')
+    df = downloader.getCachedTikerData(f'niftyITMN{type}{interval}{offset if offset is not None else ""}',s,e,'minute')
     if not df.empty:
         print("got from cache db")
         print(df)
-        
         return df 
     print("getting from db")
     db = DBBasic()
@@ -137,7 +135,7 @@ def dbget(t,s,e,offset=None,type='Call',interval=''):
     # df.drop('expirty', axis = 1, inplace = True) if 'expirty' in df.columns else None
     # df.drop('option_type', axis = 1, inplace = True) if 'option_type' in df.columns else None
     # df.drop('strike', axis = 1, inplace = True) if 'strike' in df.columns else None
-
+    print(q)
     df['symbol'] = t+type+(str(offset) if offset is not None else '')
     
     # Add NiftyData
@@ -150,7 +148,7 @@ def dbget(t,s,e,offset=None,type='Call',interval=''):
     
     df = utils.cleanDF(df)
 
-    downloader.loadTickerCache(df,f'NIFTYITMN{type}{interval}{offset if offset is not None else ""}',s,e,'minute')
+    downloader.loadTickerCache(df,f'niftyITMN{type}{interval}{offset if offset is not None else ""}',s,e,'minute')
     return df
     
 def zget(t,s,e,i):
@@ -207,6 +205,8 @@ def printTearsheet(tearsheet,df):
         print("No trades")
         return
     prevPos = 0
+    tearsheet['trades'].to_csv('trades.csv')
+
     daily_returns = tearsheet['trades']['return'].resample('D').sum()
 
     if daily_returns.shape[0] <= 1:
@@ -288,7 +288,8 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
             # signals.populateOBV,
             # signals.vwap,
             # signals.populateSVP,
-            # signals.populateCandleStickPatterns
+            # signals.populateCandleStickPatterns,
+            # signals.populateVolDelta
         ], 
         'hourly': [
         ]

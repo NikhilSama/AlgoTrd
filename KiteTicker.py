@@ -109,7 +109,7 @@ def getTickersToTrack():
         
         #Create an empty DataFrame with column names and index
         # Initialize the tick DF, so we can assign an index to it
-        columns = ['Open', 'High', 'Low', 'Adj Close', 'Volume']
+        columns = ['Open', 'High', 'Low', 'Adj Close', 'Volume','buyVol','sellVol','bid','ask','buyQt', 'sellQt', 'volDelta1', 'volDeltaRatio1', 'buyQtLvl2', 'sellQtLvl2', 'volDelta2', 'volDeltaRatio2']
         index = pd.date_range('2023-01-01', periods=0, freq='D')
         tickersToTrack[token]['df'] = pd.DataFrame(columns=columns, index=index)
         tickersToTrack[token]['ticks'] = pd.DataFrame(columns=columns, index=index)
@@ -117,6 +117,49 @@ def getTickersToTrack():
 # def trimMinuteDF(t):
 #     #trim the minute df to last cfgMaxLookbackCandles minutes
 #     tickersToTrack[t]['df'] = tickersToTrack[t]['df'].iloc[-cfgMaxLookbackCandles:]
+def getOrderBook(t,exch):
+    quote = tl.getFullQuote(t['ticker'],exch)
+    if quote is None:
+        tickerlog(f"Error:  addOrderBookInfo: quote is None for {t}")
+        return
+    ltp = quote['last_price']
+    lastQt = quote['last_quantity']
+    orderBook = quote['depth']
+    buyQt = quote['buy_quantity']
+    sellQt = quote['sell_quantity']
+    buyOrderBook = orderBook['buy']
+    sellOrderBook = orderBook['sell']
+    VolDelta1 = buyQt - sellQt
+    
+
+    buyQt2 = 0
+    sellQt2 = 0
+    for i in buyOrderBook:
+        buyQt2 += i['quantity']
+    for i in sellOrderBook:
+        sellQt2 += i['quantity']    
+    VolDelta2 = buyQt2 - sellQt2
+    
+    
+    tickerlog(f"ltp:{ltp} lastQt:{lastQt} buyQt:{buyQt} sellQt:{sellQt} VolDelta1:{VolDelta1} / {round(buyQt/sellQt,2)} | buyQt2:{buyQt2} sellQt2:{sellQt2} VolDelta2:{VolDelta2} / {round(buyQt2/sellQt2,2)}")   
+    print(f"ltp:{ltp} lastQt:{lastQt} buyQt:{buyQt} sellQt:{sellQt} VolDelta1:{VolDelta1} / {round(buyQt/sellQt,2)} | buyQt2:{buyQt2} sellQt2:{sellQt2} VolDelta2:{VolDelta2} / {round(buyQt2/sellQt2,2)}")   
+    (t['df']['buyQt'],t['df']['sellQt'],t['df']['VolDelta1'],t['df']['buyQt2'],t['df']['sellQt2'],t['df']['VolDelta2']) = \
+        (buyQt,sellQt,VolDelta1,buyQt2,sellQt2,VolDelta2)
+    return (buyQt,sellQt,VolDelta1,buyQt2,sellQt2,VolDelta2)
+
+#takes a one second tick df adds Vol Delta to it and returns it
+def addVolDelta(df):
+    # input df is in second tick format
+    buyPrice = df['BuyPrice'].iloc[-1]
+    df['midPrice'] = (df['BuyPrice'] + df['SellPrice'])/2
+    df['buyVol'] = np.where(df['Adj Close'] >= df['midPrice'].shift(), df['Volume'], 0)
+    df['sellVol'] = np.where(df['Adj Close'] <= df['midPrice'].shift(), df['Volume'], 0)
+    df['VolDelta'] = df['buyVol'] - df['sellVol']
+    df['VolDeltaRatio'] = df['buyVol'] / df['sellVol']
+    df.drop(columns=['midPrice'], inplace=True)
+    df.drop(columns=['BuyPrice', 'BuyQty', 'SellPrice', 'SellQty'], inplace=True)
+
+    return df
 
 def getHistoricalTickerData():
     #This code is intended to run before start of trading on day of
@@ -164,15 +207,45 @@ def addTicksToTickDF(ticks):
                 (utils.isNotAnOption(tickersToTrack[token]['ticker']) or \
                     cfgUseVolumeDataForOptions)) \
                     else 0
+        #voume_traded in tick is cumulative volume, so subtract last tick volume to get this tick volume
+        tick_volume -= tickersToTrack[token]['ticks']['volume'][-1]
+        buyOrders = tick['depth']['buy']
+        sellOrders = tick['depth']['sell'] 
+        buyQt2 = sellQt2 = 0
+        for o in buyOrders:
+            buyQt2 += o['quantity']
+        for o in sellOrders:
+            sellQt2 += o['quantity']
+
+        lastOrderBookMidPrice = (tickersToTrack[token]['ticks']['bid'][-1] + tickersToTrack[token]['ticks']['ask'][-1])/2
+        buyVol = tick_volume if tick['average_traded_price'] >= lastOrderBookMidPrice else 0
+        sellVol = tick_volume if tick['average_traded_price'] <= lastOrderBookMidPrice else 0
+        #Sample tick Data
+        # 09:33:01 AM Ticks:[{'tradable': True, 'mode': 'full', 'instrument_token': 14762754, 'last_price': 272.2, 'last_traded_quantity': 50, 'average_traded_price': 255.83, 'volume_traded': 528650, 'total_buy_quantity': 149100, 'total_sell_quantity': 77150, 'ohlc': {'open': 250.1, 'high': 278.7, 'low': 227.0, 'close': 263.05}, 'change': 3.4784261547234276, 'last_trade_time': datetime.datetime(2023, 6, 22, 9, 33), 'oi': 611400, 'oi_day_high': 613900, 'oi_day_low': 574800, 'exchange_timestamp': datetime.datetime(2023, 6, 22, 9, 33, 1), 'depth': {'buy': [{'quantity': 350, 'price': 272.25, 'orders': 2}, {'quantity': 600, 'price': 272.2, 'orders': 2}, {'quantity': 500, 'price': 272.15, 'orders': 1}, {'quantity': 1250, 'price': 272.1, 'orders': 5}, {'quantity': 200, 'price': 272.05, 'orders': 2}], 'sell': [{'quantity': 50, 'price': 272.85, 'orders': 1}, {'quantity': 1150, 'price': 272.9, 'orders': 4}, {'quantity': 1250, 'price': 272.95, 'orders': 3}, {'quantity': 2650, 'price': 273.0, 'orders': 6}, {'quantity': 800, 'price': 273.05, 'orders': 3}]}}]
+
+
         tick_df_row = {
             'Open': tick['last_price'],
             'High': tick['last_price'],
             'Low': tick['last_price'],
             'Adj Close': tick['last_price'],
-            'Volume': tick_volume
+            'Volume': tick_volume,
+            'buyVol': buyVol,
+            'sellVol': sellVol,
+            'bid': buyOrders[0]['price'] if len(buyOrders) > 0 else 0,
+            'ask': sellOrders[0]['price'] if len(sellOrders) > 0 else 0,
+            'buyQt': tick['total_buy_quantity'],
+            'sellQt': tick['total_sell_quantity'],
+            'volDelta1': tick['total_buy_quantity'] - tick['total_sell_quantity'],
+            'volDeltaRatio1': tick['total_buy_quantity']/tick['total_sell_quantity'],
+            'buyQtLvl2': buyQt2,
+            'sellQtLvl2': sellQt2,
+            'volDelta2': buyQt2 - sellQt2,
+            'volDeltaRatio2': buyQt2/sellQt2
         }
+        tickerlog(f"Tick: VolDelta:{buyVol - sellVol} OrderQtDelta1: {tick['total_buy_quantity'] - tick['total_sell_quantity']} OrderQtDelta2: {buyQt2 - sellQt2}")
         tickersToTrack[token]['ticks'].loc[tick_time] = tick_df_row  
-        
+
 def resampleToMinDF():
     resampled_tokens = []
     #process ticks to create minute candles
@@ -203,7 +276,7 @@ def resampleToMinDF():
             # Get rows in the DataFrame before the target time
             ticks_upto_this_minute = tick_df.loc[tick_df.index < this_minute]
             ticks_after_this_minute = tick_df.loc[tick_df.index >= this_minute]
-            #print(f"ticks_upto_this_minute: {ticks_upto_this_minute}")
+            # print(f"ticks_upto_this_minute: {ticks_upto_this_minute}")
             #print(f"ticks_after_this_minute: {ticks_after_this_minute}")
             resampled_ticks_upto_this_minute = \
             ticks_upto_this_minute.resample('1min').agg({
@@ -211,15 +284,29 @@ def resampleToMinDF():
               'High': 'max',
               'Low': 'min',
               'Adj Close': 'last',
-              'Volume': lambda x: x[-1] - x[0] #'sum' volume data in ticks is cumulative  
+              'Volume': 'sum',
+              'buyVol': 'sum',
+              'sellVol': 'sum',
+              'bid': 'last',
+              'ask': 'last',
+              'buyQt': 'mean',
+              'sellQt': 'mean',
+              'volDelta1': 'mean',
+              'volDeltaRatio1': 'mean',
+              'buyQtLvl2': 'mean',
+              'sellQtLvl2': 'mean',
+              'volDelta2': 'mean',
+              'volDeltaRatio2': 'mean'  
             })
-
+            ratio = resampled_ticks_upto_this_minute['buyQtLvl2']/resampled_ticks_upto_this_minute['sellQtLvl2']
+            tickerlog(f"Resampled VolDelta: {ratio}")
+            # tickerlog(f"Resampled {resampled_ticks_upto_this_minute['buyQtLvl2']} s:{resampled_ticks_upto_this_minute['sellQtLvl2']} ratio:{resampled_ticks_upto_this_minute['buyQtLvl2']/resampled_ticks_upto_this_minute['sellQtLvl2']}")
             #For now drop all minute_candle df's other than OCHLV and i and symbol
             #Analytics will recreate them, we dont want to confure analytics
             #TODO: Fix this, figure out how to keep that data and just do analytics on the 
             #new minute candle; this will make the tick much faster
             
-            keep_columns = ['Open', 'High', 'Low', 'Adj Close', 'Volume','symbol','i']
+            keep_columns = ['Open', 'High', 'Low', 'Adj Close', 'Volume','symbol','i','buyVol','sellVol','bid','ask','buyQt', 'sellQt', 'volDelta1', 'volDeltaRatio1', 'buyQtLvl2', 'sellQtLvl2', 'volDelta2', 'volDeltaRatio2']
             drop_columns = list(set(minute_candle_df.columns) - set(keep_columns))
             minute_candle_df.drop(columns=drop_columns, inplace=True)
             
@@ -244,7 +331,7 @@ def resampleToMinDF():
                 tickersToTrack[token]['df'] = pd.concat([minute_candle_df,
                                                 resampled_ticks_upto_this_minute],
                                                 axis=0)
-                tickerlog(f"Adding resampled rows {resampled_ticks_upto_this_minute}  to minute candle {tickersToTrack[token]['df'].tail()}")
+                # tickerlog(f"Adding resampled rows {resampled_ticks_upto_this_minute}  to minute candle {tickersToTrack[token]['df'].tail()}")
 
             # Remove the ticks that have been used to create the new minute candle
             tickersToTrack[token]['ticks'] = ticks_after_this_minute
@@ -253,18 +340,20 @@ def resampleToMinDF():
 
 def tick(tokens):
     positions = tl.get_positions()
-    tickerlog("Tick thread started")
+    # tickerlog("Tick thread started")
     for token in tokens:
         tokenData = tickersToTrack[token]
         targetExitAchieved = tokenData['targetExitAchieved']
-        tickerlog(f"tickThread generating signals for: token {token} {tokenData['ticker']}")
-        tickerlog(f"positions: {positions} df: {tokenData['df']}")
+        # tickerlog(f"tickThread generating signals for: token {token} {tokenData['ticker']}")
+        # tickerlog(f"positions: {positions} df: {tokenData['df']}")
+        getOrderBook(tokenData,'NFO')
+
         df = tl.generateSignalsAndTrade(tokenData['df'].copy(),positions,
                                    False,True,tradeStartTime=tradingStartTime,
                                    targetClosedPositions=targetExitAchieved)
-        tickerlog(f"tickThread done generating signals for {token}.  Placing limit orders now")
+        # tickerlog(f"tickThread done generating signals for {token}.  Placing limit orders now")
         placeLimitOrders(df,tokenData['orders'])
-    tickerlog("Tick thread done")
+    # tickerlog("Tick thread done")
     email.ping()
 def processTicks(ticks):
     #add the tick to the tick df
@@ -317,7 +406,7 @@ def placeLimitOrders(df,orders):
 ####### KITE TICKER CALLBACKS #######
 def on_ticks(ws, ticks):
     # Callback to receive ticks.
-    #tickerlog("Ticks:")    
+    # tickerlog(f"Ticks:{ticks}")    
     processTicks(ticks)
     # bid = ticks[0]['depth']['buy'][0]['price']
     # ask = ticks[0]['depth']['sell'][0]['price']
@@ -325,13 +414,14 @@ def on_ticks(ws, ticks):
     # print(ctime(time()),">>>Bid=",bid," ASK=",ask, " Last Trade: ", ticks[0]["last_trade_time"])
 
 def on_message(ws, payload, is_binary):
+    None
     # Callback to receive all messages.
-    if is_binary:
-        # VERY Chatty ? what are we getting ? 
-        #tickerlog("Binary message received: {}".format(len(payload)))
-        x = 1
-    else:
-        tickerlog("Message: {}".format(payload))
+    # if is_binary:
+    #     # VERY Chatty ? what are we getting ? 
+    #     #tickerlog("Binary message received: {}".format(len(payload)))
+    #     x = 1
+    # else:
+    #     tickerlog("Message: {}".format(payload))
     
 def on_order_update(ws, data):
     # Callback to receive order updates.
@@ -359,7 +449,7 @@ def on_order_update(ws, data):
     if status == 'COMPLETE':
         if tag == 'main-long':
             placeStopLossAndTargetOrders(ticker,exchange,q,p)
-    if tag == 'TargetExit' and status == 'COMPLETE':
+    if tag == 'Exit1' and status == 'COMPLETE':
         tickerlog(f"TargetExit order complete. Adding {localized_timestamp} to targetExitAchieved")
         tickersToTrack[token]['targetExitAchieved'].append(localized_timestamp)
 
@@ -406,7 +496,8 @@ kws.on_message = on_message
 kws.on_error = on_error
 # Infinite loop on the main thread. Nothing after this will run.
 # You have to use the pre-defined callbacks to manage subscriptions.
-
+print(f"time is {datetime.datetime.now(ist).time()}")
+print(f"start time is {cfgStartTimeOfDay}")
 while datetime.datetime.now(ist).time() < cfgStartTimeOfDay:
     email.ping()
     sleep(60)

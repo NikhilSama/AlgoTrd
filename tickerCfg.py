@@ -49,7 +49,7 @@ tickerCfg = {
         'cfgObvMaLen': 4,
         'cfgObvLen':10,
         'obvOscThresh': 0.1,
-        'bet_size': 10000
+        'bet_size': 500000
     }, 
         # 'NIFTY' : {
         #     'maLen': 10,

@@ -8,8 +8,11 @@ Created on Sun Feb  5 14:26:36 2023
 import sys
 import datetime
 cfgDict = {
+    'cfgSlippage': 0.001,
+    'cfgVolDeltaThresholdMultiplier':0.5,
+    'cfgGoodTradeProfitPct': 0.2,
     'cfgNiftyOpen': 18500,
-    'cfgIsBackTest': False,
+    'cfgIsBackTest': True,
     'cfgZGetStartDate': None,
     'cfgZGetEndDate': None,    
     'cfgMaxLotsForTrade' : 36,
@@ -92,7 +95,7 @@ cfgDict = {
     'dbpass' : 'trading123',
     'showTradingViewLive' : False,
     'cacheTickData' : False, 
-    'bet_size': 10000
+    'bet_size': 500000
 }
 
 args = sys.argv[1:]

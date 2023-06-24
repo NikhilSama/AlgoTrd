@@ -171,6 +171,16 @@ def getTxType(kite,tx_type):
     else:
         logging.error(f"Unknown tx_type {tx_type}")
     return kite_tx_type
+
+def get_quote(kite,t,exchange):
+    instr = f"{exchange}:{t}"
+    try:
+        quote = kite.quote([instr])
+        # logging.info(f"quote for {instr} is {quote}")
+        return quote[instr]
+    except:
+        logging.error(f"Error getting quote for {instr}. Skipping")
+        return None
 def get_ltp(kite,t,exchange):
     try: 
         ltp = kite.ltp([f"{exchange}:{t}"])
@@ -201,7 +211,7 @@ def getOrderVariety(kite,q,lot_size) :
     return (v,iceberg_legs,iceberg_q, q)
 
 def convertSLTriggerToPrice(sltrigger,slTxType,tick_size):
-    slTriggerMult = 1.01 if slTxType == 'BUY' else 0.99
+    slTriggerMult = (1+cfgSlippage) if slTxType == 'BUY' else (1-cfgSlippage)
     return round(sltrigger*slTriggerMult/tick_size)*tick_size
 def convertSLTriggerToTrigger(sltrigger,tick_size):
     return round(sltrigger/tick_size)*tick_size

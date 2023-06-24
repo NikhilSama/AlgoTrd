@@ -132,9 +132,9 @@ def plot_backtest(df,trades=None):
     #pprint.pprint(tearsheet, indent=4)
     #df[['ma_superTrend', 'ma_slow', 'ma_fast']].plot(grid=True, figsize=(12, 8))
 #    fig, (ax1, ax2, ax3, ax4, ax5, ax7) = plt.subplots(6, 1, figsize=(8, 8))
-    fig, (ax1, ax2, ax3, ax4, ax5, ax6, ax7) = \
-        plt.subplots(7, 1, figsize=(8, 8), sharex=True, 
-                     gridspec_kw={'height_ratios': [6, 1, 1, 2,2,2,2]})
+    fig, (ax1, ax2, ax3, ax4) = \
+        plt.subplots(4, 1, figsize=(8, 8), sharex=True, 
+                     gridspec_kw={'height_ratios': [6, 1, 1, 4]})
     plt.subplots_adjust(left=0.1, bottom=0.1)
     # df['SLOPE-OSC'].fillna(0, inplace=True)
     # df['ma20_pct_change_ma'].fillna(0, inplace=True)
@@ -177,10 +177,10 @@ def plot_backtest(df,trades=None):
     #ax2.plot(df['i'], df['Adj Close-P'], color='blue', linewidth=2)
     #ax2.plot(df['i'], df['Adj Close-C'], color='red', linewidth=2)   
     #ax3.plot(df['i'], df['ma20_pct_change_ma'], color='red', linewidth=2)
-    ax2.plot(df['i'], df['nifty'], color='blue', linewidth=2)
-    ax2.set_title('nifty ↓', loc='right')
-    ax2.plot(df['i'], df['SuperTrendUpper'], color='green', linewidth=1)
-    ax2.plot(df['i'], df['SuperTrendLower'], color='red', linewidth=1)
+    ax2.plot(df['i'], df['cum_strategy_returns'], color='blue', linewidth=2)
+    ax2.set_title('returns ↓', loc='right')
+    # ax2.plot(df['i'], df['SuperTrendUpper'], color='green', linewidth=1)
+    # ax2.plot(df['i'], df['SuperTrendLower'], color='red', linewidth=1)
 
     # ax2.axhline(round(df['nifty'][-1]/100)*100, color='grey', linestyle='--')  # adjust color and linestyle as necessary
     # ax2.axhline((round(df['nifty'][-1]/100)*100) -100, color='grey', linestyle='--')  # adjust color and linestyle as necessary
@@ -189,37 +189,49 @@ def plot_backtest(df,trades=None):
     ax3.plot(df['i'], df['position'], color='green', linewidth=2)
     ax3.set_title('Position↓', loc='right')
     # df['ADX'] .fillna(0, inplace=True)
-    ax4.plot(df['i'], abs(df['Adj Close'] - iv), color='black', linewidth=2)
-    # ax4.plot(df['i'], df['+di'], color='green', linewidth=1)
-    # ax4.plot(df['i'], df['-di'], color='red', linewidth=1)
+    # ax4.plot(df['i'], abs(df['Adj Close'] - iv), color='black', linewidth=2)
+    threshold = df['volDeltaThreshold'] * 2
+
+    # Clip the data using the calculated threshold
+    clippedVolDelta = np.clip(df['VolDelta'], -threshold, threshold)
+
+
+    ax4.plot(df['i'], df['stMaxVolDelta'], color='red', linewidth=1)
+    ax4.plot(df['i'], df['stMinVolDelta'], color='red', linewidth=1)
+    ax4.plot(df['i'], clippedVolDelta, color='black', linewidth=1)
+    ax4.plot(df['i'], df['volDeltaThreshold'], color='green', linewidth=1)
+    ax4.plot(df['i'], -df['volDeltaThreshold'], color='red', linewidth=1)
     # draw a threshold line at y=0.5
     # ax4.axhline(y=-1, color='red', linestyle='--')
     # ax4.axhline(y=-2, color='blue', linestyle='--')
-    ax4.axhline(y=-.1, color='red', linestyle='--')
-    ax4.axhline(y=-.2, color='blue', linestyle='--')
+    # ax4.axhline(y=-50000, color='red', linestyle='--')
+    # ax4.axhline(y=-.2, color='blue', linestyle='--')
     # ax4.axhline(y=1, color='green', linestyle='--')
     # ax4.axhline(y=2, color='blue', linestyle='--')
-    ax4.axhline(y=.1, color='green', linestyle='--')
-    ax4.axhline(y=.2, color='blue', linestyle='--')
-    ax4.set_title('IV Less Close↓', loc='right')
+    # ax4.axhline(y=.1, color='green', linestyle='--')
+    # ax4.axhline(y=.2, color='blue', linestyle='--')
+    ax4.set_title('maVolDelta↓', loc='right')
 
-    ax5.plot(df['i'], df['Volume'], color='red', linewidth=1)
-    # ax5.plot(df['i'], df['slpSTPoc'], color='black', linewidth=1)
-    # ax5.plot(df['i'], df['slpVah'], color='green', linewidth=1)
-    # ax5.plot(df['i'], df['slpVal'], color='red', linewidth=1)
-    ax5.set_title('Vol Candle↓', loc='right')
-    ax5.axhline(y=1, color='red', linestyle='--')
-    ax5.axhline(y=-1, color='red', linestyle='--')
+    # ax5.plot(df['i'], df['sellVol'], color='red', linewidth=1)
+    # # ax5.plot(df['i'], df['slpSTPoc'], color='black', linewidth=1)
+    # # ax5.plot(df['i'], df['slpVah'], color='green', linewidth=1)
+    # # ax5.plot(df['i'], df['slpVal'], color='red', linewidth=1)
+    # ax5.set_title('SellVol↓', loc='right')
+    # ax5.axhline(y=50000, color='red', linestyle='--')
+    # # ax5.axhline(y=-1, color='red', linestyle='--')
 
-    # ax6.plot(df['i'], df['ma20_pct_change'], color='green', linewidth=2)
-    ax6.set_title('SLP ST POC ↓', loc='right')
-    ax6.axhline(y=maSlopeThresh, color='red', linestyle='--')
-    ax6.axhline(y=-maSlopeThresh, color='red', linestyle='--')
+    # ax6.plot(df['i'], df['VolDelta'], color='green', linewidth=2)
+    # ax6.set_title('VolDelta ↓', loc='right')
+    # ax6.axhline(y=av, color='red', linestyle='--')
+    # ax6.axhline(y=-av, color='red', linestyle='--')
+    # # ax6.axhline(y=4*av, color='red', linestyle='--')
+    # # ax6.axhline(y=-4*av, color='red', linestyle='--')
 
-    # ax7.plot(df['i'], df['MA-FAST-SLP'], color='green', linewidth=2)
-    ax7.set_title('SLOPE-OSC-SLOPE sq ↓', loc='right')
-    ax7.axhline(y=cfgFastMASlpThresh, color='red', linestyle='--')
-    ax7.axhline(y=-cfgFastMASlpThresh, color='red', linestyle='--')
+    # df['VolDeltaRatio'] = df['VolDeltaRatio'].clip(0, 2)
+    # ax7.plot(df['i'], df['VolDeltaRatio'], color='green', linewidth=2)
+    # ax7.set_title('VolDeltaRatio ↓', loc='right')
+    # ax7.axhline(y=cfgFastMASlpThresh, color='red', linestyle='--')
+    # ax7.axhline(y=-cfgFastMASlpThresh, color='red', linestyle='--')
 
     # if 'OBV-OSC' in df.columns and df['OBV-OSC'][-1] != 0:
     #     ax8.plot(df['i'], df['OBV'], color='green', linewidth=2)
@@ -268,8 +280,8 @@ def plot_backtest(df,trades=None):
         ax2.axvspan(start_index, end_index, alpha=0.2, color='gray')
         ax3.axvspan(start_index, end_index, alpha=0.2, color='gray')
         ax4.axvspan(start_index, end_index, alpha=0.2, color='gray')
-        ax5.axvspan(start_index, end_index, alpha=0.2, color='gray')
-        ax6.axvspan(start_index, end_index, alpha=0.2, color='gray')
+        ax5.axvspan(start_index, end_index, alpha=0.2, color='gray') if 'ax5' in locals() else None
+        ax6.axvspan(start_index, end_index, alpha=0.2, color='gray') if 'ax6' in locals() else None
         ax7.axvspan(start_index, end_index, alpha=0.2, color='gray') if 'ax7' in locals() else None
         ax8.axvspan(start_index, end_index, alpha=0.2, color='gray') if 'ax8' in locals() else None
         ax9.axvspan(start_index, end_index, alpha=0.2, color='gray') if 'ax9' in locals() else None
@@ -288,8 +300,8 @@ def plot_backtest(df,trades=None):
             ax2.axvspan(start_index, end_index, alpha=0.2, color='yellow')
             ax3.axvspan(start_index, end_index, alpha=0.2, color='yellow')
             ax4.axvspan(start_index, end_index, alpha=0.2, color='yellow')
-            ax5.axvspan(start_index, end_index, alpha=0.2, color='yellow')
-            ax6.axvspan(start_index, end_index, alpha=0.2, color='yellow')
+            ax5.axvspan(start_index, end_index, alpha=0.2, color='yellow') if 'ax5' in locals() else None
+            ax6.axvspan(start_index, end_index, alpha=0.2, color='yellow') if 'ax6' in locals() else None
             ax7.axvspan(start_index, end_index, alpha=0.2, color='yellow') if 'ax7' in locals() else None
             ax8.axvspan(start_index, end_index, alpha=0.2, color='yellow') if 'ax8' in locals() else None
             ax9.axvspan(start_index, end_index, alpha=0.2, color='yellow') if 'ax9' in locals() else None
@@ -322,7 +334,7 @@ def plot_backtest(df,trades=None):
         #     ax8.axvspan(start_index, end_index, alpha=0.2, color='red')
         #     ax9.axvspan(start_index, end_index, alpha=0.2, color='red')
 
-        mask = (df['position'].shift(-1) != 0)
+        mask = ((df['maVolDelta'] > df['volDeltaThreshold']) | (df['maVolDelta'] < -df['volDeltaThreshold']))
         # Use the shift method to get the start and end times of each region where the mask is True
         start_times = df.index[(mask & ~mask.shift(1, fill_value=False))].tolist()
         end_times = df.index[(mask & ~mask.shift(-1, fill_value=False))].tolist()
@@ -336,11 +348,34 @@ def plot_backtest(df,trades=None):
             ax2.axvspan(start_index, end_index, alpha=0.2, color='green')
             ax3.axvspan(start_index, end_index, alpha=0.2, color='green')
             ax4.axvspan(start_index, end_index, alpha=0.2, color='green')
-            ax5.axvspan(start_index, end_index, alpha=0.2, color='green')
-            ax6.axvspan(start_index, end_index, alpha=0.2, color='green')
+            ax5.axvspan(start_index, end_index, alpha=0.2, color='green') if 'ax5' in locals() else None
+            ax6.axvspan(start_index, end_index, alpha=0.2, color='green')   if 'ax6' in locals() else None
             ax7.axvspan(start_index, end_index, alpha=0.2, color='green') if 'ax7' in locals() else None
             ax8.axvspan(start_index, end_index, alpha=0.2, color='green') if 'ax8' in locals() else None
             ax9.axvspan(start_index, end_index, alpha=0.2, color='green') if 'ax9' in locals() else None
+    
+        mask = (df['position'].shift(-1) != 0)
+        # Use the shift method to get the start and end times of each region where the mask is True
+        start_times = df.index[(mask & ~mask.shift(1, fill_value=False))].tolist()
+        end_times = df.index[(mask & ~mask.shift(-1, fill_value=False))].tolist()
+        # Loop over each start and end time and add a shaded rectangle
+        for start_time, end_time in zip(start_times, end_times):
+            start_index=df['i'][start_time]
+            end_index=df['i'][end_time]
+            xticks.extend([start_index,end_index])
+            # Add a shaded rectangle for the time period between start_time and end_time
+            ax1.axvspan(start_index, end_index, alpha=0.2, color='red')
+            ax2.axvspan(start_index, end_index, alpha=0.2, color='red')
+            ax3.axvspan(start_index, end_index, alpha=0.2, color='red')
+            ax4.axvspan(start_index, end_index, alpha=0.2, color='red')
+            ax5.axvspan(start_index, end_index, alpha=0.2, color='red') if 'ax5' in locals() else None
+            ax6.axvspan(start_index, end_index, alpha=0.2, color='red')  if 'ax6' in locals() else None
+            ax7.axvspan(start_index, end_index, alpha=0.2, color='red') if 'ax7' in locals() else None
+            ax8.axvspan(start_index, end_index, alpha=0.2, color='red') if 'ax8' in locals() else None
+            ax9.axvspan(start_index, end_index, alpha=0.2, color='red') if 'ax9' in locals() else None
+
+    
+    
     # create the slider widget
     plt.xticks(xticks,rotation=90)
     axpos = plt.axes([0.25, 0.01, 0.65, 0.03])

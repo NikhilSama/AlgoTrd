@@ -47,8 +47,7 @@ def cleanTickDf(df,isOption=False):
 
     df.rename(columns={"LTP":"Adj Close"},inplace=True)
     # Drop the original Date and Time columns
-    df.drop(columns=['Date', 'Time'], inplace=True) if isOption else \
-    df.drop(columns=['Date', 'Time', 'BuyPrice', 'BuyQty', 'SellPrice', 'SellQty', "LTQ"], inplace=True)
+    df.drop(columns=['Date', 'Time'], inplace=True)
 
     if not isOption:
         df.drop(columns=['OpenInterest'], inplace=True) if 'OpenInterest' in df.columns else None
@@ -149,7 +148,7 @@ def get_last_thursday_of_week(date):
     days_to_add = (3 - current_day_of_week) % 7
     # Get the date of the Thursday following the given date
     next_thursday = date + timedelta(days=days_to_add)
-    return next_thursdayx   ``
+    return next_thursday
 
 def getExpiry(date):
     expiry = get_last_thursday_of_week(date) if date > datetime(2019, 2, 11) else get_last_thursday_of_month(date)
@@ -196,10 +195,23 @@ def resample (df, interval):
         'niftyLow': 'min',
         'option_type': 'last',
         'strike': 'last',
-        'expiry': 'last'
+        'expiry': 'last',
+        'buyVol': 'sum',
+        'sellVol': 'sum',
+        'VolDelta': 'sum'
     })
+    df_resampled['VolDeltaRatio'] = np.where(df_resampled['sellVol'] != 0, df_resampled['buyVol'] / df_resampled['sellVol'], 10)
     # df_resampled.drop(columns=['BuyPrice', 'BuyQty','SellPrice','SellQty'], inplace=True)
     return df_resampled
+def addVolDelta(df):
+    # input df is in second tick format
+    df['midPrice'] = (df['BuyPrice'] + df['SellPrice'])/2
+    df['buyVol'] = np.where(df['Adj Close'] >= df['midPrice'].shift(), df['Volume'], 0)
+    df['sellVol'] = np.where(df['Adj Close'] <= df['midPrice'].shift(), df['Volume'], 0)
+    df.drop(columns=['midPrice'], inplace=True)
+    df.drop(columns=['BuyPrice', 'BuyQty', 'SellPrice', 'SellQty'], inplace=True)
+
+    return df
 
 # Interval examples 
 # 'B': Business day frequency
@@ -214,7 +226,7 @@ def resample (df, interval):
 # 'L' or 'ms': Millisecond frequency
 # 'U' or 'us': Microsecond frequency
 # 'N': Nanosecond frequency
-
+    
 ## Can also do 2S for 2 seconds, or or 2T for 2 minutes
 def csvGetOption(t,s,e,targetCallPrice=200,type="Call",interval='1s'):
     thisDay = s
@@ -246,6 +258,7 @@ def csvGetOption(t,s,e,targetCallPrice=200,type="Call",interval='1s'):
                     offset = offset - 100
                     day_df = getOptionDF(thisDay,offset=offset,type=type)
             print(day_df)
+            day_df = addVolDelta(day_df)
             day_df = resample(day_df, interval) if interval != '1s' else day_df
             
             df = df.append(day_df)
@@ -259,16 +272,19 @@ def csvToDb(s,e,interval='T',type='Call',offset=0):
     df.drop(columns=['i'], inplace=True) if 'i' in df.columns else None
     df.rename(columns={"OpenInterest":"Open Interest"},inplace=True) if 'OpenInterest' in df.columns else None
 
+    # df.to_csv('test.csv')
+    # exit()
     db = DBBasic()
-    print(f"saving to DB niftyITMN{type}{offset if offset !=0 else ''}")
-    db.toDB(f'niftyITMN{type}{interval}{offset if offset !=0 else ""}',df)
+    print(f"saving to DB niftyITMVD{type}{offset if offset !=0 else ''}")
+    db.toDB(f'niftyITMVD{type}{interval}{offset if offset !=0 else ""}',df)
 
 def splitTimeFramesAndSaveToDb():
     # csvToDb(datetime(2018,7,1,9,15), datetime(2019,28,2,9,15),interval='T',type='Call',offset=0)
     # csvToDb(datetime(2019,3,1,9,15), datetime(2019,12,31,9,15),interval='T',type='Call',offset=0)
     # csvToDb(datetime(2020,1,1,9,15), datetime(2020,12,31,9,15),interval='T',type='Call',offset=0)
     # csvToDb(datetime(2021,1,1,9,15), datetime(2021,12,31,9,15),interval='T',type='Call',offset=0)
-    csvToDb(datetime(2023,5,1,9,15), datetime(2023,5,31,9,15),interval='3S',type='Call',offset=0)
+    # csvToDb(datetime(2023,5,1,9,15), datetime(2023,5,31,9,15),interval='3S',type='Call',offset=0)
+    csvToDb(datetime(2023,5,1,9,15), datetime(2023,5,31,9,15),interval='T',type='Call',offset=0)
 
 
 splitTimeFramesAndSaveToDb()
