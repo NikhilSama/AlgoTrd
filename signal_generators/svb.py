@@ -7,7 +7,7 @@ import cfg
 globals().update(vars(cfg))
 
 class svb(SignalGenerator):
-    logArray = ['svp','ohlv']
+    logArray = ['voldelta','svp','ohlv']
     extraLogString = ''
     def svpTrendsDown(self,row):
         return row['slpPoc'] <= -cfgSVPSlopeThreshold
@@ -87,86 +87,70 @@ class svb(SignalGenerator):
             
     def shortResistance(self,row):
         return self.longSupport(row)
+    def timeWindow(self,row):
+        return True if row.name.hour >= 11 else False
 
     #MAIN
     def OkToEnterLong(self,row):
-        return self.svpTrendsUp(row)
-    def OkToEnterShort(self,row):
-        return self.svpTrendsDown(row)
-    def checkLongEntry(self,s,row,df,isLastRow,limit1,limit2,sl1,sl2,logString):
-        (close,val15,slpVal15) = (row['Adj Close'],row.val15m,row.slp15Val)
-        i = df.index.get_loc(row.name)    
-        prevClose = df.iloc[i - 1,df.columns.get_loc('Adj Close')]
-        prevVal15 = df.iloc[i - 1,df.columns.get_loc('val15m')]
+        close = row['Adj Close']
+        if self.marketIsNeutral(row) and close < row.poc and self.timeWindow(row):
+            return True
+        else:
+            return False
 
-        if self.crossOver(close,row.val15m,prevClose,prevVal15):
+    def OkToEnterShort(self,row):
+        close = row['Adj Close']
+        if self.marketIsNeutral(row) and close > row.poc and self.timeWindow(row):
+            return True
+        else:
+            return False
+    def checkLongEntry(self,s,row,df,isLastRow,limit1,limit2,sl1,sl2,logString):
+        (close,poc,vah,val) = (row['Adj Close'],row.poc,row.vah,row.val)
+
+        if self.getVolDeltaSignal(row,'longEntry') or \
+            (close <= val and self.getSTOrderBookImbalance(row) == 1):
             s = 1
             logString = "SVP-LONG-ENTRY"
-            logging.info(f"TARGET Hit: We Crossed Over Val15") if isLastRow else None
-        elif slpVal15 >= -cfgSVPSlopeThreshold:
-            logString = "SVP-WAITING-FOR-LONG-TREND"
-            limit1 = val15
-            sl1 = -(val15*0.95)
         else:
-            logString = "SVP-SKIP-LONG-VAL-SLOPING-DOWN"
-        self.extraLogString = f'VAH15:{round(row.vah15m,1)}({round(row.slp15Vah,2)}) VAL15:{round(row.val15m,1)}({round(row.slp15Val,2)})'
+            logString = "SVP-WAITING-FOR-LONG-ENTRY"
+            limit1 = val-5
         return (s, limit1, limit2, sl1, sl2,logString)
 
     def checkShortEntry(self,s,row,df,isLastRow,limit1,limit2,sl1,sl2,logString):
-        (close,vah15,slpVah15) = (row['Adj Close'],row.vah15m,row.slp15Vah)
-        i = df.index.get_loc(row.name)    
-        prevClose = df.iloc[i - 1,df.columns.get_loc('Adj Close')]
-        prevVah15 = df.iloc[i - 1,df.columns.get_loc('vah15m')]
+        (close,poc,vah,val) = (row['Adj Close'],row.poc,row.vah,row.val)
 
-        if self.crossUnder(close,row.vah15m,prevClose,prevVah15) and self.getSVPquadrant(row) != 'Low':
+        if self.getVolDeltaSignal(row,'shortEntry') or \
+            (close >= vah and self.getSTOrderBookImbalance(row) == -1):
             s = -1
             logString = "SVP-SHORT-ENTRY"
-            logging.info(f"TARGET Hit: We CrossUnder Vah15") if isLastRow else None
-        elif slpVah15 <= cfgSVPSlopeThreshold and self.getSVPquadrant(row) != 'Low':
-            logString = "SVP-WAITING-FOR-SHORT-TREND"
-            limit1 = -vah15
-            sl1 = -(vah15*1.05)
         else:
-            logString = "SVP-SKIP-SHORT-VAH-SLOPING-UP" if self.getSVPquadrant(row) != 'Low' else "SVP-SKIP-SHORT-IN-LOW-QUADRANT"
-        self.extraLogString = f'VAH15:{round(row.vah15m,1)}({round(row.slp15Vah,2)}) VAL15:{round(row.val15m,1)}({round(row.slp15Val,2)})'
-
+            logString = "SVP-WAITING-FOR-SHORT-ENTRY"
+            limit1 = -(vah+5)
+            
         return (s, limit1, limit2, sl1, sl2,logString)
 
-    def checkLongExit(self,s,row,df,isLastRow, entryPrice,limit1,limit2,sl1,sl2,logString):
-        (close,vah15,slpVah15) = (row['Adj Close'],row.vah15m,row.slp15Vah)
+    def checkLongExit(self,s,row,df,isLastRow, entryPrice,limit1,limit2,sl1,sl2,logString,
+                      tradeEntry,tradeMax):
+        (close,poc,vah,val) = (row['Adj Close'],row.poc,row.vah,row.val)
 
-        i = df.index.get_loc(row.name)    
-        prevClose = df.iloc[i - 1,df.columns.get_loc('Adj Close')]
-        prevVah15 = df.iloc[i - 1,df.columns.get_loc('vah15m')]
-        
-        if self.crossUnder(close,vah15,prevClose,prevVah15):
+        if self.getVolDeltaSignal(row,'longExit') or \
+            (close >= poc and self.getSTOrderBookImbalance(row) == -1):
             s = 0
             logString = "SVP-LONG-EXIT"
-            logging.info(f"TARGET Hit: We Crossed Under vah15") if isLastRow else None
-        elif slpVah15 <= cfgSVPSlopeThreshold:
-            sl1 = -entryPrice*.95
-            limit1 = -vah15
         else:
-            logString = "SVP-SKIP-LONG-VAH-SLOPING-UP"
-        self.extraLogString = f'VAH15:{round(row.vah15m,1)}({round(row.slp15Vah,2)}) VAL15:{round(row.val15m,1)}({round(row.slp15Val,2)})'
-
+            limit1 = -vah
+            sl1 = -(max(tradeEntry,tradeMax) - 15)
         return (s, limit1, limit2, sl1, sl2,logString)
 
-    def checkShortExit(self,s,row,df,isLastRow, entryPrice,limit1,limit2,sl1,sl2,logString):
-        (close,val15,slpVal15) = (row['Adj Close'],row.val15m,row.slp15Val)
-        i = df.index.get_loc(row.name)    
-        prevClose = df.iloc[i - 1,df.columns.get_loc('Adj Close')]
-        prevVal15 = df.iloc[i - 1,df.columns.get_loc('val15m')]
+    def checkShortExit(self,s,row,df,isLastRow, entryPrice,limit1,limit2,sl1,sl2,logString,
+                       tradeEntry,tradeMin):
+        (close,poc,vah,val) = (row['Adj Close'],row.poc,row.vah,row.val)
         
-        if self.crossOver(close,val15,prevClose,prevVal15):
+        if self.getVolDeltaSignal(row,'shortExit') or \
+            (close <= poc and self.getSTOrderBookImbalance(row) == 1):
             s = 0 
             logString = "SVP-SHORT-EXIT"
-            logging.info(f"TARGET HIT: We crosssed over Val 15.")     if isLastRow else None
-        elif slpVal15 >= -cfgSVPSlopeThreshold:
-            sl1 = entryPrice*1.05
-            limit1 = val15 
         else:
-            logString = "SVP-SKIP-SHORT-EXIT-VAL-SLOPING-DOWN"
-        self.extraLogString = f'VAH15:{round(row.vah15m,1)}({round(row.slp15Vah,2)}) VAL15:{round(row.val15m,1)}({round(row.slp15Val,2)})'
-
+            limit1 = val
+            sl1 = min(tradeEntry,tradeMin) + 15
         return (s, limit1, limit2, sl1, sl2,logString)

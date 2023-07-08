@@ -37,6 +37,9 @@ class DBBasic:
     def __init__(self):
         pass
     
+    def close_db(self):
+        self.con.close()
+
     def delAfter(self,frm):
         cursor = self.con.cursor()
         #Delete seems to be hanging the db, so switched to warning instead; delete manually if you see this warning
@@ -103,6 +106,20 @@ class DBBasic:
             logging.info('toDB Unable to save')
             logging.info(e.args[0])
 
+    def fromDBResult(self, q):
+        try:
+            cursor = self.con.cursor()
+            cursor.execute(q)
+            results = cursor.fetchall()
+            logging.info(f'fromDBResult {q}')
+            logging.info(results)
+        except Exception as e:
+            logging.info(f'fromDBResult Unable to get {q}')
+            logging.info(e.args[0])
+            results = [(0,0)]
+
+        return results
+
     def frmDB(self, q):
         try:
             df = pd.read_sql(q, con=self.engine)
@@ -154,7 +171,6 @@ class DBBasic:
             if strike == 0:
                 extra = f' AND strike < {price}' if type == 'CE' else f' AND strike > {price}'
                 q = f"SELECT tradingsymbol,lot_size,tick_size,strike FROM trading.instruments_zerodha where instrument_type = '{type}' and underlying_ticker = '{ticker}' AND expiry >= '{date.today()}' {extra} ORDER BY ABS( strike - {price} ) ASC, expiry ASC LIMIT 1"
-                print(q)
             else: # strike is provided, find the option with this strike only
                 q = f"SELECT tradingsymbol,lot_size,tick_size,strike FROM trading.instruments_zerodha where instrument_type = '{type}' and underlying_ticker = '{ticker}' AND expiry >= '{date.today()}' AND strike = {strike} ORDER BY ABS( strike - {price} ) ASC, expiry ASC LIMIT 1"
         else:

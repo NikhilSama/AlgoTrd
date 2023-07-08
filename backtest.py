@@ -90,13 +90,17 @@ index_tickers = td.get_index_tickers()
 firstTradeTime = datetime.datetime(2022,5,1,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
 zgetTo = datetime.datetime(2023,4,1,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 
+#One day default
+# firstTradeTime = datetime.datetime(2023,3,31,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
+# zgetTo = datetime.datetime(2023,3,31,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+
 
 # firstTradeTime = datetime.datetime(2023,3,21,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
 # zgetTo = datetime.datetime(2023,3,21,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 
 #3S 
-# firstTradeTime = datetime.datetime(2023,5,23,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
-# zgetTo = datetime.datetime(2023,5,23,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+# firstTradeTime = datetime.datetime(2023,5,30,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
+# zgetTo = datetime.datetime(2023,5,30,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 
 firstTradeTime = ist.localize(firstTradeTime)
 zgetFrom = firstTradeTime - timedelta(days=cfgHistoricalDaysToGet)
@@ -144,8 +148,8 @@ def dbget(t,s,e,offset=None,type='Call',interval=''):
     df['nifty'] = niftydf['Adj Close'] if 'nifty' not in df.columns else df['nifty']
     df['niftyHigh'] = niftydf['High'] if 'niftyHigh' not in df.columns else df['niftyHigh']
     df['niftyLow'] = niftydf['Low'] if 'niftyLow' not in df.columns else df['niftyLow']
-    
-    
+    df['niftyUpVol'] = df['niftyDnVol'] = df['niftyFutureUpVol'] = df['niftyFutureDnVol'] = 0
+    df['futOrderBookBuyQt'] = df['futOrderBookSellQt'] = df['futOrderBookBuyQtLevel1'] = df['futOrderBookSellQtLevel1'] = 1
     df = utils.cleanDF(df)
 
     downloader.loadTickerCache(df,f'niftyITMN{type}{interval}{offset if offset is not None else ""}',s,e,'minute')
@@ -282,6 +286,7 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
         'daily': [
             signals.populateATR,
             signals.populateRenko,
+            signals.populateRSI,
             # signals.populateBB,     
             # signals.populateADX, 
             # signals.populateSuperTrend,

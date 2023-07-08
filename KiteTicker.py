@@ -24,6 +24,7 @@ from freezegun import freeze_time
 import math
 import threading
 import signals 
+import os
 import utils
 import subprocess
 
@@ -37,6 +38,7 @@ import cfg
 globals().update(vars(cfg))
 
 global tickThread
+
 tickThread = None
 tickThreadBacklog = []
 nifty_ltp = 0
@@ -65,6 +67,7 @@ tickersToTrack = {}
 now = datetime.datetime.now(ist)
 tradingStartTime = now.replace(hour=cfgStartTimeOfDay.hour, minute=cfgStartTimeOfDay.minute, 
                                second=0, microsecond=0)
+niftyFutureTicker = 'NIFTY23JULFUT'
 
 def getNiftyLTP():
     return nifty_ltp
@@ -88,12 +91,22 @@ def tickerlog(s):
 
 
 def getTickersToTrack():
+    
     tickers = td.get_fo_active_nifty_tickers(offset=100)
     #tickers = ['RELIANCE']
 
     for t in tickers:
         token = \
             db.get_instrument_token(t)
+        
+        if token in tickersToTrack.keys():
+             # This will happen if we lost connection and are re-connection. 
+             # No need to reset the df in that case, else we lose VolDelta
+             # info in the old df (because we rebuild the df from historical,
+             # and historical does not have VolDelta and OrderBook Imbalance info
+             # ), and therefore positions will be inconsistent with live
+            continue
+        
         tickersToTrack[token] = {
                 "ticker": t,
                 'df': pd.DataFrame(),
@@ -109,7 +122,9 @@ def getTickersToTrack():
         
         #Create an empty DataFrame with column names and index
         # Initialize the tick DF, so we can assign an index to it
-        columns = ['Open', 'High', 'Low', 'Adj Close', 'Volume','buyVol','sellVol','volDelta', 'bid','ask','buyQt', 'sellQt', 'volDelta1', 'volDeltaRatio1', 'buyQtLvl2', 'sellQtLvl2', 'volDelta2', 'volDeltaRatio2']
+        columns = ['Open', 'High', 'Low', 'Adj Close', 'Volume','buyVol','sellVol',\
+            'volDelta', 'bid','ask','oi','buyQt', 'sellQt', 'obImabalance', 'obImabalanceRatio', \
+                'buyQtLvl2', 'sellQtLvl2', 'obSTImabalance', 'obSTImabalanceRatio']
         index = pd.date_range('2023-01-01', periods=0, freq='D')
         tickersToTrack[token]['df'] = pd.DataFrame(columns=columns, index=index)
         tickersToTrack[token]['ticks'] = pd.DataFrame(columns=columns, index=index)
@@ -117,11 +132,12 @@ def getTickersToTrack():
 # def trimMinuteDF(t):
 #     #trim the minute df to last cfgMaxLookbackCandles minutes
 #     tickersToTrack[t]['df'] = tickersToTrack[t]['df'].iloc[-cfgMaxLookbackCandles:]
-def getOrderBook(t,exch):
-    quote = tl.getFullQuote(t['ticker'],exch)
+def getFutOrderBookBuySellQt(t):
+    quote = tl.getFullQuote(t,'NFO')
     if quote is None:
         tickerlog(f"Error:  addOrderBookInfo: quote is None for {t}")
-        return
+        return (0,0,0,0)
+    oi = quote['oi']
     ltp = quote['last_price']
     lastQt = quote['last_quantity']
     orderBook = quote['depth']
@@ -129,7 +145,7 @@ def getOrderBook(t,exch):
     sellQt = quote['sell_quantity']
     buyOrderBook = orderBook['buy']
     sellOrderBook = orderBook['sell']
-    VolDelta1 = buyQt - sellQt
+    obImabalance = buyQt - sellQt
     
 
     buyQt2 = 0
@@ -138,14 +154,13 @@ def getOrderBook(t,exch):
         buyQt2 += i['quantity']
     for i in sellOrderBook:
         sellQt2 += i['quantity']    
-    VolDelta2 = buyQt2 - sellQt2
+    obSTImabalance = buyQt2 - sellQt2
     
-    
-    tickerlog(f"ltp:{ltp} lastQt:{lastQt} buyQt:{buyQt} sellQt:{sellQt} VolDelta1:{VolDelta1} / {round(buyQt/sellQt,2)} | buyQt2:{buyQt2} sellQt2:{sellQt2} VolDelta2:{VolDelta2} / {round(buyQt2/sellQt2,2)}")   
-    print(f"ltp:{ltp} lastQt:{lastQt} buyQt:{buyQt} sellQt:{sellQt} VolDelta1:{VolDelta1} / {round(buyQt/sellQt,2)} | buyQt2:{buyQt2} sellQt2:{sellQt2} VolDelta2:{VolDelta2} / {round(buyQt2/sellQt2,2)}")   
-    (t['df']['buyQt'],t['df']['sellQt'],t['df']['VolDelta1'],t['df']['buyQt2'],t['df']['sellQt2'],t['df']['VolDelta2']) = \
-        (buyQt,sellQt,VolDelta1,buyQt2,sellQt2,VolDelta2)
-    return (buyQt,sellQt,VolDelta1,buyQt2,sellQt2,VolDelta2)
+    # tickerlog(f"ltp:{ltp} lastQt:{lastQt} buyQt:{buyQt} sellQt:{sellQt} obImabalance:{obImabalance} / {round(buyQt/sellQt,2)} | buyQt2:{buyQt2} sellQt2:{sellQt2} obSTImabalance:{obSTImabalance} / {round(buyQt2/sellQt2,2)}")   
+    # print(f"ltp:{ltp} lastQt:{lastQt} buyQt:{buyQt} sellQt:{sellQt} obImabalance:{obImabalance} / {round(buyQt/sellQt,2)} | buyQt2:{buyQt2} sellQt2:{sellQt2} obSTImabalance:{obSTImabalance} / {round(buyQt2/sellQt2,2)}")   
+    # (t['df']['buyQt'],t['df']['sellQt'],t['df']['obImabalance'],t['df']['buyQt2'],t['df']['sellQt2'],t['df']['obSTImabalance']) = \
+    #     (buyQt,sellQt,obImabalance,buyQt2,sellQt2,obSTImabalance)
+    return (buyQt,sellQt,buyQt2,sellQt2)
 
 #takes a one second tick df adds Vol Delta to it and returns it
 def addVolDelta(df):
@@ -186,6 +201,103 @@ def subscribeToTickerData():
     kws.subscribe(tokenList)
     kws.set_mode(kws.MODE_FULL, tokenList)
 
+def getLazyData():
+    
+    # getLazyData is a seperate pythong script that runs from cron 
+    # every minute at the 30th second, and fetches VolDelta and PCR
+    # stuff we dont want to do in the main loop
+    # getLazyData dumps its updated output into a file, that we read here
+    # to fill in the df
+    
+    # VolDeta: is one of the parameters that getLazyData gets
+    # It Measures vol delta of intra-second up or down candles   
+    # HFT Marker
+    # I think its When derivative price has deviated too far from underlying; typically marks end of trend .. at least short term
+    # but many times long term too
+        
+    file_path = f'{cfgLazyDataFilePath}'
+    file_modified_time = os.path.getmtime(file_path)
+    file_modified_time = datetime.datetime.fromtimestamp(file_modified_time)
+    time_difference = datetime.datetime.now() - file_modified_time
+    time_difference = time_difference.total_seconds()
+    if time_difference > 60:
+        tickerlog(f"getLazyData: File '{file_path}' is stale. Last Modified: {file_modified_time}.")
+        return (0,0,0,0,0)
+    
+    try:
+        with open(file_path, 'r') as file:
+            # Read the contents of the file
+            file_content = file.read().strip()
+
+            # Split the text by comma separator
+            split_values = file_content.split(',')
+            # tickerlog(f"getSpaceMVolDelta: {split_values}")
+            # Assign the values to separate variables
+            pcr = split_values[0].strip()
+            upVolNifty = split_values[1].strip()
+            dnVolNifty = split_values[2].strip()
+            upVolFut = split_values[3].strip()
+            dnVolFut = split_values[4].strip()
+            
+            dnVolNifty = float(dnVolNifty)
+            upVolNifty = float(upVolNifty)
+            pcr = float(pcr)
+            dnVolFut = float(dnVolFut)
+            upVolFut = float(upVolFut)
+            
+            # tickerlog(f"getSpaceMVolDelta: {upVol} {dnVol}")
+    except FileNotFoundError:
+        tickerlog(f"File '{file_path}' not found.")
+        return (0,0,0,0,0)
+    except Exception as e:
+        tickerlog(f"Error occurred while reading the file: {str(e)}")
+        return (0,0,0,0,0)
+
+    return (pcr,upVolNifty,dnVolNifty,upVolFut,dnVolFut)
+
+def getVolDelta(token,tick):
+    tickTimeStamp = tick['exchange_timestamp']
+    if tickersToTrack[token]['ticks'].empty:
+        buyVol = sellVol = volDelta = lastOrderBookMidPrice= bid = ask = this_tick_volume = 0
+    else:
+        (o,h,l,c,v) = getTickOHLCV(tick,token)
+        o = tickersToTrack[token]['ticks']['Open'][-1]
+        
+        #voume_traded in tick is cumulative volume, so subtract last tick volume to get this tick volume
+        lastVol = tickersToTrack[token]['ticks']['Volume'][-1] if not tickersToTrack[token]['ticks'].empty else 0
+        this_tick_volume = v - lastVol
+
+        buyVol = this_tick_volume if c > o else 0
+        sellVol = this_tick_volume if c < o else 0
+        volDelta = buyVol - sellVol
+
+        # this_tick_price = tick['last_price']
+        
+        # bid = tickersToTrack[token]['ticks']['bid'][-1]
+        # ask = tickersToTrack[token]['ticks']['ask'][-1]
+        # lastOrderBookMidPrice = (bid+ask)/2
+        # buyVol = this_tick_volume if this_tick_price >= lastOrderBookMidPrice else 0
+        # sellVol = this_tick_volume if this_tick_price <= lastOrderBookMidPrice else 0
+        # volDelta = buyVol - sellVol
+    return (buyVol,sellVol,volDelta,this_tick_volume)
+
+def getTickOHLCV(tick,token):
+    # OHLC is OHLC for the day, not for the tick
+    # ohlc = tick['ohlc'] 
+    # (o,h,l,c) = (ohlc['open'],ohlc['high'],ohlc['low'],ohlc['close'])
+    
+    (o,h,l,c) = (tick['last_price'],tick['last_price'],tick['last_price'],tick['last_price'])
+    
+    #Filter out volume for options (irrelevant) and for
+    #indexes (vol not available)
+
+    v = tick['volume_traded'] \
+    if (('volume_traded' in tick) and \
+        (utils.isNotAnOption(tickersToTrack[token]['ticker']) or \
+            cfgUseVolumeDataForOptions)) \
+            else 0
+    return (o,h,l,c,v)
+
 def addTicksToTickDF(ticks):
     global nifty_ltp
     #tickerlog(f"{ticks}")
@@ -200,59 +312,48 @@ def addTicksToTickDF(ticks):
         #Insert this tick into the tick df
         tick_time = tick['exchange_timestamp']
         tick_time = ist.localize(tick_time)
-        #Filter out volume for options (irrelevant) and for
-        #indexes (vol not available)
-        tick_volume = tick['volume_traded'] \
-            if (('volume_traded' in tick) and \
-                (utils.isNotAnOption(tickersToTrack[token]['ticker']) or \
-                    cfgUseVolumeDataForOptions)) \
-                    else 0
-        #voume_traded in tick is cumulative volume, so subtract last tick volume to get this tick volume
-        tick_volume -= tickersToTrack[token]['ticks']['volume'][-1]
         buyOrders = tick['depth']['buy']
         sellOrders = tick['depth']['sell'] 
         buyQt2 = sellQt2 = 0
-        for o in buyOrders:
-            buyQt2 += o['quantity']
-        for o in sellOrders:
-            sellQt2 += o['quantity']
+        for od in buyOrders:
+            buyQt2 += od['quantity']
+        for od in sellOrders:
+            sellQt2 += od['quantity']
 
-        if tickersToTrack[token]['ticks'].empty:
-            buyVol = sellVol = volDelta = 0
-        else:
-            lastOrderBookMidPrice = (tickersToTrack[token]['ticks']['bid'][-1] + tickersToTrack[token]['ticks']['ask'][-1])/2
-            buyVol = tick_volume if tick['average_traded_price'] >= lastOrderBookMidPrice else 0
-            sellVol = tick_volume if tick['average_traded_price'] <= lastOrderBookMidPrice else 0
-            volDelta = buyVol - sellVol
-            volDelta += tickersToTrack[token]['ticks']['volDelta'][-1]
+        (o,h,l,c,v) = getTickOHLCV(tick,token)
+        
+        (buyVol,sellVol,volDelta,this_tick_volume) = getVolDelta(token,tick)
         #Sample tick Data
         # 09:33:01 AM Ticks:[{'tradable': True, 'mode': 'full', 'instrument_token': 14762754, 'last_price': 272.2, 'last_traded_quantity': 50, 'average_traded_price': 255.83, 'volume_traded': 528650, 'total_buy_quantity': 149100, 'total_sell_quantity': 77150, 'ohlc': {'open': 250.1, 'high': 278.7, 'low': 227.0, 'close': 263.05}, 'change': 3.4784261547234276, 'last_trade_time': datetime.datetime(2023, 6, 22, 9, 33), 'oi': 611400, 'oi_day_high': 613900, 'oi_day_low': 574800, 'exchange_timestamp': datetime.datetime(2023, 6, 22, 9, 33, 1), 'depth': {'buy': [{'quantity': 350, 'price': 272.25, 'orders': 2}, {'quantity': 600, 'price': 272.2, 'orders': 2}, {'quantity': 500, 'price': 272.15, 'orders': 1}, {'quantity': 1250, 'price': 272.1, 'orders': 5}, {'quantity': 200, 'price': 272.05, 'orders': 2}], 'sell': [{'quantity': 50, 'price': 272.85, 'orders': 1}, {'quantity': 1150, 'price': 272.9, 'orders': 4}, {'quantity': 1250, 'price': 272.95, 'orders': 3}, {'quantity': 2650, 'price': 273.0, 'orders': 6}, {'quantity': 800, 'price': 273.05, 'orders': 3}]}}]
 
 
         tick_df_row = {
-            'Open': tick['last_price'],
-            'High': tick['last_price'],
-            'Low': tick['last_price'],
-            'Adj Close': tick['last_price'],
-            'Volume': tick_volume,
+            'Open': o,
+            'High': h,
+            'Low': l,
+            'Adj Close': c,
+            'Volume': v,
             'buyVol': buyVol,
             'sellVol': sellVol,
             'volDelta': volDelta,
             'bid': buyOrders[0]['price'] if len(buyOrders) > 0 else 0,
             'ask': sellOrders[0]['price'] if len(sellOrders) > 0 else 0,
+            'oi': tick['oi'] if 'oi' in tick else 0,
             'buyQt': tick['total_buy_quantity'],
             'sellQt': tick['total_sell_quantity'],
-            'volDelta1': tick['total_buy_quantity'] - tick['total_sell_quantity'],
-            'volDeltaRatio1': tick['total_buy_quantity']/tick['total_sell_quantity'],
+            'obImabalance': tick['total_buy_quantity'] - tick['total_sell_quantity'],
+            'obImabalanceRatio': tick['total_buy_quantity']/tick['total_sell_quantity'],
             'buyQtLvl2': buyQt2,
             'sellQtLvl2': sellQt2,
-            'volDelta2': buyQt2 - sellQt2,
-            'volDeltaRatio2': buyQt2/sellQt2
+            'obSTImabalance': buyQt2 - sellQt2,
+            'obSTImabalanceRatio': buyQt2/sellQt2,
         }
-        tickerlog(f"Tick: VolDelta:{buyVol - sellVol} cumVolDelta: {volDelta} OrderQtImbalance1: {tick['total_buy_quantity'] - tick['total_sell_quantity']} OrderQtImbalance2: {buyQt2 - sellQt2}")
+        tickerlog(f"{tick_time.minute}:{tick_time.second}:{tick_time.microsecond} V: {this_tick_volume} ltp: {tick['last_price']} buyVol:{buyVol} sellVol:{sellVol} VolDelta: {volDelta} OrderQtImbalance1: {tick['total_buy_quantity'] - tick['total_sell_quantity']} OrderQtImbalance2: {buyQt2 - sellQt2}")
         tickersToTrack[token]['ticks'].loc[tick_time] = tick_df_row  
 
 def resampleToMinDF():
+    global nifty_ltp
+    
     resampled_tokens = []
     #process ticks to create minute candles
     for token in tickersToTrack.keys():
@@ -290,20 +391,21 @@ def resampleToMinDF():
               'High': 'max',
               'Low': 'min',
               'Adj Close': 'last',
-              'Volume': 'sum',
+              'Volume': lambda x: x[-1] - x[0], #'sum' volume data in ticks is cumulative  ,
               'buyVol': 'sum',
               'sellVol': 'sum',
-              'volDelta': 'last',
+              'volDelta': 'sum',
               'bid': 'last',
               'ask': 'last',
+              'oi': 'last',
               'buyQt': 'mean',
               'sellQt': 'mean',
-              'volDelta1': 'mean',
-              'volDeltaRatio1': 'mean',
+              'obImabalance': 'mean',
+              'obImabalanceRatio': 'mean',
               'buyQtLvl2': 'mean',
               'sellQtLvl2': 'mean',
-              'volDelta2': 'mean',
-              'volDeltaRatio2': 'mean'  
+              'obSTImabalance': 'mean',
+              'obSTImabalanceRatio': 'mean'
             })
             resampled_ticks_upto_this_minute['maxVolDelta'] = ticks_upto_this_minute['volDelta'].max()
             resampled_ticks_upto_this_minute['minVolDelta'] = ticks_upto_this_minute['volDelta'].min()
@@ -315,10 +417,15 @@ def resampleToMinDF():
             #TODO: Fix this, figure out how to keep that data and just do analytics on the 
             #new minute candle; this will make the tick much faster
             
-            keep_columns = ['Open', 'High', 'Low', 'Adj Close', 'Volume','symbol','i','buyVol','sellVol','volDelta','maxVolDelta','minVolDelta','bid','ask','buyQt', 'sellQt', 'volDelta1', 'volDeltaRatio1', 'buyQtLvl2', 'sellQtLvl2', 'volDelta2', 'volDeltaRatio2']
+            keep_columns = ['Open', 'High', 'Low', 'Adj Close', 'Volume','symbol','i','buyVol','sellVol','volDelta',\
+                'maxVolDelta','minVolDelta','bid','ask','oi','buyQt', 'sellQt', 'obImabalance', 'obImabalanceRatio', 'buyQtLvl2', \
+                    'sellQtLvl2', 'obSTImabalance', 'obSTImabalanceRatio', 'futOrderBookBuyQt', 'futOrderBookSellQt', \
+                        'futOrderBookBuyQtLevel1', 'futOrderBookSellQtLevel1', 'niftyUpVol', \
+                        'niftyDnVol', 'niftyFutureUpVol', 'niftyFutureDnVol', 'nifty']
             drop_columns = list(set(minute_candle_df.columns) - set(keep_columns))
             minute_candle_df.drop(columns=drop_columns, inplace=True)
             
+            resampled_ticks_upto_this_minute['nifty'] = nifty_ltp
             if minute_candle_df.empty:
                 tickerlog(f"Min candle emply. First call for {token}. Getting historical, and ignoring this first half formed tick candle")
                 historicalEnd = tick_df.index[-1] #downloader will remove lst min half formed candle
@@ -347,21 +454,35 @@ def resampleToMinDF():
             resampled_tokens.append(token)
     return resampled_tokens 
 
+def addNiftyVolDelta(token):
+    df = tickersToTrack[token]['df']
+    if not 'futOrderBookBuyQt' in df.columns:
+        #initialize if it doesnt already exist
+        df['futOrderBookBuyQt'] = df['futOrderBookSellQt'] = df['futOrderBookBuyQtLevel1'] = df['futOrderBookSellQtLevel1'] \
+            = df['niftyUpVol'] = df['niftyDnVol'] = df['niftyFutureUpVol'] = df['niftyFutureDnVol'] = 0
+        
+    (df['futOrderBookBuyQt'][-1],df['futOrderBookSellQt'][-1],df['futOrderBookBuyQtLevel1'][-1],df['futOrderBookSellQtLevel1'][-1]) =\
+        getFutOrderBookBuySellQt(niftyFutureTicker)
+    (df['niftyPCR'],df['niftyUpVol'][-1],df['niftyDnVol'][-1],df['niftyFutureUpVol'][-1],df['niftyFutureDnVol'][-1]) = \
+        getLazyData()
+
+
 def tick(tokens):
     positions = tl.get_positions()
     # tickerlog("Tick thread started")
     for token in tokens:
         tokenData = tickersToTrack[token]
         targetExitAchieved = tokenData['targetExitAchieved']
+        addNiftyVolDelta(token)
         # tickerlog(f"tickThread generating signals for: token {token} {tokenData['ticker']}")
         # tickerlog(f"positions: {positions} df: {tokenData['df']}")
-        getOrderBook(tokenData,'NFO')
-
+        # tickerlog(f"{tokenData['df']['futOrderBookBuyQt']}")
+        # tickerlog(f"{tokenData['df']['niftyFutureDnVol']}")
         df = tl.generateSignalsAndTrade(tokenData['df'].copy(),positions,
                                    False,True,tradeStartTime=tradingStartTime,
                                    targetClosedPositions=targetExitAchieved)
         # tickerlog(f"tickThread done generating signals for {token}.  Placing limit orders now")
-        placeLimitOrders(df,tokenData['orders'])
+        placeLimitOrders(df,tokenData['orders']) if df['symbol'][0] != 'NIFTY23JUNFUT' else None
     # tickerlog("Tick thread done")
     email.ping()
 def processTicks(ticks):

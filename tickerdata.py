@@ -133,7 +133,7 @@ def get_fo_active_nifty_tickers(offset=0):
             (itmCall,otmCall,otmPut,itmPut) = getActiveOptionTickers('NIFTY 50',offset)
             callPrice = getTickerPrice(itmCall,datetime.datetime.combine(datetime.date.today(), datetime.time(9,18)))
     print(f"Option is {itmCall}, price is {callPrice}, target is {targetOptClose}")
-    return [itmCall]
+    return [itmCall,"NIFTY 50"]
     return ['HDFCBANK', 'ICICIBANK', 'RELIANCE', 'KOTAKBANK']
     return ['NIFTY 50','NIFTY23APRFUT','RELIANCE','INFY','BAJFINANCE','SBIN', 'TCS', 'KOTAKBANK', 'ICICIBANK', 'HDFCBANK', 'MARUTI' ]
 

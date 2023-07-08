@@ -1,0 +1,100 @@
+from pygments import highlight
+from .SignalGenerator import SignalGenerator
+
+import numpy as np
+import pandas as pd
+import logging
+import cfg
+globals().update(vars(cfg))
+
+class NSAlgo (SignalGenerator):
+    logArray = ['voldelta','RenkoData','ohlv']
+    
+    def __init__(self, limitExitOrders=False, limitEntryOrders=False, slEntryOrders=False, slExitOrders=False,exitStaticBricks=False,useSVPForEntryExitPrices=False,useVolDelta=False,**kwargs):
+        super().__init__(**kwargs)
+
+    def timeWindow(self,row):
+        return True
+    def getPCR(self,row):
+        return 1
+    def getOrderBookImbalance(self,row):
+        return 1
+    def getSTOrderBookImbalance(self,row):
+        return 1
+    def getMarketbalance(self,row):
+        pcr = self.getPCR(row)
+        orderBookImbalance = self.getOrderBookImbalance(row)
+        if pcr > 1.2 and orderBookImbalance > 1.2:
+            return 1
+        elif pcr < 0.8 and orderBookImbalance < 0.8:
+            return -1
+        else:
+            return 0
+    def marketIsBullish(self,row):
+        return self.getMarketbalance(row) > 0
+    def marketIsBearish(self,row):
+        return self.getMarketbalance(row) < 0
+    def marketIsNeutral(self,row):
+        return self.getMarketbalance(row) == 0
+        
+    #MAIN
+    def OkToEnterLong(self,row):
+        # First Check if overall uptrend (PCR Ratio and OrderBook Imbalance > 1.2 
+        # If Long or short basis PCR/OrderBook Imbalance then only take long/short trades, 
+        # if neutral then both sides are OK -- but longs only at VAL, shorts only at VAH
+        # Renko Uptrend on small brick size(5?) is the basic signal after applying above conditions
+        return row['renko_uptrend'] and self.timeWindow(row)
+
+
+    def OkToEnterShort(self,row):
+        # First Check if overall uptrend (PCR Ratio and OrderBook Imbalance > 1.2 
+        # If Long or short basis PCR/OrderBook Imbalance then only take long/short trades, 
+        # if neutral then both sides are OK -- but longs only at VAL, shorts only at VAH
+        # Renko Uptrend on small brick size(5?) is the basic signal after applying above conditions
+        return not row['renko_uptrend'] and self.timeWindow(row)
+
+    def checkLongEntry(self,s,row,df,isLastRow,limit1,limit2,sl1,sl2,logString):
+        (brickNum,brickSize,brickHigh,brickLow,close) = (row['renko_brick_num'],row['renko_brick_high'] - row['renko_brick_low'],row['renko_brick_high'],row['renko_brick_low'],row['Adj Close'])
+       
+        if brickNum >= self.getNumBricksForLongTrend(row,df):
+            limit1 = self.getLimit1Price(row,'longEntryLimit1',df,0,volDeltaSignal) if self.limitEntryOrders else float('nan')
+            if np.isnan(limit1):
+                s = 1
+                logString = "RENKO-LONG-ENTRY"
+        elif self.slEntryOrders and brickNum >= 1:
+            sl1 = self.getSLPrice(row,'longEntrySL',df,0,volDeltaSignal)
+        return (s, limit1, limit2, sl1, sl2,logString)
+
+    def checkShortEntry(self,s,row,df,isLastRow,limit1,limit2,sl1,sl2,logString):
+        (brickNum,brickSize,brickHigh,brickLow,close) = (row['renko_brick_num'],row['renko_brick_high'] - row['renko_brick_low'],row['renko_brick_high'],row['renko_brick_low'],row['Adj Close'])
+        
+
+        if brickNum <= -self.getNumBricksForShortTrend(row):
+            limit1 = self.getLimit1Price(row,'shortEntryLimit1',df,0,volDeltaSignal) if self.limitEntryOrders else float('nan')
+            if np.isnan(limit1):
+                s = -1 
+                logString = "RENKO-SHORT-ENTRY"
+                # else:
+                #     sl1 = -max((brickLow - brickSize),self.getImmidiateSupport(row)-5)
+
+        elif self.slEntryOrders and brickNum <= -1:
+            sl1 = self.getSLPrice(row,'shortEntrySL',df,0,volDeltaSignal) 
+        return (s, limit1, limit2, sl1, sl2,logString)
+
+    def checkLongExit(self,s,row,df,isLastRow, entryPrice,limit1,limit2,sl1,sl2,logString,
+                      tradeEntry,tradeMax):
+        # If we are in a macro uptrend or downtrend (based on PCR/OrderBook Imbalance) then exit only at VAH/VAL @ brickHigh * 14 
+        # Else in a balanced market at any brickHigh + 14
+        # In either case always, exit and re-enter when HFT marker intra-second vol delta signal spikes OR Other end of trend signals
+        # such as STOrderBookImbalance divergance
+        
+        
+        return (s, limit1, limit2, sl1, sl2,logString)
+
+    def checkShortExit(self,s,row,df,isLastRow, entryPrice,limit1,limit2,sl1,sl2,logString,
+                       tradeEntry,tradeMin):
+        # If we are in a macro uptrend or downtrend (based on PCR/OrderBook Imbalance) then exit only at VAH/VAL @ brickHigh * 14 
+        # Else in a balanced market at any brickHigh + 14
+        # In either case always, exit and re-enter when HFT marker intra-second vol delta signal spikes
+
+        return (s, limit1, limit2, sl1, sl2,logString)

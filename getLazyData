@@ -1,0 +1,4 @@
+#!/bin/zsh
+
+source /Users/nikhilsama/opt/anaconda3/bin/activate AlgoTrading
+python3 getLazyData.py cfgTicker:NIFTY > Data/lazyData

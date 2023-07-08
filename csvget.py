@@ -182,6 +182,8 @@ def resample (df, interval):
     df_resampled = df
     df_resampled['Open'] = df_resampled['High'] = df_resampled['Low'] = df_resampled['Adj Close']
     
+    df['maxVolDelta'] = df['minVolDelta'] = df['volDelta']
+    
     df_resampled = df.resample(interval).agg({
         'symbol': 'last',
         'Open': 'first',
@@ -198,7 +200,9 @@ def resample (df, interval):
         'expiry': 'last',
         'buyVol': 'sum',
         'sellVol': 'sum',
-        'VolDelta': 'sum'
+        'volDelta': 'last',
+        'maxVolDelta': 'max',
+        'minVolDelta': 'min',
     })
     df_resampled['VolDeltaRatio'] = np.where(df_resampled['sellVol'] != 0, df_resampled['buyVol'] / df_resampled['sellVol'], 10)
     # df_resampled.drop(columns=['BuyPrice', 'BuyQty','SellPrice','SellQty'], inplace=True)
@@ -208,7 +212,9 @@ def addVolDelta(df):
     df['midPrice'] = (df['BuyPrice'] + df['SellPrice'])/2
     df['buyVol'] = np.where(df['Adj Close'] >= df['midPrice'].shift(), df['Volume'], 0)
     df['sellVol'] = np.where(df['Adj Close'] <= df['midPrice'].shift(), df['Volume'], 0)
-    df['VolDelta'] = df['buyVol'] - df['sellVol']
+    df['volDelta'] = df['buyVol'] - df['sellVol']
+    df = df[~df.index.duplicated(keep='first')]
+    df['volDelta'] = df.groupby(pd.Grouper(freq='1T'))['volDelta'].cumsum()
     df.drop(columns=['midPrice'], inplace=True)
     df.drop(columns=['BuyPrice', 'BuyQty', 'SellPrice', 'SellQty'], inplace=True)
 
@@ -287,5 +293,18 @@ def splitTimeFramesAndSaveToDb():
     # csvToDb(datetime(2023,5,1,9,15), datetime(2023,5,31,9,15),interval='3S',type='Call',offset=0)
     csvToDb(datetime(2023,5,1,9,15), datetime(2023,5,31,9,15),interval='T',type='Call',offset=0)
 
+def tickerCacheToDB(date,t):
+    file = f'/Users/nikhilsama/Dropbox/Coding/AlgoTrading/Data/td_cache/{date.strftime("%d-%m-%y")}/{t}/ohlv-03:29PM.csv'
+    df = getDataFromFile(file)
+    print(df.columns)
 
-splitTimeFramesAndSaveToDb()
+    keep_columns = ['Open', 'High', 'Low', 'Adj Close', 'Volume','symbol','i','buyVol','sellVol','volDelta','maxVolDelta','minVolDelta','bid','ask','buyQt', 'sellQt', 'obImabalance', 'volDeltaRatio1', 'buyQtLvl2', 'sellQtLvl2', 'obSTImabalance', 'volDeltaRatio2']
+    drop_columns = list(set(df.columns) - set(keep_columns))
+    df.drop(columns=drop_columns, inplace=True)
+    db = DBBasic()
+    print(f"saving to DB niftyITMCallLive")
+    db.toDB(f'niftyITMCallLive',df)
+
+
+tickerCacheToDB(datetime(2023,6,28,9,15), 'NIFTY23JUN18600CE')
+# splitTimeFramesAndSaveToDb()

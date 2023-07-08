@@ -132,9 +132,9 @@ def plot_backtest(df,trades=None):
     #pprint.pprint(tearsheet, indent=4)
     #df[['ma_superTrend', 'ma_slow', 'ma_fast']].plot(grid=True, figsize=(12, 8))
 #    fig, (ax1, ax2, ax3, ax4, ax5, ax7) = plt.subplots(6, 1, figsize=(8, 8))
-    fig, (ax1, ax2, ax3, ax4) = \
-        plt.subplots(4, 1, figsize=(8, 8), sharex=True, 
-                     gridspec_kw={'height_ratios': [6, 1, 1, 4]})
+    fig, (ax1, ax2, ax3, ax4,ax5,ax6) = \
+        plt.subplots(6, 1, figsize=(8, 8), sharex=True, 
+                     gridspec_kw={'height_ratios': [6, 1, 1, 4,1,1]})
     plt.subplots_adjust(left=0.1, bottom=0.1)
     # df['SLOPE-OSC'].fillna(0, inplace=True)
     # df['ma20_pct_change_ma'].fillna(0, inplace=True)
@@ -152,8 +152,8 @@ def plot_backtest(df,trades=None):
     # ax1.plot(df['i'], df['VWAP'], color='gold', linewidth=2)
     ax1.plot(df['i'], df['Adj Close'], color='black', linewidth=2)
     # ax1.plot(df['i'], iv, color='red', linewidth=2)
-    # ax1.plot(df['i'], df['renko_brick_high'], color='green', linewidth=1)
-    # ax1.plot(df['i'], df['renko_brick_low'], color='red', linewidth=1)
+    ax1.plot(df['i'], df['renko_brick_high'], color='green', linewidth=1)
+    ax1.plot(df['i'], df['renko_brick_low'], color='red', linewidth=1)
     # ax1.plot(df['i'], df['pocShrtTrm'], color='black', linewidth=1)
     # ax1.plot(df['i'], df['ShrtTrmHigh'], color='green', linewidth=1)
     # ax1.plot(df['i'], df['ShrtTrmLow'], color='red', linewidth=1)
@@ -164,6 +164,9 @@ def plot_backtest(df,trades=None):
     # ax1.plot(df['i'], df['ma20'], color='green', linewidth=1)
     # ax1.plot(df['i'], df['SuperTrendUpper'], color='green', linewidth=1)
     # ax1.plot(df['i'], df['SuperTrendLower'], color='red', linewidth=1)
+    # ax1.plot(df['i'], df['vah'], color='green', linewidth=1)
+    # ax1.plot(df['i'], df['val'], color='red', linewidth=1)
+    # ax1.plot(df['i'], df['poc'], color='yellow', linewidth=1)
 
     #Draw horizontal lines at renko bricks
     # start = df['renko_brick_low'].min()
@@ -190,17 +193,22 @@ def plot_backtest(df,trades=None):
     ax3.set_title('Position↓', loc='right')
     # df['ADX'] .fillna(0, inplace=True)
     # ax4.plot(df['i'], abs(df['Adj Close'] - iv), color='black', linewidth=2)
-    threshold = df['volDeltaThreshold'] * 2
+    ax4.plot(df['i'], df['RSI'], color='black', linewidth=2)
+    ax4.axhline(y=75, color='red', linestyle='--')
+    ax4.axhline(y=25, color='red', linestyle='--')
+
+    # threshold = df['volDeltaThreshold'] * 2
 
     # Clip the data using the calculated threshold
-    clippedVolDelta = np.clip(df['VolDelta'], -threshold, threshold)
+    # clippedVolDelta = np.clip(df['volDelta'], -threshold, threshold)
+    # clippedMaxDelta = np.clip(df['maxVolDelta'], -threshold, threshold)
+    # clippedMinDelta = np.clip(df['minVolDelta'], -threshold, threshold)
 
-
-    ax4.plot(df['i'], df['stMaxVolDelta'], color='red', linewidth=1)
-    ax4.plot(df['i'], df['stMinVolDelta'], color='red', linewidth=1)
-    ax4.plot(df['i'], clippedVolDelta, color='black', linewidth=1)
-    ax4.plot(df['i'], df['volDeltaThreshold'], color='green', linewidth=1)
-    ax4.plot(df['i'], -df['volDeltaThreshold'], color='red', linewidth=1)
+    # ax4.plot(df['i'], clippedMaxDelta, color='red', linewidth=1)
+    # ax4.plot(df['i'], clippedMinDelta, color='green', linewidth=1)
+    # ax4.plot(df['i'], clippedVolDelta, color='black', linewidth=1)
+    # ax4.plot(df['i'], df['volDeltaThreshold'], color='green', linewidth=1)
+    # ax4.plot(df['i'], -df['volDeltaThreshold'], color='red', linewidth=1)
     # draw a threshold line at y=0.5
     # ax4.axhline(y=-1, color='red', linestyle='--')
     # ax4.axhline(y=-2, color='blue', linestyle='--')
@@ -210,15 +218,15 @@ def plot_backtest(df,trades=None):
     # ax4.axhline(y=2, color='blue', linestyle='--')
     # ax4.axhline(y=.1, color='green', linestyle='--')
     # ax4.axhline(y=.2, color='blue', linestyle='--')
-    ax4.set_title('maVolDelta↓', loc='right')
-
-    # ax5.plot(df['i'], df['sellVol'], color='red', linewidth=1)
+    ax4.set_title('maVolDelta↓', loc='right')    
+    
+    # ax5.plot(df['i'], df['stCumVolDelta'], color='red', linewidth=1)
     # # ax5.plot(df['i'], df['slpSTPoc'], color='black', linewidth=1)
     # # ax5.plot(df['i'], df['slpVah'], color='green', linewidth=1)
     # # ax5.plot(df['i'], df['slpVal'], color='red', linewidth=1)
     # ax5.set_title('SellVol↓', loc='right')
     # ax5.axhline(y=50000, color='red', linestyle='--')
-    # # ax5.axhline(y=-1, color='red', linestyle='--')
+    # ax5.axhline(y=-50000, color='red', linestyle='--')
 
     # ax6.plot(df['i'], df['VolDelta'], color='green', linewidth=2)
     # ax6.set_title('VolDelta ↓', loc='right')
@@ -334,25 +342,25 @@ def plot_backtest(df,trades=None):
         #     ax8.axvspan(start_index, end_index, alpha=0.2, color='red')
         #     ax9.axvspan(start_index, end_index, alpha=0.2, color='red')
 
-        mask = ((df['maVolDelta'] > df['volDeltaThreshold']) | (df['maVolDelta'] < -df['volDeltaThreshold']))
-        # Use the shift method to get the start and end times of each region where the mask is True
-        start_times = df.index[(mask & ~mask.shift(1, fill_value=False))].tolist()
-        end_times = df.index[(mask & ~mask.shift(-1, fill_value=False))].tolist()
-        # Loop over each start and end time and add a shaded rectangle
-        for start_time, end_time in zip(start_times, end_times):
-            start_index=df['i'][start_time]
-            end_index=df['i'][end_time]
-            xticks.extend([start_index,end_index])
-            # Add a shaded rectangle for the time period between start_time and end_time
-            ax1.axvspan(start_index, end_index, alpha=0.2, color='green')
-            ax2.axvspan(start_index, end_index, alpha=0.2, color='green')
-            ax3.axvspan(start_index, end_index, alpha=0.2, color='green')
-            ax4.axvspan(start_index, end_index, alpha=0.2, color='green')
-            ax5.axvspan(start_index, end_index, alpha=0.2, color='green') if 'ax5' in locals() else None
-            ax6.axvspan(start_index, end_index, alpha=0.2, color='green')   if 'ax6' in locals() else None
-            ax7.axvspan(start_index, end_index, alpha=0.2, color='green') if 'ax7' in locals() else None
-            ax8.axvspan(start_index, end_index, alpha=0.2, color='green') if 'ax8' in locals() else None
-            ax9.axvspan(start_index, end_index, alpha=0.2, color='green') if 'ax9' in locals() else None
+        # mask = ((df['maVolDelta'] > df['volDeltaThreshold']) | (df['maVolDelta'] < -df['volDeltaThreshold']))
+        # # Use the shift method to get the start and end times of each region where the mask is True
+        # start_times = df.index[(mask & ~mask.shift(1, fill_value=False))].tolist()
+        # end_times = df.index[(mask & ~mask.shift(-1, fill_value=False))].tolist()
+        # # Loop over each start and end time and add a shaded rectangle
+        # for start_time, end_time in zip(start_times, end_times):
+        #     start_index=df['i'][start_time]
+        #     end_index=df['i'][end_time]
+        #     xticks.extend([start_index,end_index])
+        #     # Add a shaded rectangle for the time period between start_time and end_time
+        #     ax1.axvspan(start_index, end_index, alpha=0.2, color='green')
+        #     ax2.axvspan(start_index, end_index, alpha=0.2, color='green')
+        #     ax3.axvspan(start_index, end_index, alpha=0.2, color='green')
+        #     ax4.axvspan(start_index, end_index, alpha=0.2, color='green')
+        #     ax5.axvspan(start_index, end_index, alpha=0.2, color='green') if 'ax5' in locals() else None
+        #     ax6.axvspan(start_index, end_index, alpha=0.2, color='green')   if 'ax6' in locals() else None
+        #     ax7.axvspan(start_index, end_index, alpha=0.2, color='green') if 'ax7' in locals() else None
+        #     ax8.axvspan(start_index, end_index, alpha=0.2, color='green') if 'ax8' in locals() else None
+        #     ax9.axvspan(start_index, end_index, alpha=0.2, color='green') if 'ax9' in locals() else None
     
         mask = (df['position'].shift(-1) != 0)
         # Use the shift method to get the start and end times of each region where the mask is True

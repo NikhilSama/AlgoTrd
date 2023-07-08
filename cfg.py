@@ -8,11 +8,14 @@ Created on Sun Feb  5 14:26:36 2023
 import sys
 import datetime
 cfgDict = {
+    'cfgLazyDataFilePath': '/Users/nikhilsama/Dropbox/Coding/AlgoTrading/Data/lazyData',
+    'cfgNiftyVolDeltaThreshold': 250000,
+    'cfgFutVolDeltaThreshold': 15000,
     'cfgSlippage': 0.001,
     'cfgVolDeltaThresholdMultiplier':0.5,
     'cfgGoodTradeProfitPct': 0.2,
     'cfgNiftyOpen': 18500,
-    'cfgIsBackTest': True,
+    'cfgIsBackTest': False,
     'cfgZGetStartDate': None,
     'cfgZGetEndDate': None,    
     'cfgMaxLotsForTrade' : 36,
@@ -95,7 +98,7 @@ cfgDict = {
     'dbpass' : 'trading123',
     'showTradingViewLive' : False,
     'cacheTickData' : False, 
-    'bet_size': 500000
+    'bet_size': 100000
 }
 
 args = sys.argv[1:]

@@ -34,6 +34,56 @@ class SignalGenerator:
     def crossUnder(self,fast,slow,lastFast=None,lastSlow=None):
         return fast < slow and \
             (lastFast is None or (lastFast >= lastSlow))
+            
+    def getPCR(self,row):
+        return 1
+    def getOrderBookImbalance(self,row):
+        if ('futOrderBookBuyQt' in row):
+            obImbalanceRatio = row.futOrderBookBuyQt/row.futOrderBookSellQt if row.futOrderBookSellQt > 0 else 10
+            obImbalance = row.futOrderBookBuyQt - row.futOrderBookSellQt
+        else:
+            obImbalanceRatio = 1
+            obImbalance = 0
+        if obImbalance > 10000 and obImbalanceRatio > 1.15:
+            return 1
+        elif obImbalance < -10000 and obImbalanceRatio < 0.85:
+            return -1
+        else:
+            return 0
+    def getSTOrderBookImbalance(self,row):
+        if 'futOrderBookBuyQtLevel1' in row:
+            obImbalanceRatio = row.futOrderBookBuyQtLevel1/row.futOrderBookSellQtLevel1 if row.futOrderBookSellQtLevel1 > 0 else 10
+            obImbalance = row.futOrderBookBuyQtLevel1 - row.futOrderBookSellQtLevel1
+        else:
+            obImbalance = 0
+            obImbalanceRatio = 1
+        if obImbalance > 100 and obImbalanceRatio > 1.15:
+            return 1
+        elif obImbalance < -100 and obImbalanceRatio < 0.85:
+            return -1
+        else:
+            return 0
+
+    def marketIsBullish(self,row):
+        return self.getOrderBookImbalance(row) > 0
+    def marketIsBearish(self,row):
+        return self.getOrderBookImbalance(row) < 0
+    def marketIsNeutral(self,row):
+        return self.getOrderBookImbalance(row) == 0
+
+    def getVolDeltaSignal(self,row, sigType):
+        (niftyUp,niftyDn,futUp,futDn) = row[['niftyUpVol','niftyDnVol','niftyFutureUpVol','niftyFutureDnVol']] if 'niftyUpVol' in row else (0,0,0,0)
+        niftyVolDelta = niftyUp - niftyDn
+        futVolDelta = futUp - futDn
+        
+        if sigType == 'longExit' or sigType == 'shortEntry':
+            if niftyVolDelta < -cfgNiftyVolDeltaThreshold or futVolDelta < -cfgFutVolDeltaThreshold:
+                return 1
+        if sigType == 'shortExit' or sigType == 'longEntry':
+            if niftyVolDelta > cfgNiftyVolDeltaThreshold or futVolDelta > cfgFutVolDeltaThreshold:
+                return 1
+        return 0
+
 # class svb(SignalGenerator):
 #     #Helpers
 #     def svpTrendsDown(self,row):

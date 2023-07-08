@@ -127,7 +127,7 @@ def placeOrder(t,exchange,tx_type,q,ltp,p,tag,order_type):
     ki.exec(kite,t,exchange,tx_type,q=q,ltp=ltp,p=p,tag=tag,
             order_type=order_type)
 def getFullQuote(t,exch):
-    return ki.get_quote(kite,'NIFTY2362218600CE','NFO')
+    return ki.get_quote(kite,t,'NFO')
 
 # BUY CONDITION
 # Buy if current signal is 1 and position is not 1, 
@@ -439,13 +439,15 @@ def generateSignalsAndTrade(df,positions,stock,options,tradeStartTime=None, data
             # signals.populateSuperTrend,
             # signals.populateOBV,
             # signals.vwap,
-            # signals.populateSVP,
+            signals.populateSVP,
+            signals.populateVolDelta,
 
-            signals.populateCandleStickPatterns
+            # signals.populateCandleStickPatterns
         ], 
         'hourly': [
         ]
     } if dataPopulators is None else dataPopulators
+    
     signalGenerators = [    
                         signals.followSVP
                         #signals.followObvAdxMA
@@ -472,7 +474,10 @@ def generateSignalsAndTrade(df,positions,stock,options,tradeStartTime=None, data
     #placeExitOrder(df,positions)
     
     downloader.cache_df(df, t, now)
-        
+
+    if df['symbol'][0] == 'NIFTY23JUNFUT':
+        return df
+            
     ltp = df['Adj Close'][-1]
 
     net_position = checkPositionsForConsistency(positions,df)

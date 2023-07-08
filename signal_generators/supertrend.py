@@ -14,7 +14,7 @@ class SuperTrend(SignalGenerator):
         super().__init__(**kwargs)
     
     def timeWindow(self,row):
-        return row.name.time().minute > 55 or row.name.time().hour > 9
+        return  row.name.time().hour > 13
     
     def priceRange(self,row):
         return row['Adj Close'] > 120 
@@ -39,7 +39,8 @@ class SuperTrend(SignalGenerator):
         s = -1
         return (s, limit1, limit2, sl1, sl2,logString)
 
-    def checkLongExit(self,s,row,df,isLastRow, entryPrice,limit1,limit2,sl1,sl2,logString):
+    def checkLongExit(self,s,row,df,isLastRow, entryPrice,limit1,limit2,sl1,sl2,logString,
+                      tradeEntry,tradeMax   ):
         (close, upper, lower) = (row['Adj Close'],row['SuperTrendUpper'], row['SuperTrendLower'])
 
         if not row.SuperTrendDirection:
@@ -50,7 +51,8 @@ class SuperTrend(SignalGenerator):
 
         return (s, limit1, limit2, sl1, sl2,logString)
 
-    def checkShortExit(self,s,row,df,isLastRow, entryPrice,limit1,limit2,sl1,sl2,logString):
+    def checkShortExit(self,s,row,df,isLastRow, entryPrice,limit1,limit2,sl1,sl2,logString,
+                       tradeEntry,tradeMin):
         (close, upper, lower) = (row['Adj Close'],row['SuperTrendUpper'], row['SuperTrendLower'])
 
         if row.SuperTrendDirection:
