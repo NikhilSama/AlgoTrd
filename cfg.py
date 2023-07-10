@@ -36,7 +36,7 @@ cfgDict = {
     'cfgTarget': 0.06,
     'days': 60,
     'superLen': 200,
-    'maLen': 14,
+    'maLen': 20,
     'cfgMiniBandWidthMult': 0.75, 
     'bandWidth': 2,
     'cfgSuperBandWidthMult': 1.25,
@@ -98,7 +98,7 @@ cfgDict = {
     'dbpass' : 'trading123',
     'showTradingViewLive' : False,
     'cacheTickData' : False, 
-    'bet_size': 100000
+    'bet_size': 200000
 }
 
 args = sys.argv[1:]

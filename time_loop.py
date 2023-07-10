@@ -434,7 +434,7 @@ def generateSignalsAndTrade(df,positions,stock,options,tradeStartTime=None, data
         'daily': [
             signals.populateATR,
             signals.populateRenko,
-            signals.populateBB,     
+            signals.populateRSI,
             # signals.populateADX, 
             # signals.populateSuperTrend,
             # signals.populateOBV,
@@ -603,7 +603,7 @@ def getTargetEntryExitPoints(df,positions,tradeStartTime=tradingStartTime):
         'daily': [
             signals.populateATR,
             signals.populateRenko,
-            signals.populateBB,     
+            signals.populateBB,    
             # signals.populateADX, 
             # signals.populateSuperTrend,
             # signals.populateOBV,

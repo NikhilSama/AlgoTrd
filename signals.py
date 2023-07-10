@@ -736,31 +736,24 @@ def tickerHasLongPosition(ticker):
 def tickerHasShortPosition(ticker):
     return getTickerPosition(ticker) == -1
 def getDefaultTickerMaxPrice():
-    return int(1000000)
-def getDefaultTickerMinPrice():
     return int(0)
-def setTickerMaxPriceForTrade(ticker,entry_price,signal):
+def getDefaultTickerMinPrice():
+    return int(10000000)
+def setTickerMaxPriceForTrade(ticker,entry_price,high,low,signal):
     default_min = getDefaultTickerMinPrice()
     default_max = getDefaultTickerMaxPrice()
-    if 'max_price' not in tickerStatus[ticker] or \
-        signal == 0:
+    if 'max_price' not in tickerStatus[ticker]:
         tickerStatus[ticker]['max_price'] = default_max
         tickerStatus[ticker]['min_price'] = default_min
     if np.isnan(signal):
-        if tickerStatus[ticker]['max_price'] != default_max:
-            tickerStatus[ticker]['max_price'] = max(entry_price,tickerStatus[ticker]['max_price'])
-        if tickerStatus[ticker]['min_price'] != default_min:
-            tickerStatus[ticker]['min_price'] = min(entry_price,tickerStatus[ticker]['min_price'])
-    elif signal == 1:
-        tickerStatus[ticker]['max_price'] = max(entry_price,tickerStatus[ticker]['max_price']) if \
-            tickerStatus[ticker]['max_price'] != default_max else entry_price
-    elif signal == -1:
-        tickerStatus[ticker]['min_price'] = min(entry_price,tickerStatus[ticker]['min_price']) if \
-            tickerStatus[ticker]['min_price'] != default_min else entry_price
-
-def setTickerPosition(ticker,signal, entry_price,limit1, limit2, sl1, sl2):
+        tickerStatus[ticker]['max_price'] = round(max(high,tickerStatus[ticker]['max_price']))
+        tickerStatus[ticker]['min_price'] = round(min(low,tickerStatus[ticker]['min_price']))
+    else: # signal is 1/-1/0, start or end of a new trade
+        tickerStatus[ticker]['max_price'] = tickerStatus[ticker]['min_price'] = round(entry_price,1)
+    
+def setTickerPosition(ticker,signal, entry_price,high, low, limit1, limit2, sl1, sl2):
     # logging.info(f"setting ticker position for {ticker} to {signal} entry{entry_price} pos:{tickerStatus[ticker]['position']}")
-    setTickerMaxPriceForTrade(ticker,entry_price,signal)
+    setTickerMaxPriceForTrade(ticker,entry_price,high,low,signal)
     (tickerStatus[ticker]['limit1'], tickerStatus[ticker]['limit2'], tickerStatus[ticker]['sl1'], tickerStatus[ticker]['sl2']) = (limit1, limit2, sl1, sl2)
     #logging.info(f"signal: {signal} entry: {tickerStatus[ticker]['entry_price']} max: {tickerStatus[ticker]['max_price']} min: {tickerStatus[ticker]['min_price']}")
     if np.isnan(signal):
@@ -772,10 +765,10 @@ def setTickerPosition(ticker,signal, entry_price,limit1, limit2, sl1, sl2):
         if signal == 0:
             tickerStatus[ticker]['entry_price'] = float('nan')
         else:
-            tickerStatus[ticker]['entry_price'] = entry_price
+            tickerStatus[ticker]['entry_price'] = round(entry_price,1)
             # logging.info(f"setting entry price for {ticker} to {entry_price}")
 def getTickerEntryPrice(ticker):
-    return tickerStatus[ticker]['entry_price']
+    return round(tickerStatus[ticker]['entry_price']) if not np.isnan(tickerStatus[ticker]['entry_price']) else 0
 def getTickerMaxPrice(ticker):
     return tickerStatus[ticker]['max_price']
 def getTickerMinPrice(ticker):
@@ -965,8 +958,10 @@ def logSignal(msg,reqData,signal,s,row,window,isLastRow,extra='',logWithNoSignal
     rowInfo = f'{row.symbol}:{row.i} '
     rowPrice = f'p:{round(row["Adj Close"],1)} '
     sigInfo = f'sig:{"-" if np.isnan(signal) else signal} s:{"-" if np.isnan(s) else s} {"E" if window == 1 else "X"} '
-    longTradeInfo = f"Entry:{getTickerEntryPrice(row['symbol'])} Max:{getTickerMaxPrice(row['symbol'])} " if int(getTickerMaxPrice(row['symbol'])) != getDefaultTickerMaxPrice() else ''
-    shortTradeInfo = f"Entry:{getTickerEntryPrice(row['symbol'])} Min:{getTickerMinPrice(row['symbol'])} " if int(getTickerMinPrice(row['symbol'])) != getDefaultTickerMinPrice() else ''
+    tradeInfo = f"Entry:{getTickerEntryPrice(row['symbol'])} Max:{getTickerMaxPrice(row['symbol'])} Min:{getTickerMinPrice(row['symbol'])}" 
+    # \
+    #     if int(getTickerMaxPrice(row['symbol'])) != getDefaultTickerMaxPrice() and \
+    #         int(getTickerMinPrice(row['symbol'])) != getDefaultTickerMinPrice() else ''
     dataStrings = {
         "ohlv": logOHLV(row),
         "adxData" : logADX(row),
@@ -988,7 +983,7 @@ def logSignal(msg,reqData,signal,s,row,window,isLastRow,extra='',logWithNoSignal
     elif signalChanged(s,signal) or logWithNoSignalChange:
         rowTime = row.name.strftime("%d/%m %I:%M")
         rowInfo = rowInfo+f':{rowTime} ' #backtest needs date
-        logging.debug(rowInfo+' => '+rowPrice+' => '+msg+' '+longTradeInfo+' '+shortTradeInfo+' '+extra+' '+sigInfo+ ' => '+dataString)
+        logging.debug(rowInfo+' => '+rowPrice+' => '+msg+' '+tradeInfo+' '+' '+extra+' '+sigInfo+ ' => '+dataString)
 
 def skipFilter (signal,type):
     # Since this is a FILTER, we only negate long and short signals
@@ -2053,9 +2048,9 @@ def checkPrevOrderEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,lo
     if isLongLimit1Order(row.symbol) and row.Low <= prevTarget:
         s = 1
         entry_price = min(row.Open,prevTarget)
-        if row.High < prevTarget:
-            print(f"ERROR: {row.name} checkSVPLongEntry: How can row high {row.High} be less than limit entry {prevTarget}")
-            logging.error(f"ERROR: {row.name} checkSVPLongEntry: How can row high {row.High} be less than limit entry {prevTarget}")
+        # if row.High < prevTarget:
+        #     print(f"ERROR: {row.name} checkSVPLongEntry: How can row high {row.High} be less than limit entry {prevTarget}")
+        #     logging.error(f"ERROR: {row.name} checkSVPLongEntry: How can row high {row.High} be less than limit entry {prevTarget}")
             #possible I guess because our limit order was not actually there, this is just a simulation backtest, if it was there then row high would have taken it out
             #exit(0)
         logString = "LONG-ENTRY"
@@ -2068,14 +2063,14 @@ def checkPrevOrderEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,lo
         return (s,entry_price, limit1, limit2, sl1, sl2,logString)
     if isShortSL1Order(row.symbol) and row.Low <= prevSL1:
         s = -1
-        entry_price = min(prevSL1,row.Open)
+        entry_price = min(utils.priceWithSlippage(prevSL1,'shortEntry'),row.Open)
         logString = "SHORT-ENTRY"
         logging.info(f"SL order hit at {entry_price}.") if isLastRow else None
         return (s,entry_price, limit1, limit2, sl1, sl2,logString)
 
     if isLongSL1Order(row.symbol) and row.High >= prevSL1:
         s = 1
-        entry_price = max(prevSL1,row.Open)
+        entry_price = max(utils.priceWithSlippage(prevSL1,'longEntry'),row.Open)
         if row.Open - prevSL1 > 2:
             print(f"ERROR: {row.name} checkSVPLongEntry: Entry price {row.Open} is more than 2 away from SL {prevSL1}")
             logging.error(f"ERROR: {row.name} checkSVPLongEntry: Entry price {row.Open} is more than 2 away from SL {prevSL1}")
@@ -2116,7 +2111,8 @@ def checkSVPShortEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,log
 
     else:
         (s, limit1, limit2, sl1, sl2,logString) = \
-            getSignalGenerator(row).checkShortEntry(s,row,df,isLastRow,limit1,limit2,sl1,sl2,logString)
+            getSignalGenerator(row).checkShortEntry(s,row,df,getTickerMaxPrice(row.symbol),
+                                               getTickerMinPrice(row.symbol),isLastRow,limit1,limit2,sl1,sl2,logString)
 
     return (s,entry_price, limit1, limit2, sl1, sl2,logString)
 
@@ -2137,8 +2133,8 @@ def checkSVPLongEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,logS
     elif row.Low <= prevTarget:
         s = 1
         entry_price = min(row.Open,prevTarget)
-        if row.High < prevTarget:
-            print(f"ERROR: {row.name} checkSVPLongEntry: How can row high {row.High} be less than limit entry {prevTarget}")
+        # if row.High < prevTarget:
+            # print(f"ERROR: {row.name} checkSVPLongEntry: How can row high {row.High} be less than limit entry {prevTarget}")
             #possible I guess because our limit order was not actually there, this is just a simulation backtest, if it was there then row high would have taken it out
             #exit(0)
         logString = "LONG-ENTRY"
@@ -2146,7 +2142,8 @@ def checkSVPLongEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,logS
 
     else:
         (s, limit1, limit2, sl1, sl2,logString) = \
-            getSignalGenerator(row).checkLongEntry(s,row,df,isLastRow,limit1,limit2,sl1,sl2,logString)
+            getSignalGenerator(row).checkLongEntry(s,row,df,getTickerMaxPrice(row.symbol),
+                                               getTickerMinPrice(row.symbol),isLastRow,limit1,limit2,sl1,sl2,logString)
     return (s,entry_price, limit1, limit2, sl1, sl2,logString)
 
 def checkSVPLongExit(s,row,df,isLastRow, exit_price,limit1,limit2,sl1,sl2,logString):
@@ -2173,7 +2170,8 @@ def checkSVPLongExit(s,row,df,isLastRow, exit_price,limit1,limit2,sl1,sl2,logStr
     else:
         (s, limit1, limit2, sl1, sl2,logString) = \
             getSignalGenerator(row).checkLongExit(s,row,df,isLastRow, entryPrice,limit1,limit2,sl1,sl2,logString,
-                                               getTickerEntryPrice(row.symbol),getTickerMaxPrice(row.symbol))
+                                               getTickerEntryPrice(row.symbol),getTickerMaxPrice(row.symbol),
+                                               getTickerMinPrice(row.symbol))
 
     return (s,exit_price,limit1,limit2,sl1,sl2,logString)
 
@@ -2200,7 +2198,8 @@ def checkSVPShortExit(s,row,df,isLastRow, exit_price,limit1,limit2,sl1,sl2,logSt
     else:
         (s, limit1, limit2, sl1, sl2,logString) = \
             getSignalGenerator(row).checkShortExit(s,row,df,isLastRow, entryPrice,limit1,limit2,sl1,sl2,logString,
-                                                getTickerEntryPrice(row.symbol),getTickerMinPrice(row.symbol))
+                                                getTickerEntryPrice(row.symbol),getTickerMaxPrice(row.symbol),
+                                                getTickerMinPrice(row.symbol))
 
     return (s,exit_price,limit1,limit2,sl1,sl2,logString)
 
@@ -2398,7 +2397,7 @@ def getSignal(row,signalGenerators, df):
 
             # logging.info(f"trade price is {trade_price}")
             setTickerPosition(row.symbol, s, row['Adj Close'] if np.isnan(trade_price) else trade_price,\
-                limit1, limit2, sl1, sl2)
+                row.High, row.Low, limit1, limit2, sl1, sl2)
     else:
         #reset at start of day
         initTickerStatus(row.symbol)

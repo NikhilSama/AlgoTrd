@@ -91,8 +91,8 @@ firstTradeTime = datetime.datetime(2022,5,1,9,15) if cfgZGetStartDate == None el
 zgetTo = datetime.datetime(2023,4,1,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 
 #One day default
-# firstTradeTime = datetime.datetime(2023,3,31,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
-# zgetTo = datetime.datetime(2023,3,31,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+# firstTradeTime = datetime.datetime(2022,5,5,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
+# zgetTo = datetime.datetime(2022,5,5,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 
 
 # firstTradeTime = datetime.datetime(2023,3,21,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
@@ -287,7 +287,7 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
             signals.populateATR,
             signals.populateRenko,
             signals.populateRSI,
-            # signals.populateBB,     
+            signals.populateBB,     
             # signals.populateADX, 
             # signals.populateSuperTrend,
             # signals.populateOBV,
