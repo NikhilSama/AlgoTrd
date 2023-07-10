@@ -13,7 +13,7 @@ cfgDict = {
     'cfgFutVolDeltaThreshold': 15000,
     'cfgSlippage': 0.001,
     'cfgVolDeltaThresholdMultiplier':0.5,
-    'cfgGoodTradeProfitPct': 0.2,
+    'cfgGoodTradeProfitPct': 0.3,
     'cfgNiftyOpen': 18500,
     'cfgIsBackTest': False,
     'cfgZGetStartDate': None,

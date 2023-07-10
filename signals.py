@@ -712,6 +712,7 @@ def getLastSignal(signal):
 def initTickerStatus(ticker):
 #    if ticker not in tickerStatus.keys():
     tickerStatus[ticker] = {'position':float("nan"), 
+                            'prevPosition': float("nan"),
                             'trendSignal':float("nan"),
                             'entry_price':float("nan"),
                             'max_price':getDefaultTickerMaxPrice(),
@@ -728,6 +729,13 @@ def getTickerPosition(ticker):
         return float ('nan')
     else:
         return tickerStatus[ticker]['position']
+def getTickerPrevPosition(ticker):
+    if ticker not in tickerStatus:
+        return float ('nan')
+    elif 'prevPosition' not in tickerStatus[ticker]:
+        return float ('nan')
+    else:
+        return tickerStatus[ticker]['prevPosition']
 def tickerHasPosition(ticker):
     return (not np.isnan(getTickerPosition(ticker))
                 and getTickerPosition(ticker) != 0)
@@ -761,6 +769,7 @@ def setTickerPosition(ticker,signal, entry_price,high, low, limit1, limit2, sl1,
     if ticker not in tickerStatus:
         tickerStatus[ticker] = {}
     if tickerStatus[ticker]['position'] != signal:
+        tickerStatus[ticker]['prevPosition'] = tickerStatus[ticker]['position']
         tickerStatus[ticker]['position'] = signal
         if signal == 0:
             tickerStatus[ticker]['entry_price'] = float('nan')

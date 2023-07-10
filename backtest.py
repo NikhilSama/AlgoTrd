@@ -91,8 +91,8 @@ firstTradeTime = datetime.datetime(2022,5,1,9,15) if cfgZGetStartDate == None el
 zgetTo = datetime.datetime(2023,4,1,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 
 #One day default
-# firstTradeTime = datetime.datetime(2022,5,5,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
-# zgetTo = datetime.datetime(2022,5,5,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+firstTradeTime = datetime.datetime(2023,2,28,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
+zgetTo = datetime.datetime(2023,2,28,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 
 
 # firstTradeTime = datetime.datetime(2023,3,21,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
@@ -611,7 +611,7 @@ if isMain:
     t = perfProfiler("Start", time.time())
     # backtest('NIFTY 50','minute')
 
-    backtest('NIFTYWEEKLYOPTION','minute',src="db", type='Call', interval='')
+    backtest('NIFTYWEEKLYOPTION','minute',src="db", type='Put', interval='')
     t = perfProfiler("End", t)
 
     #oneThousandRandomTests()
