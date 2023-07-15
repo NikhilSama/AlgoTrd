@@ -44,6 +44,7 @@ def calculate_bnh_returns (df):
         df['bnh_returns-C'] = df["Open-C"].pct_change().shift(-1)
     if "Adj Close-P" in df.columns:
         df['bnh_returns-P'] = df["Open-P"].pct_change().shift(-1)
+    return df
 
 
 def calculate_positions (df,close_at_end=True):
@@ -77,6 +78,7 @@ def calculate_positions (df,close_at_end=True):
     #position as before
     df['position_change'] = df['position']-df.shift()['position']
     df['position_change'] = df['position_change'].fillna(0)
+    
     return df
 
 def calculate_strategy_returns (df):
@@ -95,20 +97,23 @@ def calculate_strategy_returns (df):
     df['cum_strategy_returns'] = (1+df['strategy_returns']).cumprod() - 1
     df['strategy_ln_returns'] = df['bnh_ln_returns'] * (df['position'])
     df['cum_strategy_ln_returns'] = df['strategy_ln_returns'].cumsum()
+    return df
 
 def prep_dataframe (df, close_at_end=True):
+    df = duplicateDFRowsWithMultipleTrades(df)
+    
     #calc returns if not already calculated
     if not set(['position','cum_bnh_returns']).issubset(df.columns):
-        calculate_bnh_returns(df)
+        df = calculate_bnh_returns(df)
         
     #calc positions if not already calculated
     if not set(['position']).issubset(df.columns):
-        calculate_positions (df, close_at_end)
+        df = calculate_positions (df, close_at_end)
     
     #calc strategy returns if not already calculated
     if not set(['strategy_returns','cum_strategy_returns']).issubset(df.columns):
-        calculate_strategy_returns(df)
-
+        df = calculate_strategy_returns(df)
+    return df
 #### END OF GLOBAL prep functions
 
 # Return CAGR for strategy
@@ -121,6 +126,89 @@ def get_n_for_cagr(rows, timeframe):
         n = rows/252
     return n
 
+
+def insertSyntheticExitSignalforAbrubtDirectionChange(df):
+    #Trade Calculators dont like position change from 1 to -1 directly, or vice versa
+    # without an exit 0 signal in between.  So we add a 0 signal in between
+    #artificially
+    df['signal_change'] = df['signal']-df.shift()['signal']
+    df['signal_change'] = df['signal_change'].fillna(0)
+
+    valid_rows = df[(df['signal_change'] == 2) | (df['signal_change'] == -2)]
+
+    # Create a copy of those rows
+    duplicated_rows = valid_rows.copy()
+
+    # Apply the rules to the original and duplicated rows
+    for idx, row in duplicated_rows.iterrows():
+        duplicated_rows.loc[idx, 'signal'] = 0
+        # Set Exit price to next candle open, unless there is already an SL exit price there
+        if np.isnan(df.loc[idx, 'exit_price']):
+            df['Open_shifted'] = df['Open'].shift(-1)
+            duplicated_rows.loc[idx, 'exit_price'] = df.loc[idx, 'Open_shifted']
+            df = df.drop('Open_shifted', axis=1)
+
+        df.loc[idx, 'exit_price'] = df.loc[idx, 'entry_price'] = np.nan
+        
+    # Change the index of duplicated rows to be one microsecond before the original row
+    duplicated_rows.index = duplicated_rows.index - pd.Timedelta(microseconds=1)
+
+    # Concatenate the original dataframe with the duplicated rows
+    df = pd.concat([df, duplicated_rows]).sort_index()  
+    df = df.drop('signal_change', axis=1)
+
+    return df
+
+def duplicateDFRowsWithMultipleTrades(df):
+    # Some DF rows have multiple trades, exit_price and entry_price are set
+    # by limit or SL order entries set in the previous row
+    # Either we exited (via stoploss or target limit order trigger), 
+    # and then entered in the same minute via CheckLongEntry or CheckShortEntry
+    # or Vice versa (entered and then exited)
+    # these rows become hard to handle in performance calculations, so we split them
+    # into multiple rows, one for the first trade and one for the second trade.
+    # Assert if both entry_price and exit_price are not 'nan' for any row
+    # These prices are set by checkOrderStatus, which should only set one, not both
+    assert not df[(~df['entry_price'].isna()) & (~df['exit_price'].isna())].shape[0], "Both entry_price and exit_price are not 'nan' for some rows"
+
+    # Select rows where either entry_price or exit_price are not nan
+    valid_rows = df[~(df['entry_price'].isna() & df['exit_price'].isna())]
+    
+    # Create a copy of those rows
+    duplicated_rows = valid_rows.copy()
+
+    # Apply the rules to the original and duplicated rows
+    for idx, row in duplicated_rows.iterrows():
+        if not pd.isna(row['exit_price']):
+            duplicated_rows.loc[idx, 'signal'] = 0
+        elif row['entry_price'] < 0:
+            duplicated_rows.loc[idx, 'signal'] = -1
+        elif row['entry_price'] > 0:
+            duplicated_rows.loc[idx, 'signal'] = 1
+
+        df.loc[idx, 'entry_price'] = np.nan
+        df.loc[idx, 'exit_price'] = np.nan
+    
+        if df.loc[idx, 'signal'] == duplicated_rows.loc[idx, 'signal']:
+            df.loc[idx, 'signal'] = np.nan 
+    
+    # Change the index of duplicated rows to be one microsecond before the original row
+    duplicated_rows.index = duplicated_rows.index - pd.Timedelta(microseconds=10)
+
+    # Concatenate the original dataframe with the duplicated rows
+    df = pd.concat([df, duplicated_rows]).sort_index()  
+    
+    #Trade Calculators dont like position change from 1 to -1, or vice versa
+    # without an exit 0 signal in between.  So we add a 0 signal in between
+    #artificially
+    df = insertSyntheticExitSignalforAbrubtDirectionChange(df)
+
+    #Shift entry and exit prices down one row. they are currently in the signal row, but the trade starts at the next row
+    #where position change happens. So we shift them down one row
+    df['entry_price'] = abs(df['entry_price']).shift(1)
+    df['exit_price'] = df['exit_price'].shift(1)
+  
+    return df
 def CAGR (df, timeframe='d'):
     prep_dataframe(df)
     n = get_n_for_cagr(len(df), 'd')
@@ -156,8 +244,14 @@ def calc_trade_returns (date, trades, ticker_data):
 #    ticker_data['cum_trade_returns'] =  (1+ticker_data['strategy_returns']).cumprod() - 1
 #   trades.loc[date, 'return'] = ticker_data.iloc[-1]['cum_trade_returns']
 
-    tradeEntry = ticker_data.iloc[0, ticker_data.columns.get_loc('Open')]
-    tradeExit  = ticker_data.iloc[-1, ticker_data.columns.get_loc('Open')]
+    tradeEntry = ticker_data.iloc[0, ticker_data.columns.get_loc('entry_price')] if 'entry_price' in ticker_data.columns else float('nan')
+    tradeEntry = ticker_data.iloc[0, ticker_data.columns.get_loc('Open')] if np.isnan(tradeEntry) else tradeEntry
+    tradeEntry = abs(tradeEntry)
+    
+    
+    tradeExit  = ticker_data.iloc[-1, ticker_data.columns.get_loc('exit_price')] if 'exit_price' in ticker_data.columns else float('nan')
+    tradeExit  = ticker_data.iloc[-1, ticker_data.columns.get_loc('Open')] if np.isnan(tradeExit) else tradeExit
+    
     tradePNL = (tradeExit - tradeEntry) * ticker_data.iloc[0, ticker_data.columns.get_loc('position')]
     trades.loc[date, 'return'] = tradePNL/tradeEntry
     return
@@ -243,8 +337,16 @@ def addDailyReturns(trades,tearsheet):
     tearsheet["daily_returns"] = daily_returns
     
     return tearsheet
+
+
+
 def tearsheet (df):
-    prep_dataframe(df)
+    df2 = df.loc[:, ['Open', 'High', 'Low', 'Adj Close', 'signal', 'entry_price', 'exit_price', 'limit1', 'sl1']]
+    df2.to_csv('before.csv')
+    df = prep_dataframe(df)
+    df2 = df.loc[:, ['Open', 'High', 'Low', 'Adj Close', 'signal', 'entry_price', 'exit_price', 'limit1', 'sl1','position', 'position_change']]
+    df2.to_csv('afterprep.csv')
+
     tearsheet = {}
     trades = get_trades(df)
     tearsheet["trading_days"] = len(np.unique(df.index.date))
@@ -298,5 +400,5 @@ def tearsheet (df):
         
     # trades.to_csv('trades.csv')
     # df.to_csv('df.csv')
-    return tearsheet,tearsheetdf
+    return tearsheet,tearsheetdf,df
     

@@ -91,8 +91,8 @@ firstTradeTime = datetime.datetime(2022,5,1,9,15) if cfgZGetStartDate == None el
 zgetTo = datetime.datetime(2023,4,1,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 
 #One day default
-firstTradeTime = datetime.datetime(2023,2,28,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
-zgetTo = datetime.datetime(2023,2,28,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+# firstTradeTime = datetime.datetime(2023,3,24,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
+# zgetTo = datetime.datetime(2023,3,24,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 
 
 # firstTradeTime = datetime.datetime(2023,3,21,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
@@ -128,7 +128,7 @@ def dbget(t,s,e,offset=None,type='Call',interval=''):
     df = downloader.getCachedTikerData(f'niftyITMN{type}{interval}{offset if offset is not None else ""}',s,e,'minute')
     if not df.empty:
         print("got from cache db")
-        print(df)
+        # df.to_csv('temp.csv')
         return df 
     print("getting from db")
     db = DBBasic()
@@ -217,11 +217,12 @@ def printTearsheet(tearsheet,df):
         print("TRADES: ")
         for index,trade in tearsheet['trades'].iterrows():
             if trade['position'] == 0:
-                diff = round(trade['Open'] - entry_price,2)*prevPos
-                print(f"\t\t{utils.timeToString(index,date=False,time=True)}: EXIT @ {trade['Open']:.2f}({diff} or {diff/entry_price:.2%})")
+                exit_price = trade['exit_price'] if not np.isnan(trade['exit_price']) else trade['Open']
+                diff = round(exit_price - entry_price,2)*prevPos
+                print(f"\t\t{utils.timeToString(index,date=False,time=True)}: EXIT @ {exit_price:.2f}({diff} or {diff/entry_price:.2%})")
             else:
-                entry_price = trade['Open']
-                print(f"\t{utils.timeToString(index,date=True)} {trade['i']} Position: {trade['position']} @ {trade['Open']} \tReturn:{trade['return']:.2%} \tCUM=>{trade['sum_return']:.2%}")
+                entry_price = trade['entry_price'] if not np.isnan(trade['entry_price']) else trade['Open']
+                print(f"\t{utils.timeToString(index,date=True)} {trade['i']} Position: {trade['position']} @ {entry_price} \tReturn:{trade['return']:.2%} \tCUM=>{trade['sum_return']:.2%}")
             prevPos = trade['position']
     else:
         print("Days: ")
@@ -249,7 +250,8 @@ def printTearsheet(tearsheet,df):
     print(f"Drawdown from Prev Peak: {tearsheet['max_drawdown_from_prev_peak_sum']:.2%}")
     print("Sharpe: ", tearsheet['sharpe_ratio'])
     print("Calamar: ", tearsheet['calamar_ratio'])
-    print("Num Trades: ", tearsheet['num_trades'])
+    print(f"Trades: N:{tearsheet['num_trades']} W:{tearsheet['win_pct']:.1%}")
+    print(f"Av Ret Winners:{tearsheet['wins']['mean']:.1%} L: {tearsheet['loss']['mean']:.1%}")
     print(f"Avg Return per day: {tearsheet['avg_daily_return']:.2%}")
     print(f"Worst Day ({tearsheet['worst_daily_return_date']}): {tearsheet['worst_daily_return']:.2%}")
     print(f"Best Day ({tearsheet['best_daily_return_date']}): {tearsheet['best_daily_return']:.2%}")
@@ -257,11 +259,11 @@ def printTearsheet(tearsheet,df):
 def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
             exportCSV=True, tradingStartTime = firstTradeTime, \
             applyTickerSpecificConfig = True, signalGenerators = None,
-            src = 'z', type="Call", interval=''):
+            src = 'z', type="Call", interval='',offset=None):
     perfTIME = time.time()    
     startingTime = perfTIME
     if src == 'db':
-        df = dbget(t,start,end,type=type,interval=interval)
+        df = dbget(t,start,end,type=type,interval=interval,offset=offset)
     else:
         df = zget(t,start,end,i=i)
     if df.empty:
@@ -288,8 +290,8 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
             signals.populateRenko,
             signals.populateRSI,
             signals.populateBB,     
-            # signals.populateADX, 
-            # signals.populateSuperTrend,
+            # # signals.populateADX, 
+            signals.populateSuperTrend,
             # signals.populateOBV,
             # signals.vwap,
             # signals.populateSVP,
@@ -332,7 +334,7 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
     perfTIME = perfProfiler("SIGNAL GENERATION", perfTIME)
 
 
-    tearsheet,tearsheetdf = perf.tearsheet(df)
+    tearsheet,tearsheetdf,df = perf.tearsheet(df)
     printTearsheet(tearsheet,df) if isMain else None
     # print(f'Total Return: {tearsheet["return"]*100}%')
     # print(f'Sharpe: {tearsheet["sharpe_ratio"]}')
@@ -350,7 +352,7 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
    # perfTIME = perfProfiler("to CSV", perfTIME)expo
     #perfTIME = perfProfiler("Backtest:", startingTime)
   
-    plot_option_vs_stock(df)
+    # plot_option_vs_stock(df)
     if (plot == []):
         return tearsheetdf
     
@@ -611,7 +613,7 @@ if isMain:
     t = perfProfiler("Start", time.time())
     # backtest('NIFTY 50','minute')
 
-    backtest('NIFTYWEEKLYOPTION','minute',src="db", type='Put', interval='')
+    backtest('NIFTYWEEKLYOPTION','minute',src="db", type='Call', interval='',offset='100')
     t = perfProfiler("End", t)
 
     #oneThousandRandomTests()

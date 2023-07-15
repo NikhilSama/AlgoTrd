@@ -38,6 +38,7 @@ class SignalGenerator:
     def getPCR(self,row):
         return 1
     def getOrderBookImbalance(self,row):
+        return 0
         if ('futOrderBookBuyQt' in row):
             obImbalanceRatio = row.futOrderBookBuyQt/row.futOrderBookSellQt if row.futOrderBookSellQt > 0 else 10
             obImbalance = row.futOrderBookBuyQt - row.futOrderBookSellQt
@@ -75,6 +76,9 @@ class SignalGenerator:
         (niftyUp,niftyDn,futUp,futDn) = row[['niftyUpVol','niftyDnVol','niftyFutureUpVol','niftyFutureDnVol']] if 'niftyUpVol' in row else (0,0,0,0)
         niftyVolDelta = niftyUp - niftyDn
         futVolDelta = futUp - futDn
+        
+        # if row.name.time().hour > 15:
+        #     return 0 # Vol Delta has no impact after 3 PM
         
         if sigType == 'longExit' or sigType == 'shortEntry':
             if niftyVolDelta < -cfgNiftyVolDeltaThreshold or futVolDelta < -cfgFutVolDeltaThreshold:

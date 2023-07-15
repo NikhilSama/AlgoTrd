@@ -9,8 +9,8 @@ import sys
 import datetime
 cfgDict = {
     'cfgLazyDataFilePath': '/Users/nikhilsama/Dropbox/Coding/AlgoTrading/Data/lazyData',
-    'cfgNiftyVolDeltaThreshold': 250000,
-    'cfgFutVolDeltaThreshold': 15000,
+    'cfgNiftyVolDeltaThreshold': 140000,
+    'cfgFutVolDeltaThreshold': 25000,
     'cfgSlippage': 0.001,
     'cfgVolDeltaThresholdMultiplier':0.5,
     'cfgGoodTradeProfitPct': 0.3,

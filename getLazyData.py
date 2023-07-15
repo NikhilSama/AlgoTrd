@@ -51,7 +51,7 @@ def getSpaceMVolDelta(t):
     # but many times long term too
 
     eTime = datetime.datetime.now()
-    sTime = eTime - datetime.timedelta(seconds=75)
+    sTime = eTime - datetime.timedelta(seconds=120)
     q = f'select sum(up_h),sum(dn_h) from voldelta where ticker = "{t}" and t >= "' + \
         sTime.strftime("%Y-%m-%d %H:%M:%S") + \
             '" and t <= "' + \
