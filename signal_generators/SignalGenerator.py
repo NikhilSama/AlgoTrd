@@ -77,8 +77,8 @@ class SignalGenerator:
         niftyVolDelta = niftyUp - niftyDn
         futVolDelta = futUp - futDn
         
-        # if row.name.time().hour > 15:
-        #     return 0 # Vol Delta has no impact after 3 PM
+        if row.name.time().hour > 15:
+            return 0 # Vol Delta has no impact after 3 PM
         
         if sigType == 'longExit' or sigType == 'shortEntry':
             if niftyVolDelta < -cfgNiftyVolDeltaThreshold or futVolDelta < -cfgFutVolDeltaThreshold:

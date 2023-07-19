@@ -67,12 +67,12 @@ cfgDict = {
     'cfgTargetPercentageFromResistance': 0.01,
     'cfgSLPercentageFromSupport': 0.02,
     'cfgRenkoNumBricksForTrend': 2,
-    'cfgFastSVPWindowSize': 30,
+    'cfgFastSVPWindowSize': 15,
     'cfgSVPSlopeCandles': 2,
     'cfgSVPSlopeProjectionCandles': 1,
     'cfgSVPSlopeThreshold': 1,
     'cfgSVPSessionSlopeThreshold': 0.1,
-    'cfgEnoughReturnForTheDay': 0.2,
+    'cfgEnoughReturnForTheDay': 0.05,
     'cfgEnoughLossForTheDay': 1,
     'cfgPartialExitPercent': 1,
     'includeOptions': True,
@@ -98,7 +98,7 @@ cfgDict = {
     'dbpass' : 'trading123',
     'showTradingViewLive' : False,
     'cacheTickData' : False, 
-    'bet_size': 200000
+    'bet_size': 100000
 }
 
 args = sys.argv[1:]

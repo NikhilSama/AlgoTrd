@@ -8,7 +8,7 @@ import cfg
 globals().update(vars(cfg))
 
 class BurstFinder (SignalGenerator):
-    logArray = ['ohlv']
+    logArray = ['ohlv','svp']
     
     def __init__(self, limitExitOrders=False, limitEntryOrders=False, slEntryOrders=False, slExitOrders=False,exitStaticBricks=False,useSVPForEntryExitPrices=False,useVolDelta=False,**kwargs):
         super().__init__(**kwargs)
@@ -18,42 +18,59 @@ class BurstFinder (SignalGenerator):
         
     #MAIN
     def OkToEnterLong(self,row):
+        return row['renko_uptrend'] and row.slpSTPoc >=0 
+        close = row['Adj Close']
+        return close <= row.pocShrtTrm and row.slpSTLow >= 0
         return True
 
     def OkToEnterShort(self,row):
-        return True
-    def checkLongEntry(self,s,row,df,tradeHigh,tradeLow,isLastRow,limit1,limit2,sl1,sl2,logString):
-       
+        return not row['renko_uptrend'] and row.slpSTPoc <=0 
+
         close = row['Adj Close']
-        sl1 = row.Low+15
+        return close > row.pocShrtTrm and row.slpSTHigh <= 0
+        return True
+    
+    def checkLongEntry(self,s,row,df,prevPosition,tradeHigh,tradeLow,isLastRow,limit1,limit2,sl1,sl2,logString):
+        (poc,vah,val,h,l) = (row['pocShrtTrm'],row['vahShrtTrm'],row['valShrtTrm'],row['ShrtTrmHigh'],row['ShrtTrmLow'])
+        limit1 = val 
         return (s, limit1, limit2, sl1, sl2,logString)
 
-    def checkShortEntry(self,s,row,df,tradeHigh,tradeLow,isLastRow,limit1,limit2,sl1,sl2,logString):
-        close = row['Adj Close']
-        sl1 = -(row.Low-15)
+    def checkShortEntry(self,s,row,df,prevPosition,tradeHigh,tradeLow,isLastRow,limit1,limit2,sl1,sl2,logString):
+        (poc,vah,val,h,l) = (row['pocShrtTrm'],row['vahShrtTrm'],row['valShrtTrm'],row['ShrtTrmHigh'],row['ShrtTrmLow'])
+        limit1 = -(vah)
         return (s, limit1, limit2, sl1, sl2,logString)
 
     def checkLongExit(self,s,row,df,isLastRow, entryPrice,limit1,limit2,sl1,sl2,logString,
                       tradeEntry,tradeHigh,tradeLow):
-        sl1 = -(tradeEntry-15)
-        if row.Low<sl1:
+        (poc,vah,val,h,l,close) = (row['pocShrtTrm'],row['vahShrtTrm'],row['valShrtTrm'],row['ShrtTrmHigh'],\
+            row['ShrtTrmLow'],row['Adj Close'])      
+        (brickNum,brickSize,brickHigh,brickLow,close,high) = (row['renko_brick_num'],row['renko_brick_high'] - row['renko_brick_low'],row['renko_brick_high'],row['renko_brick_low'],row['Adj Close'],row.High)
+ 
+        sl1 = -(l-5) # (max(tradeEntry-7,tradeHigh-20))
+        if close <= abs(sl1):
             s = 0
             sl1 = float('nan')
-            logging.debug(f"tradeEntry is {tradeEntry} and sl1 is {sl1} and row.High is {row.High}")
             logString = "EXIT-SL"
 
-        limit1 = -(tradeEntry+15)
+        limit1 = -(tradeEntry+5)
+        limit1 = -(poc)
+        limit1 = -(h)
         return (s, limit1, limit2, sl1, sl2,logString)
 
     def checkShortExit(self,s,row,df,isLastRow, entryPrice,limit1,limit2,sl1,sl2,logString,
                        tradeEntry,tradeHigh,tradeLow):
-        
-        sl1 = tradeEntry+15
-        if row.High>sl1:
+        (poc,vah,val,h,l,close) = (row['pocShrtTrm'],row['vahShrtTrm'],row['valShrtTrm'],row['ShrtTrmHigh'],\
+            row['ShrtTrmLow'],row['Adj Close'])       
+        (brickNum,brickSize,brickHigh,brickLow,close,high) = (row['renko_brick_num'],row['renko_brick_high'] - row['renko_brick_low'],row['renko_brick_high'],row['renko_brick_low'],row['Adj Close'],row.High)
+
+        sl1 = h+5 # min(tradeEntry+7,tradeLow+20)
+        if close >= sl1:
             s = 0
             sl1 = float('nan')
-            logging.debug(f"tradeEntry is {tradeEntry} and sl1 is {sl1} and row.High is {row.High}")
             logString = "EXIT-SL"
 
-        limit1 = tradeEntry-30
+        limit1 = tradeEntry-5
+        limit1 = (poc)
+        limit1 = (l)
+
         return (s, limit1, limit2, sl1, sl2,logString)

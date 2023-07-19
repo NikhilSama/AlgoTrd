@@ -18,17 +18,17 @@ class BollingerBand (SignalGenerator):
         
     #MAIN
     def OkToEnterLong(self,row):
-        return row.ma20_pct_change>0.01 and row.renko_uptrend and row.RSI < 70
+        return row.ma20_pct_change>0.02 and row.renko_uptrend and row.RSI < 70
 
     def OkToEnterShort(self,row):
-        return row.ma20_pct_change<-0.01 and not row.renko_uptrend and row.RSI > 30
+        return row.ma20_pct_change<-0.02 and not row.renko_uptrend and row.RSI > 30
     
     def checkLongEntry(self,s,row,df,prevPosition,tradeHigh,tradeLow,isLastRow,limit1,limit2,sl1,sl2,logString):
-        limit1 = row.ma20 #(row.ma20+row.lower_band)/2#row.lower_band #
+        limit1 = row.lower_band #row.ma20 #(row.ma20+row.lower_band)/2#row.lower_band #
         return (s, limit1, limit2, sl1, sl2,logString)
 
     def checkShortEntry(self,s,row,df,prevPosition,tradeHigh,tradeLow,isLastRow,limit1,limit2,sl1,sl2,logString):
-        limit1 = -row.ma20 #-(row.ma20+row.upper_band)/2#-row.upper_band #
+        limit1 = -row.upper_band #row.ma20 #-(row.ma20+row.upper_band)/2#-row.upper_band #
         return (s, limit1, limit2, sl1, sl2,logString)
 
     def checkLongExit(self,s,row,df,isLastRow, entryPrice,limit1,limit2,sl1,sl2,logString,

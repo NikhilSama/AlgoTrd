@@ -104,7 +104,7 @@ class svb(SignalGenerator):
             return True
         else:
             return False
-    def checkLongEntry(self,s,row,df,isLastRow,limit1,limit2,sl1,sl2,logString):
+    def checkLongEntry(self,s,row,df,prevPosition,tradeHigh,tradeLow,isLastRow,limit1,limit2,sl1,sl2,logString):
         (close,poc,vah,val) = (row['Adj Close'],row.poc,row.vah,row.val)
 
         if self.getVolDeltaSignal(row,'longEntry') or \
@@ -116,7 +116,7 @@ class svb(SignalGenerator):
             limit1 = val-5
         return (s, limit1, limit2, sl1, sl2,logString)
 
-    def checkShortEntry(self,s,row,df,isLastRow,limit1,limit2,sl1,sl2,logString):
+    def checkShortEntry(self,s,row,df,prevPosition,tradeHigh,tradeLow,isLastRow,limit1,limit2,sl1,sl2,logString):
         (close,poc,vah,val) = (row['Adj Close'],row.poc,row.vah,row.val)
 
         if self.getVolDeltaSignal(row,'shortEntry') or \
@@ -130,7 +130,7 @@ class svb(SignalGenerator):
         return (s, limit1, limit2, sl1, sl2,logString)
 
     def checkLongExit(self,s,row,df,isLastRow, entryPrice,limit1,limit2,sl1,sl2,logString,
-                      tradeEntry,tradeMax):
+                      tradeEntry,tradeHigh,tradeLow):
         (close,poc,vah,val) = (row['Adj Close'],row.poc,row.vah,row.val)
 
         if self.getVolDeltaSignal(row,'longExit') or \
@@ -139,11 +139,11 @@ class svb(SignalGenerator):
             logString = "SVP-LONG-EXIT"
         else:
             limit1 = -vah
-            sl1 = -(max(tradeEntry,tradeMax) - 15)
+            sl1 = -(max(tradeEntry,tradeHigh) - 15)
         return (s, limit1, limit2, sl1, sl2,logString)
 
     def checkShortExit(self,s,row,df,isLastRow, entryPrice,limit1,limit2,sl1,sl2,logString,
-                       tradeEntry,tradeMin):
+                       tradeEntry,tradeHigh,tradeLow):
         (close,poc,vah,val) = (row['Adj Close'],row.poc,row.vah,row.val)
         
         if self.getVolDeltaSignal(row,'shortExit') or \
@@ -152,5 +152,5 @@ class svb(SignalGenerator):
             logString = "SVP-SHORT-EXIT"
         else:
             limit1 = val
-            sl1 = min(tradeEntry,tradeMin) + 15
+            sl1 = min(tradeEntry,tradeLow) + 15
         return (s, limit1, limit2, sl1, sl2,logString)

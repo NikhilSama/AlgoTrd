@@ -91,8 +91,8 @@ firstTradeTime = datetime.datetime(2022,5,1,9,15) if cfgZGetStartDate == None el
 zgetTo = datetime.datetime(2023,4,1,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 
 #One day default
-# firstTradeTime = datetime.datetime(2023,3,24,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
-# zgetTo = datetime.datetime(2023,3,24,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+# firstTradeTime = datetime.datetime(2023,7,19,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
+# zgetTo = datetime.datetime(2023,7,19,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 
 
 # firstTradeTime = datetime.datetime(2023,3,21,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
@@ -100,7 +100,8 @@ zgetTo = datetime.datetime(2023,4,1,15,30) if cfgZGetStartDate == None else cfgZ
 
 #3S 
 # firstTradeTime = datetime.datetime(2023,5,30,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
-# zgetTo = datetime.datetime(2023,5,30,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+# zgetTo = datetime.datetime(2023,5,30,15,30) if cfgZGetS
+# tartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 
 firstTradeTime = ist.localize(firstTradeTime)
 zgetFrom = firstTradeTime - timedelta(days=cfgHistoricalDaysToGet)
@@ -294,7 +295,7 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
             signals.populateSuperTrend,
             # signals.populateOBV,
             # signals.vwap,
-            # signals.populateSVP,
+            signals.populateSVP,
             # signals.populateCandleStickPatterns,
             # signals.populateVolDelta
         ], 
@@ -613,7 +614,7 @@ if isMain:
     t = perfProfiler("Start", time.time())
     # backtest('NIFTY 50','minute')
 
-    backtest('NIFTYWEEKLYOPTION','minute',src="db", type='Call', interval='',offset='100')
+    backtest('NIFTYWEEKLYOPTION','minute',src="db", type='Call', interval='',offset='')
     t = perfProfiler("End", t)
 
     #oneThousandRandomTests()

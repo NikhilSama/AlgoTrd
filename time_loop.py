@@ -435,6 +435,7 @@ def generateSignalsAndTrade(df,positions,stock,options,tradeStartTime=None, data
             signals.populateATR,
             signals.populateRenko,
             signals.populateRSI,
+            signals.populateBB,
             # signals.populateADX, 
             # signals.populateSuperTrend,
             # signals.populateOBV,

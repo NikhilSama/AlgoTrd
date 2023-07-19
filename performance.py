@@ -30,13 +30,14 @@ pd.options.mode.chained_assignment = None  # default='warn'
 ### based on signal column
 
 def calculate_bnh_returns (df):
-    df['bnh_returns'] = df["Open"].pct_change()
+    df['trade_price'] = df['exit_price'].fillna(df['entry_price']).fillna(df['Open'])
+    df['bnh_returns'] = df["trade_price"].pct_change()
     #pct change gets the pct change from prev row open to this row open
     #we want this row bnh_returns to contain the returns for holding from this row open
     #to next row open, so we shift the column down by one
     df['bnh_returns'] = df['bnh_returns'].shift(-1)
     df['cum_bnh_returns'] = (1+df["bnh_returns"]).cumprod() - 1
-    df['bnh_ln_returns'] = np.log(df['Open']/df['Open'].shift(1))
+    df['bnh_ln_returns'] = np.log(df['trade_price']/df['trade_price'].shift(1))
     df['cum_bnh_ln_returns'] = df['bnh_ln_returns'].cumsum()
 
     ## IF Call and Put option data exists
@@ -341,11 +342,7 @@ def addDailyReturns(trades,tearsheet):
 
 
 def tearsheet (df):
-    df2 = df.loc[:, ['Open', 'High', 'Low', 'Adj Close', 'signal', 'entry_price', 'exit_price', 'limit1', 'sl1']]
-    df2.to_csv('before.csv')
     df = prep_dataframe(df)
-    df2 = df.loc[:, ['Open', 'High', 'Low', 'Adj Close', 'signal', 'entry_price', 'exit_price', 'limit1', 'sl1','position', 'position_change']]
-    df2.to_csv('afterprep.csv')
 
     tearsheet = {}
     trades = get_trades(df)
@@ -398,7 +395,7 @@ def tearsheet (df):
         tearsheet["kurtosis_pertrade_return"] = 0
         tearsheetdf = pd.DataFrame(tearsheet,index=[0])
         
-    # trades.to_csv('trades.csv')
+    trades.to_csv('trades-renko.csv')
     # df.to_csv('df.csv')
     return tearsheet,tearsheetdf,df
     

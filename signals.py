@@ -46,6 +46,7 @@ def getSignalGenerator(row):
     # return SuperTrend()
     # return MeanRev()
     # return BurstFinder()
+    # return svb()
     # return BollingerBand() ##-- WORKS, good sharp ratio
 
     sigGen = SignalGenerator()
@@ -758,10 +759,10 @@ def setTickerMaxPriceForTrade(ticker,entry_price,high,low,signal):
         tickerStatus[ticker]['max_price'] = default_max
         tickerStatus[ticker]['min_price'] = default_min
     if np.isnan(signal):
-        tickerStatus[ticker]['max_price'] = round(max(high,tickerStatus[ticker]['max_price']))
-        tickerStatus[ticker]['min_price'] = round(min(low,tickerStatus[ticker]['min_price']))
+        tickerStatus[ticker]['max_price'] = round(max(abs(high),tickerStatus[ticker]['max_price']))
+        tickerStatus[ticker]['min_price'] = round(min(abs(low),tickerStatus[ticker]['min_price']))
     else: # signal is 1/-1/0, start or end of a new trade
-        tickerStatus[ticker]['max_price'] = tickerStatus[ticker]['min_price'] = round(entry_price,1)
+        tickerStatus[ticker]['max_price'] = tickerStatus[ticker]['min_price'] = round(abs(entry_price),1)
     
 def setTickerPosition(ticker,signal, entry_price,high, low, limit1, limit2, sl1, sl2):
     # logging.info(f"setting ticker position for {ticker} to {signal} entry{entry_price} pos:{tickerStatus[ticker]['position']}")
@@ -783,11 +784,11 @@ def setTickerPosition(ticker,signal, entry_price,high, low, limit1, limit2, sl1,
             tickerStatus[ticker]['entry_price'] = round(entry_price,1)
             # logging.info(f"setting entry price for {ticker} to {entry_price}")
 def getTickerEntryPrice(ticker):
-    return round(tickerStatus[ticker]['entry_price']) if not np.isnan(tickerStatus[ticker]['entry_price']) else 0
+    return round(abs(tickerStatus[ticker]['entry_price'])) if not np.isnan(tickerStatus[ticker]['entry_price']) else 0
 def getTickerMaxPrice(ticker):
-    return tickerStatus[ticker]['max_price']
+    return abs(tickerStatus[ticker]['max_price'])
 def getTickerMinPrice(ticker):
-    return tickerStatus[ticker]['min_price']
+    return abs(tickerStatus[ticker]['min_price'])
 def getTickerLimitSLOderPrices(ticker):
     s = tickerStatus[ticker]
     return (abs(s['limit1']),abs(s['limit2']),abs(s['sl1']),abs(s['sl2']))
@@ -1095,9 +1096,13 @@ def populateRenko(df):
     
     df.drop(["Date"],inplace=True,axis=1)
     df.to_csv('renko.csv')
+    
 def populateSVP(df):
     window_size = cfgFastSVPWindowSize  # 15-minute window size in terms of number of rows
-    df['pocShrtTrm'] = df['vahShrtTrm'] = df['valShrtTrm'] = df['poc'] = df['vah'] = df['val']  = df['slpPoc'] = df['slpVah'] = df['slpVal'] = df['slpSTPoc'] = df['slpSTVah'] = df['slpSTVal'] = df['dayHigh']  = df['dayLow'] = df['ShrtTrmHigh']  = df['ShrtTrmLow'] = np.nan
+    df['pocShrtTrm'] = df['vahShrtTrm'] = df['valShrtTrm'] = df['poc'] = df['vah'] = df['val']  = \
+        df['slpPoc'] = df['slpVah'] = df['slpVal'] = df['slpSTPoc'] = df['slpSTVah'] = df['slpSTVal'] = \
+            df['dayHigh']  = df['dayLow'] = df['ShrtTrmHigh']  = df['ShrtTrmLow'] = df['slpSTHigh']  = \
+                df['slpSTLow'] = np.nan
 
     for end in range(window_size, len(df)):
         start = end-window_size
@@ -1111,6 +1116,8 @@ def populateSVP(df):
         df.iloc[end, df.columns.get_loc('slpSTVah')] = (vah - df.iloc[end-3, df.columns.get_loc('vahShrtTrm')])#.rolling(window=5, min_periods=2).mean()
         df.iloc[end, df.columns.get_loc('slpSTVal')] = (val - df.iloc[end-3, df.columns.get_loc('valShrtTrm')])#.rolling(window=5, min_periods=2).mean()
         df.iloc[end, df.columns.get_loc('slpSTPoc')] = (poc - df.iloc[end-3, df.columns.get_loc('pocShrtTrm')])#.rolling(window=5, min_periods=2).mean()
+        df.iloc[end, df.columns.get_loc('slpSTHigh')] = (dayHigh - df.iloc[end-2, df.columns.get_loc('ShrtTrmHigh')])#.rolling(window=5, min_periods=2).mean()
+        df.iloc[end, df.columns.get_loc('slpSTLow')] = (dayLow - df.iloc[end-2, df.columns.get_loc('ShrtTrmLow')])#.rolling(window=5, min_periods=2).mean()
 
     for end in range(5, len(df)):
         start = 0
@@ -2421,11 +2428,12 @@ def getSignal(row,signalGenerators, df):
     return (s,entry_price, exit_price, limit1, limit2, sl1, sl2)
 
 def cacheAnalytics(df):
-    fname = f"Data/analyticsCache/{df['symbol'][0]}-{df.index[0]}-{df.index[-1]}.pickle"
+    fname = f"Data/analyticsCache/renko-{cfgRenkoNumBricksForTrend}-{df['symbol'][0]}-{df.index[0]}-{df.index[-1]}.pickle"
     with open(fname,"wb") as f:
         pickle.dump(df,f)
 
 def hasCachedAnalytics(df):
+    print(f"maLen is {maLen}")
     # return False
     fname = f"Data/analyticsCache/renko-{cfgRenkoNumBricksForTrend}-{df['symbol'][0]}-{df.index[0]}-{df.index[-1]}.pickle"
     if os.path.exists(fname):
@@ -2433,9 +2441,10 @@ def hasCachedAnalytics(df):
     else:
         return False
 def getCachedAnalytics(df):
-    fname = f"Data/analyticsCache/{df['symbol'][0]}-{df.index[0]}-{df.index[-1]}.pickle"
+    fname = f"Data/analyticsCache/renko-{cfgRenkoNumBricksForTrend}-{df['symbol'][0]}-{df.index[0]}-{df.index[-1]}.pickle"
     with open(fname, "rb") as f:
         df = pickle.load(f)
+        print("Getting analytics from cache")
     return df
 
 
