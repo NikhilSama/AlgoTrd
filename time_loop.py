@@ -337,9 +337,9 @@ def placeExitOrder(df,positions):
         logging.error("More than one position exists for {t}. No Exit order")
         return (lim1OrderId,SL1OrderId)
     
-    if df['renko_brick_diff'][-1] != 0:
-        logging.info(f"Skipping Target Exit order for {t} as brick diff is {df['renko_brick_diff'][-1]}")
-        return (lim1OrderId,SL1OrderId)
+    # if df['renko_brick_diff'][-1] != 0:
+    #     logging.info(f"Skipping Target Exit order for {t} as brick diff is {df['renko_brick_diff'][-1]}")
+    #     return (lim1OrderId,SL1OrderId)
     
     pos = positions[t]['positions'][0]
     

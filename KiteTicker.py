@@ -67,7 +67,7 @@ tickersToTrack = {}
 now = datetime.datetime.now(ist)
 tradingStartTime = now.replace(hour=cfgStartTimeOfDay.hour, minute=cfgStartTimeOfDay.minute, 
                                second=0, microsecond=0)
-niftyFutureTicker = 'NIFTY23JULFUT'
+niftyFutureTicker = utils.getImmidiateFutureTicker()
 
 def getNiftyLTP():
     return nifty_ltp
@@ -156,7 +156,7 @@ def getFutOrderBookBuySellQt(t):
         sellQt2 += i['quantity']    
     obSTImabalance = buyQt2 - sellQt2
     
-    # tickerlog(f"ltp:{ltp} lastQt:{lastQt} buyQt:{buyQt} sellQt:{sellQt} obImabalance:{obImabalance} / {round(buyQt/sellQt,2)} | buyQt2:{buyQt2} sellQt2:{sellQt2} obSTImabalance:{obSTImabalance} / {round(buyQt2/sellQt2,2)}")   
+    tickerlog(f"ltp:{ltp} lastQt:{lastQt} buyQt:{buyQt} sellQt:{sellQt} obImabalance:{obImabalance} / {round(buyQt/sellQt,2)} | buyQt2:{buyQt2} sellQt2:{sellQt2} obSTImabalance:{obSTImabalance} / {round(buyQt2/sellQt2,2)}")   
     # print(f"ltp:{ltp} lastQt:{lastQt} buyQt:{buyQt} sellQt:{sellQt} obImabalance:{obImabalance} / {round(buyQt/sellQt,2)} | buyQt2:{buyQt2} sellQt2:{sellQt2} obSTImabalance:{obSTImabalance} / {round(buyQt2/sellQt2,2)}")   
     # (t['df']['buyQt'],t['df']['sellQt'],t['df']['obImabalance'],t['df']['buyQt2'],t['df']['sellQt2'],t['df']['obSTImabalance']) = \
     #     (buyQt,sellQt,obImabalance,buyQt2,sellQt2,obSTImabalance)

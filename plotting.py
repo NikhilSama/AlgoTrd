@@ -148,7 +148,7 @@ def plot_backtest(df,trades=None):
         
     df['OBV-OSC-PCT-CHNG'].fillna(0, inplace=True)
 
-    iv = (df['Adj Close'] - (df['nifty'] - df['strike'].astype(int)))
+    # iv = (df['Adj Close'] - (df['nifty'] - df['strike'].astype(int)))
     # plot the first series in the first subplot
     #ax1.plot(df['i'], df['ma_superTrend'], color='green', linewidth=3)
     # ax1.plot(df['i'], df['VWAP'], color='gold', linewidth=2)

@@ -369,8 +369,8 @@ def tearsheet (df):
         tearsheet['max_drawdown_from_prev_peak_sum'] = trades['drawdown_from_prev_peak_sum'].min()
         tearsheet["average_per_trade_return"] = trades[trades['return'] != 0]['return'].mean()
         tearsheet["std_dev_pertrade_return"] = trades[trades['return'] != 0]['return'].std()
-        tearsheet["sharpe_ratio"] = tearsheet['return per day in trade'] * math.sqrt(252) / tearsheet['std_daily_return']
-        tearsheet['calamar_ratio'] = tearsheet['return per day in trade'] * math.sqrt(252) / tearsheet['max_drawdown_from_prev_peak_sum']
+        tearsheet["sharpe_ratio"] = round(tearsheet['return per day in trade'] * math.sqrt(252) / tearsheet['std_daily_return'],1)
+        tearsheet['calamar_ratio'] = -round(tearsheet['return per day in trade'] * 252 / tearsheet['max_drawdown_from_prev_peak_sum'],1)
         tearsheet["skewness_pertrade_return"] = trades[trades['return'] != 0]['return'].skew()
         tearsheet["kurtosis_pertrade_return"] = trades[trades['return'] != 0]['return'].kurtosis()
         tearsheet["wins"] = get_trade_stats(trades.loc[trades['return'] > 0, 'return'])

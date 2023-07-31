@@ -1,0 +1,41 @@
+
+from datetime import date,timedelta
+import datetime
+import time
+import pytz
+import pandas as pd
+import numpy as np 
+import math 
+import utils
+import os 
+
+file = os.path.join(os.path.dirname(__file__), 'data', 'NIFTY20YearDailyData.csv')
+
+nifty_data = pd.read_csv(file)
+# Create a new DataFrame with only the data from 2000 onwards
+nifty_data_2000_onwards = nifty_data[nifty_data['Date'] >= '2000-01-01'].copy()
+nifty_data_2000_onwards['Date'] = pd.to_datetime(nifty_data_2000_onwards['Date'])
+
+# Create a new column that indicates the day of the week (Monday=0, Sunday=6)
+nifty_data_2000_onwards['Weekday'] = nifty_data_2000_onwards['Date'].dt.weekday
+
+# Find all the Fridays and the following Thursdays
+fridays = nifty_data_2000_onwards[nifty_data_2000_onwards['Weekday'] == 4]
+thursdays = nifty_data_2000_onwards[nifty_data_2000_onwards['Weekday'] == 3].shift(-1)  # Shift by -1 to align with the next Friday
+
+print(fridays['Open'])
+print(thursdays['Close'])
+# Calculate the percentage changes from each Friday to the following Thursday
+percentage_changes = ((thursdays['Close'] - fridays['Open']) / fridays['Open']) * 100
+print (float(thursdays['Close']) - float(fridays['Open']))
+print(percentage_changes)
+# Initialize a dictionary to hold the results
+percentage_drop_counts_friday_to_thursday = {}
+
+percentage_drops_to_check_extended = list(range(1, 26))  # This creates a list of numbers from 1 to 25.
+
+# Loop over the list of percentage drops and count the occurrences of each
+for drop in percentage_drops_to_check_extended:
+    percentage_drop_counts_friday_to_thursday[drop] = len(percentage_changes[percentage_changes <= -drop])
+
+print(percentage_drop_counts_friday_to_thursday)

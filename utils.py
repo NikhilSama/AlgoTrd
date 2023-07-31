@@ -6,6 +6,8 @@ import numpy as np
 from datetime import datetime
 import time
 import tickerCfg
+import calendar
+
 
 #cfg has all the config parameters make them all globals here
 import cfg
@@ -162,3 +164,43 @@ def priceWithSlippage(slPrice, type='longEntry'):
         return slPrice*(1+cfgSlippage)
     elif type == 'shortEntry' or type == 'longExit':
         return slPrice*(1-cfgSlippage)
+    
+def get_last_thursday(year, month):
+    """
+    This function returns the last Thursday of the given month and year.
+    """
+    last_day_of_month = calendar.monthrange(year, month)[1]
+    last_day_date = datetime.date(year, month, last_day_of_month)
+    while last_day_date.weekday() != calendar.THURSDAY:
+        last_day_date -= datetime.timedelta(days=1)
+    return last_day_date
+
+def getImmidiateFutureTicker(index='NIFTY'):
+    """
+    This function generates the next month NIFTY Future ticker.
+    """
+    # Get current date
+    today = datetime.date.today()
+    
+    # Get last Thursday of the current month
+    last_thursday = get_last_thursday(today.year, today.month)
+    
+    # Check if the current date is before the last Thursday of the month
+    if today < last_thursday:
+        year = today.year
+        month = today.month
+    else:
+        # If it's on or after the last Thursday, use the next month
+        if today.month == 12:
+            year = today.year + 1
+            month = 1
+        else:
+            year = today.year
+            month = today.month + 1
+    
+    # Format year, month and index name into the desired string format
+    month_str = calendar.month_name[month][:3].upper()
+    year_str = str(year)[2:]
+    ticker = f"{index}{year_str}{month_str}FUT"
+    
+    return ticker

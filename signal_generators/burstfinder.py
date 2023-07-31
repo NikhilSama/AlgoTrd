@@ -8,7 +8,7 @@ import cfg
 globals().update(vars(cfg))
 
 class BurstFinder (SignalGenerator):
-    logArray = ['ohlv','svp']
+    logArray = ['ohlv','svp','svpST']
     
     def __init__(self, limitExitOrders=False, limitEntryOrders=False, slEntryOrders=False, slExitOrders=False,exitStaticBricks=False,useSVPForEntryExitPrices=False,useVolDelta=False,**kwargs):
         super().__init__(**kwargs)
@@ -18,13 +18,15 @@ class BurstFinder (SignalGenerator):
         
     #MAIN
     def OkToEnterLong(self,row):
-        return row['renko_uptrend'] and row.slpSTPoc >=0 
+        return row['Adj Close'] < row.pocShrtTrm
+        return row.slpSTPoc >=0 
         close = row['Adj Close']
         return close <= row.pocShrtTrm and row.slpSTLow >= 0
         return True
 
     def OkToEnterShort(self,row):
-        return not row['renko_uptrend'] and row.slpSTPoc <=0 
+        return row['Adj Close'] > row.pocShrtTrm
+        return row.slpSTPoc <=0 
 
         close = row['Adj Close']
         return close > row.pocShrtTrm and row.slpSTHigh <= 0
@@ -32,12 +34,14 @@ class BurstFinder (SignalGenerator):
     
     def checkLongEntry(self,s,row,df,prevPosition,tradeHigh,tradeLow,isLastRow,limit1,limit2,sl1,sl2,logString):
         (poc,vah,val,h,l) = (row['pocShrtTrm'],row['vahShrtTrm'],row['valShrtTrm'],row['ShrtTrmHigh'],row['ShrtTrmLow'])
-        limit1 = val 
+        # sl1 = h+8
+        limit1 = l-4
         return (s, limit1, limit2, sl1, sl2,logString)
 
     def checkShortEntry(self,s,row,df,prevPosition,tradeHigh,tradeLow,isLastRow,limit1,limit2,sl1,sl2,logString):
         (poc,vah,val,h,l) = (row['pocShrtTrm'],row['vahShrtTrm'],row['valShrtTrm'],row['ShrtTrmHigh'],row['ShrtTrmLow'])
-        limit1 = -(vah)
+        # sl1 = -(l-8)
+        limit1 = -(h+4)
         return (s, limit1, limit2, sl1, sl2,logString)
 
     def checkLongExit(self,s,row,df,isLastRow, entryPrice,limit1,limit2,sl1,sl2,logString,
@@ -55,6 +59,9 @@ class BurstFinder (SignalGenerator):
         limit1 = -(tradeEntry+5)
         limit1 = -(poc)
         limit1 = -(h)
+        
+        sl1 = -(tradeEntry-10)
+        limit1 = -(tradeEntry+10)
         return (s, limit1, limit2, sl1, sl2,logString)
 
     def checkShortExit(self,s,row,df,isLastRow, entryPrice,limit1,limit2,sl1,sl2,logString,
@@ -72,5 +79,7 @@ class BurstFinder (SignalGenerator):
         limit1 = tradeEntry-5
         limit1 = (poc)
         limit1 = (l)
+        sl1 = tradeEntry+10
+        limit1 = tradeEntry-10
 
         return (s, limit1, limit2, sl1, sl2,logString)

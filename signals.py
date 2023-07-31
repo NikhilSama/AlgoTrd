@@ -26,6 +26,7 @@ from candlerankings import candle_rankings
 from signal_generators.SignalGenerator import SignalGenerator
 from signal_generators.svb import svb
 from signal_generators.renko import Renko
+from signal_generators.renkoburst import RenkoBurst
 from signal_generators.meanrev import MeanRev
 from signal_generators.supertrend import SuperTrend
 from signal_generators.voldelta import VolDelta
@@ -48,6 +49,7 @@ def getSignalGenerator(row):
     # return BurstFinder()
     # return svb()
     # return BollingerBand() ##-- WORKS, good sharp ratio
+    # return RenkoBurst()
 
     sigGen = SignalGenerator()
     
@@ -275,7 +277,7 @@ def session_volume_profile (DF, type='normal', start_time=datetime.time(9, 15)):
     if df.empty:
         return (np.nan, np.nan, np.nan, np.nan, np.nan)
 
-    df['svp_price'] = df['Adj Close']   
+    df['svp_price'] = (df['High']+df['Low'])/2   
     volume_distribution = df.groupby('svp_price').sum()['Volume']
     # POC: price with max volume
     poc = volume_distribution.idxmax()
@@ -2060,7 +2062,7 @@ def followRenkoWithOBV(type, signal, isLastRow, row, df,
     brick_size = row.renko_brick_high - row.renko_brick_low
     
     if tickerHasPosition(row.symbol):
-        (s,entry_price,limit1,limit2,sl1,sl2,logString) = checkRenkoExit(s,row,df, isLastRow,entry_price,limit1,limit2,sl1,sl2)
+        (s,entry_price,limit1,limit2,sl1,sl2,logString) = checkRenkoExit(s,row,df, isLastRow, entry_price,limit1,limit2,sl1,sl2)
     elif type == 1:
         (s,entry_price,limit1,limit2,sl1,sl2,logString) = checkRenkoEntry(s,row,df, isLastRow, entry_price,limit1,limit2,sl1,sl2)
     else:
@@ -2070,18 +2072,26 @@ def followRenkoWithOBV(type, signal, isLastRow, row, df,
     logSignal(logString,['RenkoData','ohlv','svp'],signal,s,row,type,isLastRow,f'TrdPrice:{entry_price} LIM:{limit1} SL:{sl1}',logWithNoSignalChange=True)
     return (s,entry_price, limit1, limit2, sl1, sl2)
 
+longSLExits = shortSLExits= longLimitExits = shortLimitExits = longSLEntrys = shortSLEntrys= longLimitEntrys= shortLimitEntrys = 0
+def printOrderCountStats():
+    global longSLExits,longLimitExits,shortSLExits,shortLimitExits,shortSLEntrys,shortLimitEntrys,longSLEntrys,longLimitEntrys
+    print(f"LongSLExits:{longSLExits} LongLimitExits:{longLimitExits} ShortSLExits:{shortSLExits} ShortLimitExits:{shortLimitExits}")
+    print(f"shortSLEntrys{shortSLEntrys} shortLimitEntrys{shortLimitEntrys} longSLEntrys{longSLEntrys} longimitEntrys{longLimitEntrys}")
 def checkLongExits(s,row,df,isLastRow,limit1,limit2,sl1,sl2,logString=''):
+    global longSLExits,longLimitExits
     prevSL1 = getTickerSL1(row.symbol) if isShortSL1Order(row.symbol) else float('nan')
     prevTarget = getTickerLimit1(row.symbol) if isShortLimit1Order(row.symbol) else float('nan')
     exit_price = float('nan')
     
     if row.Low <= prevSL1: #SL
+        longSLExits+=1
         s = 0
         exit_price = min(utils.priceWithSlippage(prevSL1,'longExit'),row.Open)
         logString = "LONG-EXIT-SL"
         logging.info(f"Stop Loss order hit at {prevSL1}. Next row should reflect exit.")  if isLastRow else None
         
     elif row.High >= prevTarget:#Target
+        longLimitExits+=1
         s = 0
         exit_price = max(prevTarget,row.Open)
         logString = "LONG-EXIT-LMT"
@@ -2089,16 +2099,20 @@ def checkLongExits(s,row,df,isLastRow,limit1,limit2,sl1,sl2,logString=''):
     return (s,exit_price,logString)
 
 def checkShortExits(s,row,df,isLastRow,limit1,limit2,sl1,sl2,logString=''):
+    global shortSLExits,shortLimitExits
+
     prevSL1 = getTickerSL1(row.symbol) if isLongSL1Order(row.symbol) else float('nan')
     prevTarget = getTickerLimit1(row.symbol) if isLongLimit1Order(row.symbol) else float('nan')
     exit_price = float('nan')
     
     if row.High >= prevSL1:
+        shortSLExits+=1
         s = 0
         exit_price = max(utils.priceWithSlippage(prevSL1,'shortExit'),row.Open) if prevSL1>=row.Low else row.Open
         logString = "SHORT-EXIT-SL"
         logging.info(f"Stop Loss order hit at {exit_price}. Next row should reflect exit.") if isLastRow else None
     elif row.Low <= prevTarget:
+        shortLimitExits+=1
         s = 0
         exit_price = min(prevTarget,row.Open)
         logString = "SHORT-EXIT-LMT"
@@ -2106,11 +2120,14 @@ def checkShortExits(s,row,df,isLastRow,limit1,limit2,sl1,sl2,logString=''):
     return (s,exit_price,logString)
 
 def checkPrevOrderEntry(s,row,df,isLastRow,limit1,limit2,sl1,sl2,logString=''):
+    global shortSLEntrys,shortLimitEntrys,longSLEntrys,longLimitEntrys
+
     prevSL1 = getTickerSL1(row.symbol)  
     prevTarget = getTickerLimit1(row.symbol) 
     entry_price = float('nan')
     
     if isLongLimit1Order(row.symbol) and row.Low <= prevTarget:
+        longLimitEntrys+=1
         s = 1
         entry_price = min(row.Open,prevTarget)
         # if row.High < prevTarget:
@@ -2121,22 +2138,27 @@ def checkPrevOrderEntry(s,row,df,isLastRow,limit1,limit2,sl1,sl2,logString=''):
         logString = "LONG-ENTRY-LMT"
         logging.info(f"Target Limit order hit at {entry_price}.")  if isLastRow else None
     elif isShortLimit1Order(row.symbol) and row.High >= prevTarget:
+        shortLimitEntrys+=1
         s = -1
         entry_price = -max(row.Open,prevTarget)
         logString = "SHORT-ENTRY-LMT"
         logging.info(f"Short Target Limit order hit at {entry_price}.") if isLastRow else None
     elif isShortSL1Order(row.symbol) and row.Low <= prevSL1:
+        shortSLEntrys+=1
         s = -1
         entry_price = -min(utils.priceWithSlippage(prevSL1,'shortEntry'),row.Open)
+        entry_price = -utils.priceWithSlippage(prevSL1,'shortEntry')
         logString = "SHORT-ENTRY-SL"
         logging.info(f"SL order hit at {entry_price}.") if isLastRow else None
 
     elif isLongSL1Order(row.symbol) and row.High >= prevSL1:
+        longSLEntrys+=1
         s = 1
-        entry_price = max(utils.priceWithSlippage(prevSL1,'longEntry'),row.Open)
-        if row.Open - prevSL1 > 2:
-            print(f"ERROR: {row.name} checkSVPLongEntry: Entry price {row.Open} is more than 2 away from SL {prevSL1}")
-            logging.error(f"ERROR: {row.name} checkSVPLongEntry: Entry price {row.Open} is more than 2 away from SL {prevSL1}")
+        entry_price = utils.priceWithSlippage(prevSL1,'longEntry')
+        # entry_price = max(utils.priceWithSlippage(prevSL1,'longEntry'),row.Open)
+        # if row.Open - prevSL1 > 2:
+        #     print(f"ERROR: {row.name} checkSVPLongEntry: Entry price {row.Open} is more than 2 away from SL {prevSL1}")
+        #     logging.error(f"ERROR: {row.name} checkSVPLongEntry: Entry price {row.Open} is more than 2 away from SL {prevSL1}")
             # exit(0)
         logString = "LONG-ENTRY-SL"
         logging.info(f"SL order hit at {entry_price}.")  if isLastRow else None
@@ -2433,7 +2455,6 @@ def cacheAnalytics(df):
         pickle.dump(df,f)
 
 def hasCachedAnalytics(df):
-    print(f"maLen is {maLen}")
     # return False
     fname = f"Data/analyticsCache/renko-{cfgRenkoNumBricksForTrend}-{df['symbol'][0]}-{df.index[0]}-{df.index[-1]}.pickle"
     if os.path.exists(fname):
@@ -2510,5 +2531,7 @@ def applyIntraDayStrategy(df,analyticsGenerators=[populateBB], signalGenerators=
     if len(overrideSignalGenerators):
         df['signal'] = df.apply(getOverrideSignal, 
             args=(overrideSignalGenerators, df), axis=1)
+        
+    printOrderCountStats()
 
     return df

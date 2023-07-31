@@ -13,7 +13,7 @@ cfgDict = {
     'cfgFutVolDeltaThreshold': 25000,
     'cfgSlippage': 0.001,
     'cfgVolDeltaThresholdMultiplier':0.5,
-    'cfgGoodTradeProfitPct': 0.3,
+    'cfgGoodTradeProfitPct': 0.5,
     'cfgNiftyOpen': 18500,
     'cfgIsBackTest': False,
     'cfgZGetStartDate': None,
@@ -98,7 +98,7 @@ cfgDict = {
     'dbpass' : 'trading123',
     'showTradingViewLive' : False,
     'cacheTickData' : False, 
-    'bet_size': 100000
+    'bet_size': 50000
 }
 
 args = sys.argv[1:]

@@ -38,16 +38,15 @@ class SignalGenerator:
     def getPCR(self,row):
         return 1
     def getOrderBookImbalance(self,row):
-        return 0
         if ('futOrderBookBuyQt' in row):
             obImbalanceRatio = row.futOrderBookBuyQt/row.futOrderBookSellQt if row.futOrderBookSellQt > 0 else 10
             obImbalance = row.futOrderBookBuyQt - row.futOrderBookSellQt
         else:
             obImbalanceRatio = 1
             obImbalance = 0
-        if obImbalance > 10000 and obImbalanceRatio > 1.15:
+        if obImbalance > 10000 and obImbalanceRatio > 1.9:
             return 1
-        elif obImbalance < -10000 and obImbalanceRatio < 0.85:
+        elif obImbalance < -10000 and obImbalanceRatio < 0.8: # excess sellers are ususually more aggressive than aggressive buyers, so 20% excess sellers is the same as 60% excess buyers
             return -1
         else:
             return 0
@@ -77,8 +76,8 @@ class SignalGenerator:
         niftyVolDelta = niftyUp - niftyDn
         futVolDelta = futUp - futDn
         
-        if row.name.time().hour > 15:
-            return 0 # Vol Delta has no impact after 3 PM
+        if row.name.time().hour > 14:
+            return 0 # Vol Delta has no impact after 2 PM
         
         if sigType == 'longExit' or sigType == 'shortEntry':
             if niftyVolDelta < -cfgNiftyVolDeltaThreshold or futVolDelta < -cfgFutVolDeltaThreshold:

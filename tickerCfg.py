@@ -40,7 +40,7 @@ tickerCfg = {
     
 
     'NIFTY' : {
-        'maLen': 4,
+        'maLen': 20,
         'maSlopeThresh': 0.01,
         'adxLen': 5,
         'adxThresh': 20,
@@ -49,7 +49,7 @@ tickerCfg = {
         'cfgObvMaLen': 4,
         'cfgObvLen':10,
         'obvOscThresh': 0.1,
-        'bet_size': 100000
+        'bet_size': 50000
     }, 
         # 'NIFTY' : {
         #     'maLen': 10,
