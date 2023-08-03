@@ -25,7 +25,7 @@ cfgDict = {
     'cfgUseVolumeDataForOptions': True,
     'cfgMinPriceForOptions': 10,
     'cfgStartTimeOfDay': datetime.datetime.strptime("9:20+05:30", "%H:%M%z").time(),
-    'cfgEndNewTradesTimeOfDay': datetime.datetime.strptime("15:15+05:30", "%H:%M%z").time(),
+    'cfgEndNewTradesTimeOfDay': datetime.datetime.strptime("15:09+05:30", "%H:%M%z").time(),
     'cfgEndExitTradesOnlyTimeOfDay': datetime.datetime.strptime("15:19+05:30", "%H:%M%z").time(),
     'cfgTimeToCheckDayTrendInfo': datetime.datetime.strptime("11:00+05:30", "%H:%M%z").time(),
     'cfgMeanRevStartTime': datetime.datetime.strptime("11:00+05:30", "%H:%M%z").time(),
@@ -98,7 +98,7 @@ cfgDict = {
     'dbpass' : 'trading123',
     'showTradingViewLive' : False,
     'cacheTickData' : False, 
-    'bet_size': 50000
+    'bet_size': 200000   
 }
 
 args = sys.argv[1:]

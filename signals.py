@@ -277,7 +277,7 @@ def session_volume_profile (DF, type='normal', start_time=datetime.time(9, 15)):
     if df.empty:
         return (np.nan, np.nan, np.nan, np.nan, np.nan)
 
-    df['svp_price'] = (df['High']+df['Low'])/2   
+    df['svp_price'] = (df['High']+df['Low']+df['Adj Close'])/3   
     volume_distribution = df.groupby('svp_price').sum()['Volume']
     # POC: price with max volume
     poc = volume_distribution.idxmax()
@@ -920,8 +920,8 @@ def logRenko(row):
     return f"Renko Trend:{'↑' if row['renko_uptrend'] else '↓'}:{round(row['renko_brick_num'])}({round(row['renko_brick_diff'])}) V:{round(row['renko_brick_volume_osc'],1)} StC:{round(row['renko_static_candles']) if not np.isnan(row['renko_static_candles']) else 'nan'} L:{round(row['renko_brick_low'],1)} H:{round(row['renko_brick_high'],1)} | " \
         if "renko_uptrend" in row and not np.isnan(row.renko_brick_num) else 'No Renko Data'
 def logSVP(row):
-    return f"SVP {row['dayHigh']}-{row['vah']}({round(row['slpVah'],1)})-{row['poc']}({round(row['slpPoc'],1)})-{row['val']}({round(row['slpVal'],1)})-{row['dayLow']}  | " \
-        if "poc" in row else ''
+    return f"SVP {round(row['dayHigh'])}-{round(row['vah'])}({round(row['slpVah'],1)})-{round(row['poc'])}({round(row['slpPoc'],1)})-{round(row['val'])}({round(row['slpVal'],1)})-{round(row['dayLow'])}  | " \
+        if "poc" in row and not np.isnan(row['slpVah']) and not np.isnan(row['slpPoc']) and not np.isnan(row['slpVal']) else ''
 def logSVPST(row):
     return f"SVP-ST {round(row['ShrtTrmHigh'],1)}-{round(row['vahShrtTrm'],1)}({round(row.slpSTVah,1)})-{round(row['pocShrtTrm'],1)}-{round(row['valShrtTrm'],1)}({round(row.slpSTVal,1)})-{round(row['ShrtTrmLow'],1)} | " \
         if "poc" in row else 'No SVP Data'
@@ -1872,7 +1872,6 @@ def getNumBricksForLongTrend(row):
     return cfgRenkoNumBricksForTrend if getSVPquadrant(row) != 'Low' or row['slpPoc'] <= -cfgSVPSlopeThreshold else cfgRenkoNumBricksForTrend-1
 def getNumBricksForShortTrend(row):
     return cfgRenkoNumBricksForTrend if getSVPquadrant(row) != 'High' or row['slpPoc'] >= cfgSVPSlopeThreshold else cfgRenkoNumBricksForTrend-1
-
 def checkRenkoLongEntry(s,row,df,isLastRow, entry_price,limit1,limit2,sl1,sl2,logString):
     if isRenkoUpTrend(row) != True or tickerHasPosition(row.symbol):
         print(f"ERROR: checkRenkoLongEntry called with position or without uptrend.  Trend:{row['renko_uptrend']} Position:{tickerHasPosition(row.symbol)}")

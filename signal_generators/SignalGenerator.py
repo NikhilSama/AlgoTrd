@@ -10,6 +10,8 @@ import numpy as np
 import pandas as pd
 import logging
 import cfg
+from datetime import datetime, time, timedelta
+
 globals().update(vars(cfg))
 
 class SignalGenerator:
@@ -46,7 +48,7 @@ class SignalGenerator:
             obImbalance = 0
         if obImbalance > 10000 and obImbalanceRatio > 1.9:
             return 1
-        elif obImbalance < -10000 and obImbalanceRatio < 0.8: # excess sellers are ususually more aggressive than aggressive buyers, so 20% excess sellers is the same as 60% excess buyers
+        elif obImbalance < -10000 and obImbalanceRatio < 0.9: # excess sellers are ususually more aggressive than aggressive buyers, so 20% excess sellers is the same as 60% excess buyers
             return -1
         else:
             return 0
@@ -70,6 +72,23 @@ class SignalGenerator:
         return self.getOrderBookImbalance(row) < 0
     def marketIsNeutral(self,row):
         return self.getOrderBookImbalance(row) == 0
+    def timeToLookForAGoodExit(self,row):
+        ten_minutes = timedelta(minutes=9)
+
+        # combine today's date with the time
+        exitTime = datetime.datetime.combine(datetime.datetime.today(), cfgEndExitTradesOnlyTimeOfDay) 
+
+        # subtract 10 minutes
+        exitTime -= ten_minutes
+
+        if row.name.time() > exitTime.time():
+            return True
+        else:
+            return False
+        if row.name.time().hour == 15 and row.name.time().minute > 10:
+            return True
+        else:
+            return False
 
     def getVolDeltaSignal(self,row, sigType):
         (niftyUp,niftyDn,futUp,futDn) = row[['niftyUpVol','niftyDnVol','niftyFutureUpVol','niftyFutureDnVol']] if 'niftyUpVol' in row else (0,0,0,0)

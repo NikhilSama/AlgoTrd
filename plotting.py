@@ -97,9 +97,12 @@ def plot_returns_on_nifty(df):
     fig, (ax1, ax2) = \
     plt.subplots(2, 1, figsize=(8, 8), sharex=True, 
                 gridspec_kw={'height_ratios': [3,1]})
+    print(f"from:{df.index[0]} to:{df.index[-1]}")
     niftyDf = downloader.zget(df.index[0],df.index[-1],'NIFTY 50','day',includeOptions=False)
+    print("got df")
+    print(niftyDf)
     ax1.plot(niftyDf.index, niftyDf['Adj Close'], color='red', linewidth=2)
-    ax2.plot(df.index, df['strategy_returns'], color='red', linewidth=2)
+    ax2.plot(df.index, df['sum_return'], color='red', linewidth=2)
     plt.show()
 
 
@@ -158,8 +161,8 @@ def plot_backtest(df,trades=None):
     # ax1.plot(df['i'], df['renko_brick_low'], color='red', linewidth=1)
     ax1.plot(df['i'], df['pocShrtTrm'], color='black', linewidth=1)
     ax1.plot(df['i'], df['valShrtTrm'], color='green', linewidth=1)
-    ax1.plot(df['i'], df['ShrtTrmHigh'], color='red', linewidth=1)
-    ax1.plot(df['i'], df['ShrtTrmLow'], color='green', linewidth=1)
+    # ax1.plot(df['i'], df['ShrtTrmHigh'], color='red', linewidth=1)
+    # ax1.plot(df['i'], df['ShrtTrmLow'], color='green', linewidth=1)
     ax1.plot(df['i'], df['vahShrtTrm'], color='red', linewidth=1)
     # ax1.plot(df['i'], abs(df['sl1']), color='red', linewidth=3)
     # ax1.plot(df['i'], df['val']+(df['slpVal']*10), color='red', linewidth=1)
@@ -170,9 +173,9 @@ def plot_backtest(df,trades=None):
     # ax1.plot(df['i'], df['lower_band'], color='red', linewidth=1)
     # ax1.plot(df['i'], df['SuperTrendUpper'], color='green', linewidth=1)
     # ax1.plot(df['i'], df['SuperTrendLower'], color='red', linewidth=1)
-    # ax1.plot(df['i'], df['vah'], color='green', linewidth=1)
-    # ax1.plot(df['i'], df['val'], color='red', linewidth=1)
-    # ax1.plot(df['i'], df['poc'], color='yellow', linewidth=1)
+    ax1.plot(df['i'], df['vah'], color='green', linewidth=3)
+    ax1.plot(df['i'], df['val'], color='red', linewidth=3)
+    ax1.plot(df['i'], df['poc'], color='yellow', linewidth=3)
 
     #Draw horizontal lines at renko bricks
     # start = df['renko_brick_low'].min()
@@ -226,15 +229,15 @@ def plot_backtest(df,trades=None):
     # ax4.axhline(y=.2, color='blue', linestyle='--')
     ax4.set_title('RSI↓', loc='right')    
     
-    ax5.plot(df['i'], df['slpSTVah'], color='red', linewidth=1)
+    ax5.plot(df['i'], df['slpPoc'], color='red', linewidth=1)
     # ax5.plot(df['i'], df['stCumVolDelta'], color='red', linewidth=1)
     # # ax5.plot(df['i'], df['slpSTPoc'], color='black', linewidth=1)
     # # ax5.plot(df['i'], df['slpVah'], color='green', linewidth=1)
     # # ax5.plot(df['i'], df['slpVal'], color='red', linewidth=1)
-    ax5.set_title('Slope↓', loc='right')
+    ax5.set_title('SlopePOC↓', loc='right')
     # ax5.axhline(y=0, color='red', linestyle='--')
-    ax5.axhline(y=2, color='red', linestyle='--')
-    ax5.axhline(y=-2, color='red', linestyle='--')
+    ax5.axhline(y=.1, color='red', linestyle='--')
+    ax5.axhline(y=-0.1, color='red', linestyle='--')
     # ax5.axhline(y=-50000, color='red', linestyle='--')
 
 

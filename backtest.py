@@ -84,6 +84,7 @@ index_tickers = td.get_index_tickers()
 # zgetTo = datetime.datetime(2021,12,31,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 
 
+
 # zgetTo = datetime.datetime(2021,12,31,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 
 #default
@@ -91,14 +92,15 @@ firstTradeTime = datetime.datetime(2022,5,1,9,15) if cfgZGetStartDate == None el
 zgetTo = datetime.datetime(2023,4,1,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 
 #One day default
-# firstTradeTime = datetime.datetime(2023,7,21,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
-# zgetTo = datetime.datetime(2023,7,21,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+# firstTradeTime = datetime.datetime(2023,8,2,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
+# zgetTo = datetime.datetime(2023,8,2,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+
 
 # firstTradeTime = datetime.datetime(2023,3,21,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
 # zgetTo = datetime.datetime(2023,3,21,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 
 #3S 
-# firstTradeTime = datetime.datetime(2023,5,30,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
+# firstTradeTime = da0tetime.datetime(2023,5,30,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
 # zgetTo = datetime.datetime(2023,5,30,15,30) if cfgZGetS
 # tartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 
@@ -112,10 +114,10 @@ zgetTo = ist.localize(zgetTo)
 
 #     lastCandleHigh = df.iloc[i-1, df.columns.get_loc('High')]
 #     lastCandleLow = df.iloc[i-1, df.columns.get_loc('Low')]
-    
+
 #     High = row['High']
 #     Low = row['Low']
-    
+
 #     if High >= lastCandleHigh 
 # def stratMarketMakeLastCandle():
 #     df = dbget('NIFTYWEEKLYOPTION',firstTradeTime,zgetTo)
@@ -253,8 +255,10 @@ def printTearsheet(tearsheet,df):
     print(f"Trades: N:{tearsheet['num_trades']} W:{tearsheet['win_pct']:.1%}")
     print(f"Av Ret Winners:{tearsheet['wins']['mean']:.1%} L: {tearsheet['loss']['mean']:.1%}")
     print(f"Avg Return per day: {tearsheet['avg_daily_return']:.2%}")
+    print(f"Std Dev Daily Return: {tearsheet['std_daily_return']:.2%}")
     print(f"Worst Day ({tearsheet['worst_daily_return_date']}): {tearsheet['worst_daily_return']:.2%}")
     print(f"Best Day ({tearsheet['best_daily_return_date']}): {tearsheet['best_daily_return']:.2%}")
+    print(f"Days: {tearsheet['num_days']} W:{tearsheet['numWinningDays']}({tearsheet['numWinningDays']/tearsheet['num_days']:.1%}) L:{tearsheet['numLosingDays']}")
     
 def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
             exportCSV=True, tradingStartTime = firstTradeTime, \

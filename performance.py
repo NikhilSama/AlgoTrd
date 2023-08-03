@@ -310,9 +310,14 @@ def get_trade_stats (df):
 def addDailyReturns(trades,tearsheet):
     # assuming 'trades' is the name of your DataFrame
     daily_returns = trades['return'].resample('D').sum()
+    daily_returns = daily_returns[daily_returns != 0]
+    
     avg_return = daily_returns.mean()
     best_return = daily_returns.max()
     worst_return = daily_returns.min()
+    days = daily_returns.count()
+    winning_days = daily_returns[daily_returns > 0].count()
+    losing_days = daily_returns[daily_returns < 0].count()
 
     # get the date of the best and worst daily returns
     best_date = daily_returns.idxmax().strftime('%Y-%m-%d')
@@ -335,6 +340,10 @@ def addDailyReturns(trades,tearsheet):
     tearsheet["worst_daily_return"] = worst_return
     tearsheet["worst_daily_return_date"] = worst_date
 
+    tearsheet["num_days"] = days
+    tearsheet["numWinningDays"] = winning_days
+    tearsheet["numLosingDays"] = losing_days
+    
     tearsheet["daily_returns"] = daily_returns
     
     return tearsheet
