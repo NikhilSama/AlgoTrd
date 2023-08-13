@@ -23,6 +23,9 @@ import pandas as pd
 import numpy as np
 import csv
 import math 
+#cfg has all the config parameters make them all globals here
+import cfg
+globals().update(vars(cfg))
 
 pd.options.mode.chained_assignment = None  # default='warn'
 
@@ -254,7 +257,11 @@ def calc_trade_returns (date, trades, ticker_data):
     tradeExit  = ticker_data.iloc[-1, ticker_data.columns.get_loc('Open')] if np.isnan(tradeExit) else tradeExit
     
     tradePNL = (tradeExit - tradeEntry) * ticker_data.iloc[0, ticker_data.columns.get_loc('position')]
-    trades.loc[date, 'return'] = tradePNL/tradeEntry
+    
+    tradeReturn = tradePNL/tradeEntry
+    # subtract trade costs from tradePNL
+    tradeReturn = tradeReturn - (cfgTradingCost*2) if tradeReturn != 0 else tradeReturn#2 trades, entry and exit
+    trades.loc[date, 'return'] = tradeReturn
     return
 
 def get_trades (df):
@@ -378,12 +385,14 @@ def tearsheet (df):
         tearsheet['max_drawdown_from_prev_peak_sum'] = trades['drawdown_from_prev_peak_sum'].min()
         tearsheet["average_per_trade_return"] = trades[trades['return'] != 0]['return'].mean()
         tearsheet["std_dev_pertrade_return"] = trades[trades['return'] != 0]['return'].std()
-        tearsheet["sharpe_ratio"] = round(tearsheet['return per day in trade'] * math.sqrt(252) / tearsheet['std_daily_return'],1)
-        tearsheet['calamar_ratio'] = -round(tearsheet['return per day in trade'] * 252 / tearsheet['max_drawdown_from_prev_peak_sum'],1)
+        tearsheet["sharpe_ratio"] = round(tearsheet['avg_daily_return'] * math.sqrt(252) / tearsheet['std_daily_return'],1)
+        tearsheet['calamar_ratio'] = -round(tearsheet['avg_daily_return'] * 252 / tearsheet['max_drawdown_from_prev_peak_sum'],1)
         tearsheet["skewness_pertrade_return"] = trades[trades['return'] != 0]['return'].skew()
         tearsheet["kurtosis_pertrade_return"] = trades[trades['return'] != 0]['return'].kurtosis()
         tearsheet["wins"] = get_trade_stats(trades.loc[trades['return'] > 0, 'return'])
         tearsheet["loss"] = get_trade_stats(trades.loc[trades['return'] < 0, 'return'])
+        tearsheet["normalized_hit_ratio"] = (tearsheet["num_winning_trades"]*tearsheet['wins']['mean']) / ((tearsheet["num_winning_trades"]*tearsheet['wins']['mean']) + (tearsheet["num_losing_trades"]*abs(tearsheet['loss']['mean'])))
+
         tearsheetdf = pd.DataFrame(tearsheet,index=[0])
         # drop the 'wins' and 'loss' columns
         tearsheetdf = tearsheetdf.drop(['wins', 'loss'], axis=1)

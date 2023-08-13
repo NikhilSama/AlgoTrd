@@ -141,17 +141,22 @@ def getNSEHolidays():
     nse_holidays = [h.date() for h in nse_holidays]
     return nse_holidays
 
-def cleanDF(df):
+def cleanDF(df,interval='minute'):
     # Kite can sometimes return junk data before 915 or 1530, wich very 
     # low or zero volume.  These set the min/max values for OBV and 
     # affect our analytics and signals for a long time.  So we filter
     # fileter out these junk values
 
-    df = df.between_time('09:17:00+05:30', '15:29:00+05:30')    
+    if interval == "minute":
+        df = df.between_time('09:17:00+05:30', '15:29:00+05:30')
+        
     df = df[df.index.weekday<5] # remove weekends
-    
+
     # Remove holiday data from the DataFrame
     df = df[~df.index.isin(getNSEHolidays())]
+    if interval == "day":
+        df.index = df.index.date
+
     return df
 
 def isTradingDay(date):

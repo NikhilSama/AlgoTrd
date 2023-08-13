@@ -83,17 +83,31 @@ index_tickers = td.get_index_tickers()
 # firstTradeTime = datetime.datetime(2019,3,2,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
 # zgetTo = datetime.datetime(2021,12,31,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 
+# 2019 - 2020 Normal Bull Phase
+# firstTradeTime = datetime.datetime(2019,3,2,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
+# zgetTo = datetime.datetime(2020,2,1,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 
+# 2020 - 2020 Covid crash
+# firstTradeTime = datetime.datetime(2020,2,1,15,30) if cfgZGetStartDate == None else cfgZGetStartDate
+# zgetTo = datetime.datetime(2020,3,28,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+
+# 2020 - 2021 Vertical Bull
+# firstTradeTime = datetime.datetime(2020,3,28,15,30) if cfgZGetStartDate == None else cfgZGetStartDate
+# zgetTo = datetime.datetime(2021,12,31,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 
 # zgetTo = datetime.datetime(2021,12,31,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 
-#default
+#default weekly opt from db
 firstTradeTime = datetime.datetime(2022,5,1,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
 zgetTo = datetime.datetime(2023,4,1,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 
-#One day default
-# firstTradeTime = datetime.datetime(2023,8,2,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
-# zgetTo = datetime.datetime(2023,8,2,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+#default NIFTY Day fut
+# firstTradeTime = datetime.datetime(2022,8,1,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
+# zgetTo = datetime.datetime(2023,8,11,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+
+# #One day default
+# firstTradeTime = datetime.datetime(2022,5,2,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
+# zgetTo = datetime.datetime(2022,5,3,9,15)  if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 
 
 # firstTradeTime = datetime.datetime(2023,3,21,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
@@ -252,8 +266,10 @@ def printTearsheet(tearsheet,df):
     print(f"Drawdown from Prev Peak: {tearsheet['max_drawdown_from_prev_peak_sum']:.2%}")
     print("Sharpe: ", tearsheet['sharpe_ratio'])
     print("Calamar: ", tearsheet['calamar_ratio'])
-    print(f"Trades: N:{tearsheet['num_trades']} W:{tearsheet['win_pct']:.1%}")
+    print(f"Trades: N:{tearsheet['num_trades']} W:{tearsheet['win_pct']:.1%} Norm-Hit-Ratio:{tearsheet['normalized_hit_ratio']:.1%}")
+    print("Norm Hit Ratio below 55 don't even look at it Threshold is 60/65, 80% is GOLD")
     print(f"Av Ret Winners:{tearsheet['wins']['mean']:.1%} L: {tearsheet['loss']['mean']:.1%}")
+    print(f'winners: {tearsheet["num_winning_trades"]} losers; {tearsheet["num_losing_trades"]}')
     print(f"Avg Return per day: {tearsheet['avg_daily_return']:.2%}")
     print(f"Std Dev Daily Return: {tearsheet['std_daily_return']:.2%}")
     print(f"Worst Day ({tearsheet['worst_daily_return_date']}): {tearsheet['worst_daily_return']:.2%}")
@@ -297,7 +313,30 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
             # # signals.populateADX, 
             signals.populateSuperTrend,
             # signals.populateOBV,
-            # signals.vwap,
+            signals.vwap,
+            signals.populateSVP,
+            # signals.populateCandleStickPatterns,
+            # signals.populateVolDelta
+        ], 
+        'hourly': [
+        ],
+        'nofreq': [
+        ]
+
+    } if i != 'day' else {
+        'hourly': [
+        ],
+        'daily': [
+        ],
+        'nofreq': [
+            signals.populateATR,
+            signals.populateRenko,
+            signals.populateRSI,
+            signals.populateBB,     
+            # # signals.populateADX, 
+            signals.populateSuperTrend,
+            # signals.populateOBV,
+            signals.vwap,
             signals.populateSVP,
             # signals.populateCandleStickPatterns,
             # signals.populateVolDelta
@@ -373,7 +412,7 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
         plot_trades(tearsheet['trades'])
 
     if 'plot_returns_on_nifty' in plot:
-        plot_returns_on_nifty(df)
+        plot_returns_on_nifty(df,tearsheet['trades'])
     
     # print (f"END Complete {datetime.datetime.now(ist)}")
     return tearsheetdf
@@ -615,7 +654,7 @@ if isMain:
     #backtest('NIFTY23APRFUT','minute')
     # isMain = False
     t = perfProfiler("Start", time.time())
-    # backtest('NIFTY 50','minute')
+    # backtest('NIFTY23AUGFUT','day')
 
     backtest('NIFTYWEEKLYOPTION','minute',src="db", type='Call', interval='',offset='')
     t = perfProfiler("End", t)

@@ -260,8 +260,10 @@ def renko(DF):
     return renko_df
 
 def vwap(df):
-    df['VWAP'] = np.cumsum(df['Adj Close'] * df['Volume']) / np.cumsum(df['Volume'])
-
+    df['typical_price'] = (df['High'] + df['Low'] + df['Adj Close']) / 3
+    df['VWAP'] = np.cumsum(df['typical_price'] * df['Volume']) / np.cumsum(df['Volume'])
+    df['VWAP-SLP'] = df['VWAP'].diff(1)
+    
     # Calculate Standard Deviation (SD) bands
     num_periods = 20  # Number of periods for SD calculation
     df['VWAP_SD'] = df['VWAP'].rolling(num_periods).std()  # Rolling standard deviation
@@ -921,7 +923,8 @@ def logRenko(row):
         if "renko_uptrend" in row and not np.isnan(row.renko_brick_num) else 'No Renko Data'
 def logSVP(row):
     return f"SVP {round(row['dayHigh'])}-{round(row['vah'])}({round(row['slpVah'],1)})-{round(row['poc'])}({round(row['slpPoc'],1)})-{round(row['val'])}({round(row['slpVal'],1)})-{round(row['dayLow'])}  | " \
-        if "poc" in row and not np.isnan(row['slpVah']) and not np.isnan(row['slpPoc']) and not np.isnan(row['slpVal']) else ''
+        if "poc" in row and not np.isnan(row['poc']) and not np.isnan(row['slpVah']) and not np.isnan(row['slpPoc']) and not np.isnan(row['slpVal'] \
+            and not np.isnan(row.dayHigh) and not np.isnan(row.dayLow) and not np.isnan(row.vah) and not np.isnan(row.poc) and not np.isnan(row.val)) else ''
 def logSVPST(row):
     return f"SVP-ST {round(row['ShrtTrmHigh'],1)}-{round(row['vahShrtTrm'],1)}({round(row.slpSTVah,1)})-{round(row['pocShrtTrm'],1)}-{round(row['valShrtTrm'],1)}({round(row.slpSTVal,1)})-{round(row['ShrtTrmLow'],1)} | " \
         if "poc" in row else 'No SVP Data'
@@ -977,6 +980,11 @@ def logBB(row):
     if 'upper_band' in row and not np.isnan(row.upper_band):
         str = f"BB {round(row.upper_band)}/{round(row.ma20)}/{round(row.lower_band)} | "
     return str
+def fastMA(row):
+    str = '' 
+    if 'MA-FAST' in row and not np.isnan(row['MA-FAST']) and not np.isnan(row['MA-FAST-SLP']):
+        str = f"FastMA {round(row['MA-FAST'])} ({row['MA-FAST-SLP']})| "
+    return str
 def logSignal(msg,reqData,signal,s,row,window,isLastRow,extra='',logWithNoSignalChange=False):
     # return
     rowInfo = f'{row.symbol}:{row.i} '
@@ -998,7 +1006,8 @@ def logSignal(msg,reqData,signal,s,row,window,isLastRow,extra='',logWithNoSignal
         "supertrend": logSuperTrend(row),
         "voldelta": logVolDelta(row),
         "rsi": logRSI(row),
-        'bb': logBB(row)
+        'bb': logBB(row),
+        'fastma': fastMA(row)
     }
     dataString = ''
     for key in reqData:
@@ -1077,15 +1086,22 @@ def populateRenko(df):
     df['renko_brick_volume_osc'] = df['renko_brick_volume']/np.mean(df['renko_brick_volume'].unique())
     # df = df.drop(columns='unique_brick_id')
     # df['renko_brick_vol'] = df_renko_ohlc['brick_volume']
+    
+    # Step 1: Filtering
+    filtered_series = df.loc[df['renko_brick_diff'] == 0, 'renko_brick_diff']
 
-    # Calculate renko_static_candles
-    df['renko_static_candles'] = (
-        df.loc[df['renko_brick_diff'] == 0, 'renko_brick_diff']
-        .groupby((df['renko_brick_diff'] != 0).cumsum())
-        .cumcount()
-        .where(df['renko_brick_diff'] == 0)
-        .fillna(0)
-    )
+    # Step 2: Grouping
+    groups = (df['renko_brick_diff'] != 0).cumsum()
+
+    # Step 3: Cumulative Counting
+    cumulative_counts = filtered_series.groupby(groups).cumcount()
+
+    # Step 4: Applying Conditions
+    static_candles = cumulative_counts.where(df['renko_brick_diff'] == 0).fillna(0)
+
+    # Assigning back to DataFrame
+    df['renko_static_candles'] = static_candles
+
     df['renko_static_candles'].fillna(0)
     df['renko_static_candles'] = df['renko_static_candles'].where(df['renko_static_candles'] >= 1, 0)
 
@@ -1127,16 +1143,25 @@ def populateSVP(df):
         (poc, vah, val,dayHigh,dayLow) = session_volume_profile(window_df,start_time=datetime.time(9,31)) 
         df.iloc[end, df.columns.get_loc('poc')] = poc
         df.iloc[end, df.columns.get_loc('vah')] = vah
-        df.iloc[end, df.columns.get_loc('val')] = val        
-        df.iloc[end, df.columns.get_loc('slpPoc')] = (poc - df.iloc[end-(2*cfgSVPSlopeCandles), df.columns.get_loc('poc')])/cfgSVPSlopeCandles
-        df.iloc[end, df.columns.get_loc('slpVah')] = (vah - df.iloc[end-cfgSVPSlopeCandles, df.columns.get_loc('vah')])/cfgSVPSlopeCandles
-        df.iloc[end, df.columns.get_loc('slpVal')] = (val - df.iloc[end-cfgSVPSlopeCandles, df.columns.get_loc('val')])/cfgSVPSlopeCandles
+        df.iloc[end, df.columns.get_loc('val')] = val   
+        
+        slpCandles = cfgSVPSlopeCandles
+        pocSlpCandles = 2*slpCandles
+
+        if np.isnan(df.iloc[end-pocSlpCandles, df.columns.get_loc('poc')]): 
+            slpCandles = 1
+            pocSlpCandles = slpCandles
+            
+        df.iloc[end, df.columns.get_loc('slpPoc')] = (poc - df.iloc[end-pocSlpCandles, df.columns.get_loc('poc')])/pocSlpCandles
+        df.iloc[end, df.columns.get_loc('slpVah')] = (vah - df.iloc[end-slpCandles, df.columns.get_loc('vah')])/slpCandles
+        df.iloc[end, df.columns.get_loc('slpVal')] = (val - df.iloc[end-slpCandles, df.columns.get_loc('val')])/slpCandles
+        
         df.iloc[end, df.columns.get_loc('dayHigh')] = dayHigh
         df.iloc[end, df.columns.get_loc('dayLow')] = dayLow
         # print(f"start={start}, end={end}, poc={poc}, vah={vah}, val={val}")
-    df['slpPoc'] = df['slpPoc'].ewm(span=cfgSVPSlopeCandles,min_periods=cfgSVPSlopeCandles).mean()
-    df['slpVah'] = df['slpVah'].ewm(span=cfgSVPSlopeCandles,min_periods=cfgSVPSlopeCandles).mean()
-    df['slpVal'] = df['slpVal'].ewm(span=cfgSVPSlopeCandles,min_periods=cfgSVPSlopeCandles).mean()
+    df['slpPoc'] = df['slpPoc'].ewm(span=cfgSVPSlopeCandles,min_periods=1).mean() * 100
+    df['slpVah'] = df['slpVah'].ewm(span=cfgSVPSlopeCandles,min_periods=1).mean() * 100
+    df['slpVal'] = df['slpVal'].ewm(span=cfgSVPSlopeCandles,min_periods=1).mean() * 100
     df['slpSTPoc'] = df['slpSTPoc'].rolling(window=10).mean()
     df['slpSDSTPoc'] = df['slpSTPoc'].rolling(window=10).std()
     df['slpSTPoc'].clip(lower=-3, upper=3, inplace=True)
@@ -1184,8 +1209,11 @@ def generateAnalyticsForFreq(analyticsGenerators,df,freq):
     return combined_analytics
 
 def generateAnalytics(analyticsGenerators,df):
-    dfWithAnalytics = generateAnalyticsForFreq(analyticsGenerators['hourly'],df,'H')
-    dfWithAnalytics = generateAnalyticsForFreq(analyticsGenerators['daily'],dfWithAnalytics,'D')
+    if not analyticsGenerators['nofreq']:
+        dfWithAnalytics = generateAnalyticsForFreq(analyticsGenerators['hourly'],df,'H')
+        dfWithAnalytics = generateAnalyticsForFreq(analyticsGenerators['daily'],dfWithAnalytics,'D')
+    else:
+        dfWithAnalytics = genAnalyticsForDay(df,analyticsGenerators['nofreq'])
     return dfWithAnalytics
 
 ########### END OF POPULATE FUNCTIONS ###########

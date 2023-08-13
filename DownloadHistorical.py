@@ -90,7 +90,6 @@ def zget_basic(from_date, to_date, symbol,interval='minute',
     from_date = from_date.replace(tzinfo=None)
     to_date = to_date.replace(tzinfo=None)
     #print(f"exporting {from_date} to {to_date} for {symbol}")
-    
     if cacheTickData:
         df = getCachedTikerData(symbol,from_date,
                               to_date,interval) 
@@ -105,6 +104,7 @@ def zget_basic(from_date, to_date, symbol,interval='minute',
     try:
         records = kite.historical_data(token, from_date=from_date, to_date=to_date, 
                                        continuous=continuous, interval=interval)
+
     except Exception as e:
         logging.error(f'Get Historical Data Failed T: {token} from: {from_date} to: {to_date} continueous:{continuous} interval:{interval} FAILED.')
         logging.error(e.args[0])
@@ -126,13 +126,13 @@ def zget_basic(from_date, to_date, symbol,interval='minute',
     #We dont want to make any signal decisions based on this live / incomplete
     #view, since as the candle complete, ohlcv data cahnges, that signal may
     #change.  Therefore we remove this last row of data
-    df.drop(df.tail(1).index,inplace=True) # drop last row
+    # df.drop(df.tail(1).index,inplace=True) # drop last row
 
     df['symbol'] = symbol
     df.set_index('date',inplace=True)
-    
-    df = utils.cleanDF(df)
-    
+
+    df = utils.cleanDF(df,interval)
+
     # Remove Volume data for options (not relavent)
     if utils.isOption(symbol) and (not cfgUseVolumeDataForOptions):
         df['Volume'] = 0
@@ -180,13 +180,13 @@ def zGetSurrogateVolumeFromFuture(symbol,from_date,to_date,interval='minute',con
     
     
 def zget(from_date, to_date, symbol,interval='minute',
-         includeOptions=False, continuous=False, instrumentToken=None):
+         includeOptions=False, continuous=True, instrumentToken=None):
     if utils.tickerIsFuture(symbol):
         continuous = False # set continuous True for futures//Correction, contiinous only works for day 
         # candles not for minute candles
         
     df = zget_basic(from_date, to_date, symbol,interval,continuous,instrumentToken)
-    
+
     if df.empty:
         return df
     # if (df['Volume'].iloc[-1] == 0):
@@ -194,7 +194,6 @@ def zget(from_date, to_date, symbol,interval='minute',
     #     df['Volume'] = zGetSurrogateVolumeFromFuture(symbol,from_date,to_date,interval,continuous)
     if (includeOptions):
         df = zAddOptionsData(df,symbol,from_date,to_date,interval,continuous)
-    
     return df
 
 def zColsToDbCols(df):

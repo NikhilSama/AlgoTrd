@@ -46,7 +46,7 @@ class SignalGenerator:
         else:
             obImbalanceRatio = 1
             obImbalance = 0
-        if obImbalance > 10000 and obImbalanceRatio > 1.9:
+        if obImbalance > 10000 and obImbalanceRatio > 1.7:
             return 1
         elif obImbalance < -10000 and obImbalanceRatio < 0.9: # excess sellers are ususually more aggressive than aggressive buyers, so 20% excess sellers is the same as 60% excess buyers
             return -1

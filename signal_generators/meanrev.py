@@ -8,7 +8,7 @@ import cfg
 globals().update(vars(cfg))
 
 class MeanRev(SignalGenerator):
-    logArray = ['ohlv','svpST']
+    logArray = ['ohlv','fastma','svp','svpST']
     
     def __init__(self, limitExitOrders=False, limitEntryOrders=False, slEntryOrders=False, slExitOrders=False,exitStaticBricks=False,useSVPForEntryExitPrices=False,**kwargs):
         super().__init__(**kwargs)
@@ -25,14 +25,19 @@ class MeanRev(SignalGenerator):
         return row.slpSTVal > -1 
 
     def OkToEnterLong(self,row):
-        return row.renko_brick_num == -1
+        return row.High <= row.val  and row.slpPoc > -2 and row.slpVal > -5 and self.meanRevTimeWindow(row)
+        return abs(row.slpPoc) < 5 and row['Adj Close'] < row.pocShrtTrm and self.meanRevTimeWindow(row) \
+            and abs(row.renko_brick_num) < 2 and row.slpSTPoc <= 1
         close = row['Adj Close']
         poc = row.pocShrtTrm
         return close < poc and self.meanRevTimeWindow(row) and self.pocIsFlat(row) and self.valNotDiving(row)
         # return row.slpPoc >= 0 and row.slpSTPoc >= 0 and self.meanRevTimeWindow(row) and row['Adj Close'] < row.vah
     
     def OkToEnterShort(self,row):
-        return row.renko_brick_num == 1
+        return row.Low >= row.vah  and row.slpPoc < 2 and row.slpVah < 5 and self.meanRevTimeWindow(row)
+
+        return abs(row.slpPoc) < 5 and row['Adj Close'] > row.pocShrtTrm and self.meanRevTimeWindow(row) \
+            and abs(row.renko_brick_num) < 2 and abs(row.slpSTPoc) <= 1
 
         close = row['Adj Close']
         poc = row.pocShrtTrm
@@ -43,15 +48,24 @@ class MeanRev(SignalGenerator):
         (stSVPLow,stSlpSVPLow,close, ShrtTrmLow) = (row['valShrtTrm'],row['slpSTVal'],row['Adj Close'],row['ShrtTrmLow'])
         (brickNum,brickSize,brickHigh,brickLow,close,high) = (row['renko_brick_num'],row['renko_brick_high'] - row['renko_brick_low'],row['renko_brick_high'],row['renko_brick_low'],row['Adj Close'],row.High)
 
-        limit1 = brickLow
-        sl1 = -(limit1 - 10)
+        if close > row.ShrtTrmHigh:
+            s = 1
+            logString = "LONG-BURST-ENTRY"
+        else:
+            # limit1 = row.pocShrtTrm
+            sl1 = row.val 
         return (s, limit1, limit2, sl1, sl2,logString)
 
     def checkShortEntry(self,s,row,df,prevPosition,tradeHigh,tradeLow,isLastRow,limit1,limit2,sl1,sl2,logString):
         (stSVPHigh,stSlpSVPHigh,close, ShrtTrmHigh) = (row['vahShrtTrm'],row['slpSTVah'],row['Adj Close'],row['ShrtTrmHigh'])
         (brickNum,brickSize,brickHigh,brickLow,close,high) = (row['renko_brick_num'],row['renko_brick_high'] - row['renko_brick_low'],row['renko_brick_high'],row['renko_brick_low'],row['Adj Close'],row.High)
-        limit1 = -brickHigh
-        sl1 = abs(limit1) + 10
+        
+        if close < row.ShrtTrmLow:
+            s = -1
+            logString = "SHORT-BURST-ENTRY"
+        else:
+            # limit1 = -(row.pocShrtTrm)
+            sl1 = -(row.vah)
         
         return (s, limit1, limit2, sl1, sl2,logString)
 
@@ -60,8 +74,8 @@ class MeanRev(SignalGenerator):
         (stSVPHigh,close, ShrtTrmHigh, ShrtTrmLow,poc) = (row['vahShrtTrm'],row['Adj Close'],row['ShrtTrmHigh'], row['ShrtTrmLow'],row['pocShrtTrm'])
         (brickNum,brickSize,brickHigh,brickLow,close,high) = (row['renko_brick_num'],row['renko_brick_high'] - row['renko_brick_low'],row['renko_brick_high'],row['renko_brick_low'],row['Adj Close'],row.High)
 
-        limit1 = -(entryPrice + 20)
-        sl1 = -(entryPrice - 10)
+        limit1 = -(row.poc)
+        sl1 = -(ShrtTrmLow-5)
 
         return (s, limit1, limit2, sl1, sl2,logString)
 
@@ -70,8 +84,8 @@ class MeanRev(SignalGenerator):
         (stSVPLow,close, ShrtTrmHigh, ShrtTrmLow,poc) = (row['valShrtTrm'],row['Adj Close'],row['ShrtTrmHigh'], row['ShrtTrmLow'],row['pocShrtTrm'])
         (brickNum,brickSize,brickHigh,brickLow,close,high) = (row['renko_brick_num'],row['renko_brick_high'] - row['renko_brick_low'],row['renko_brick_high'],row['renko_brick_low'],row['Adj Close'],row.High)
 
-        limit1 = (entryPrice - 20)
-        sl1 = (entryPrice + 10)
+        limit1 = (row.poc)
+        sl1 = (ShrtTrmHigh+5)
 
         return (s, limit1, limit2, sl1, sl2,logString)
 

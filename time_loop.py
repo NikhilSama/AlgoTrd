@@ -491,7 +491,8 @@ def generateSignalsAndTrade(df,positions,stock,options,tradeStartTime=None, data
     if (buyCondition(df,net_position)): 
         #Go Long --  Sell Put AND buy back any pre-sold Calls
         qToExit = \
-            exitCurrentPosition(t,positions,net_position,1)           
+            exitCurrentPosition(t,positions,net_position,1)   
+                    
         if stock:
             ki.nse_buy(kite,t,qToExit=qToExit,tag='main') 
         if options:

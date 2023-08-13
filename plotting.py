@@ -93,16 +93,16 @@ def plot_stock_and_option(df):
     ax3.plot(df['i'], df['pct_change_call'], color='grey', linewidth=2)
     plt.show()
 
-def plot_returns_on_nifty(df):
+def plot_returns_on_nifty(df,trades):
     fig, (ax1, ax2) = \
     plt.subplots(2, 1, figsize=(8, 8), sharex=True, 
                 gridspec_kw={'height_ratios': [3,1]})
-    print(f"from:{df.index[0]} to:{df.index[-1]}")
-    niftyDf = downloader.zget(df.index[0],df.index[-1],'NIFTY 50','day',includeOptions=False)
-    print("got df")
-    print(niftyDf)
-    ax1.plot(niftyDf.index, niftyDf['Adj Close'], color='red', linewidth=2)
-    ax2.plot(df.index, df['sum_return'], color='red', linewidth=2)
+    # print(f"from:{df.index[0]} to:{df.index[-1]}")
+    # niftyDf = downloader.zget(df.index[0],df.index[-1],'NIFTY 50','day',includeOptions=False)
+    # print("got df")
+    # print(niftyDf)
+    ax1.plot(df.index, df['nifty'], color='red', linewidth=2)
+    ax2.plot(trades.index, trades['sum_return'], color='red', linewidth=2)
     plt.show()
 
 
@@ -157,13 +157,14 @@ def plot_backtest(df,trades=None):
     # ax1.plot(df['i'], df['VWAP'], color='gold', linewidth=2)
     ax1.plot(df['i'], df['Adj Close'], color='black', linewidth=2)
     # ax1.plot(df['i'], iv, color='red', linewidth=2)
+    ax1.plot(df['i'], df['MA-FAST'], color='green', linewidth=1)
     # ax1.plot(df['i'], df['renko_brick_high'], color='green', linewidth=1)
     # ax1.plot(df['i'], df['renko_brick_low'], color='red', linewidth=1)
-    ax1.plot(df['i'], df['pocShrtTrm'], color='black', linewidth=1)
-    ax1.plot(df['i'], df['valShrtTrm'], color='green', linewidth=1)
+    # ax1.plot(df['i'], df['pocShrtTrm'], color='black', linewidth=1)
+    # ax1.plot(df['i'], df['valShrtTrm'], color='green', linewidth=1)
     # ax1.plot(df['i'], df['ShrtTrmHigh'], color='red', linewidth=1)
     # ax1.plot(df['i'], df['ShrtTrmLow'], color='green', linewidth=1)
-    ax1.plot(df['i'], df['vahShrtTrm'], color='red', linewidth=1)
+    # ax1.plot(df['i'], df['vahShrtTrm'], color='red', linewidth=1)
     # ax1.plot(df['i'], abs(df['sl1']), color='red', linewidth=3)
     # ax1.plot(df['i'], df['val']+(df['slpVal']*10), color='red', linewidth=1)
     # ax1.plot(df['i'], df['ma20'], color='orange', linewidth=1)
@@ -202,9 +203,9 @@ def plot_backtest(df,trades=None):
     ax3.set_title('Position↓', loc='right')
     # df['ADX'] .fillna(0, inplace=True)
     # ax4.plot(df['i'], abs(df['Adj Close'] - iv), color='black', linewidth=2)
-    ax4.plot(df['i'], df['RSI'], color='black', linewidth=2)
-    ax4.axhline(y=75, color='red', linestyle='--')
-    ax4.axhline(y=25, color='red', linestyle='--')
+    # ax4.plot(df['i'], df['Open Interest'], color='black', linewidth=2)
+    # ax4.axhline(y=75, color='red', linestyle='--')
+    # ax4.axhline(y=25, color='red', linestyle='--')
 
     # threshold = df['volDeltaThreshold'] * 2
 
@@ -223,31 +224,33 @@ def plot_backtest(df,trades=None):
     # ax4.axhline(y=-2, color='blue', linestyle='--')
     # ax4.axhline(y=-50000, color='red', linestyle='--')
     # ax4.axhline(y=-.2, color='blue', linestyle='--')
-    # ax4.axhline(y=1, color='green', linestyle='--')
+    # ax4.axhlinep(y=1, color='green', linestyle='--')
     # ax4.axhline(y=2, color='blue', linestyle='--')
     # ax4.axhline(y=.1, color='green', linestyle='--')
     # ax4.axhline(y=.2, color='blue', linestyle='--')
-    ax4.set_title('RSI↓', loc='right')    
+    ax4.set_title('OI↓', loc='right')    
     
-    ax5.plot(df['i'], df['slpPoc'], color='red', linewidth=1)
-    # ax5.plot(df['i'], df['stCumVolDelta'], color='red', linewidth=1)
+    # ivma = iv.rolling(window=20,min_periods=10).mean()
+    # diff = iv - ivma
+    # ax5.plot(df['i'], diff, color='red', linewidth=1)
+    # ax5.plot(df['i'], ivma, color='green', linewidth=1)
     # # ax5.plot(df['i'], df['slpSTPoc'], color='black', linewidth=1)
     # # ax5.plot(df['i'], df['slpVah'], color='green', linewidth=1)
     # # ax5.plot(df['i'], df['slpVal'], color='red', linewidth=1)
-    ax5.set_title('SlopePOC↓', loc='right')
+    # ax5.set_title('iv↓', loc='right')
     # ax5.axhline(y=0, color='red', linestyle='--')
     ax5.axhline(y=.1, color='red', linestyle='--')
     ax5.axhline(y=-0.1, color='red', linestyle='--')
     # ax5.axhline(y=-50000, color='red', linestyle='--')
 
 
-    ax6.plot(df['i'], df['slpSTVal'], color='green', linewidth=2)
+    ax6.plot(df['i'], df['MA-FAST-SLP'], color='green', linewidth=2)
     # ax6.plot(df['i'], df['Volume'], color='green', linewidth=2)
-    ax6.set_title('slpSTVal ↓', loc='right')
+    ax6.set_title('MA-FAST-SLP ↓', loc='right')
     # ax6.axhline(y=av, color='red', linestyle='--')
     # ax6.axhline(y=-av, color='red', linestyle='--')
-    ax6.axhline(y=2, color='red', linestyle='--')
-    ax6.axhline(y=-2, color='red', linestyle='--')
+    ax6.axhline(y=.1, color='red', linestyle='--')
+    ax6.axhline(y=-.1, color='red', linestyle='--')
 
     # df['VolDeltaRatio'] = df['VolDeltaRatio'].clip(0, 2)
     # ax7.plot(df['i'], df['VolDeltaRatio'], color='green', linewidth=2)
@@ -277,7 +280,8 @@ def plot_backtest(df,trades=None):
     if len(df) > 500 :
         plt.show()
         return # dont plot the shaded region if there are too many rows
-    
+    plt.show()
+    return
     xticks = []
     # print(df)
     # Loop over each day in the DataFrame
