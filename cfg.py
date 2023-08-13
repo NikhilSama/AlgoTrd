@@ -76,7 +76,7 @@ cfgDict = {
     'cfgEnoughReturnForTheDay': 0.05,
     'cfgEnoughLossForTheDay': 1,
     'cfgPartialExitPercent': 1,
-    'includeOptions': True,
+    'includeOptions': False,
     'plot': [
         
         # 'trade_returns'

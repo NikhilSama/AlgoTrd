@@ -104,7 +104,7 @@ def zget_basic(from_date, to_date, symbol,interval='minute',
     try:
         records = kite.historical_data(token, from_date=from_date, to_date=to_date, 
                                        continuous=continuous, interval=interval)
-
+        print(f"exporting {from_date} to {to_date} for {symbol} continuous:{continuous} interval:{interval}")
     except Exception as e:
         logging.error(f'Get Historical Data Failed T: {token} from: {from_date} to: {to_date} continueous:{continuous} interval:{interval} FAILED.')
         logging.error(e.args[0])
@@ -181,8 +181,8 @@ def zGetSurrogateVolumeFromFuture(symbol,from_date,to_date,interval='minute',con
     
 def zget(from_date, to_date, symbol,interval='minute',
          includeOptions=False, continuous=True, instrumentToken=None):
-    if utils.tickerIsFuture(symbol):
-        continuous = False # set continuous True for futures//Correction, contiinous only works for day 
+    if utils.tickerIsFuture(symbol) and interval=='day':
+        continuous = True # set continuous True for futures//Correction, contiinous only works for day 
         # candles not for minute candles
         
     df = zget_basic(from_date, to_date, symbol,interval,continuous,instrumentToken)

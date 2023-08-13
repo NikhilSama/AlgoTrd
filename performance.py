@@ -362,8 +362,14 @@ def tearsheet (df):
 
     tearsheet = {}
     trades = get_trades(df)
-    tearsheet["trading_days"] = len(np.unique(df.index.date))
-    tearsheet["days_in_trade"] = len(np.unique(trades.index.date))
+    if isinstance(df.index, pd.DatetimeIndex):
+
+        tearsheet["trading_days"] = len(np.unique(df.index.date))
+        tearsheet["days_in_trade"] = len(np.unique(trades.index.date))
+    else: # LFT strategy, not intraday
+        tearsheet["trading_days"] = len(df.index)
+        tearsheet["days_in_trade"] = len(trades.index)
+        
     if (len(trades) > 0):
         
         tearsheet["num_trades"] = len(trades[trades['return'] != 0])

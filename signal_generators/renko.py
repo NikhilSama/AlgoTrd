@@ -375,9 +375,6 @@ class Renko(SignalGenerator):
         
     def getLimit1Price(self,row,type,df,tradeEntry,tradeHigh,tradeLow):
         
-        
-        if row.i == 26:
-            print("we are here")
         # (brickNum,brickSize,brickHigh,brickLow,staticCandles,close, vah, val, slpSTVah, slpSTVal) = \
         #     (row['renko_brick_num'],row['renko_brick_high'] - row['renko_brick_low'],row['renko_brick_high'],row['renko_brick_low'],row['renko_static_candles'],row['Adj Close'],row['vah'],row['val'],row['slpSTVah'],row['slpSTVal'])
         (brickNum,brickSize,brickHigh,brickLow,staticCandles,close) = \

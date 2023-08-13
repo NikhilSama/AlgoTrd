@@ -14,6 +14,7 @@ import tickerdata as td
 import performance as perf
 import numpy as np
 import signals as signals
+import analytics as analytics
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider, Button, RadioButtons
@@ -27,7 +28,6 @@ import itertools
 from sqlalchemy import create_engine
 import mysql.connector
 import backtest_log_setup
-import os
 import pickle
 from DatabaseLogin import DBBasic
 from dateutil.relativedelta import relativedelta
@@ -102,7 +102,7 @@ firstTradeTime = datetime.datetime(2022,5,1,9,15) if cfgZGetStartDate == None el
 zgetTo = datetime.datetime(2023,4,1,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 
 #default NIFTY Day fut
-# firstTradeTime = datetime.datetime(2022,8,1,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
+# firstTradeTime = datetime.datetime(2022,2,1,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
 # zgetTo = datetime.datetime(2023,8,11,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 
 # #One day default
@@ -306,17 +306,17 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
     perfTime = perfProfiler("ZGET", perfTIME)
     dataPopulators = {
         'daily': [
-            signals.populateATR,
-            signals.populateRenko,
-            signals.populateRSI,
-            signals.populateBB,     
-            # # signals.populateADX, 
-            signals.populateSuperTrend,
-            # signals.populateOBV,
-            signals.vwap,
-            signals.populateSVP,
-            # signals.populateCandleStickPatterns,
-            # signals.populateVolDelta
+            analytics.populateATR,
+            analytics.populateRenko,
+            analytics.populateRSI,
+            analytics.populateBB,     
+            # # analytics.populateADX, 
+            analytics.populateSuperTrend,
+            # analytics.populateOBV,
+            analytics.vwap,
+            analytics.populateSVP,
+            # analytics.populateCandleStickPatterns,
+            # analytics.populateVolDelta
         ], 
         'hourly': [
         ],
@@ -329,17 +329,17 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
         'daily': [
         ],
         'nofreq': [
-            signals.populateATR,
-            signals.populateRenko,
-            signals.populateRSI,
-            signals.populateBB,     
-            # # signals.populateADX, 
-            signals.populateSuperTrend,
-            # signals.populateOBV,
-            signals.vwap,
-            signals.populateSVP,
-            # signals.populateCandleStickPatterns,
-            # signals.populateVolDelta
+            analytics.populateATR,
+            analytics.populateRenko,
+            analytics.populateRSI,
+            analytics.populateBB,     
+            # # analytics.populateADX, 
+            analytics.populateSuperTrend,
+            # analytics.populateOBV,
+            analytics.vwap,
+            analytics.populateSVP,
+            # analytics.populateCandleStickPatterns,
+            # analytics.populateVolDelta
         ], 
         'hourly': [
         ]
@@ -370,10 +370,15 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
                         ] if signalGenerators is None else signalGenerators
     overrideSignalGenerators = []   
     
-    df = signals.applyIntraDayStrategy(df,dataPopulators,signalGenerators,
-                                  overrideSignalGenerators, 
-                                  tradeStartTime=tradingStartTime,
-                                  applyTickerSpecificConfig=applyTickerSpecificConfig)
+    if isinstance(df.index, pd.DatetimeIndex):
+
+        df = signals.applyIntraDayStrategy(df,dataPopulators,signalGenerators,
+                                    overrideSignalGenerators, 
+                                    tradeStartTime=tradingStartTime,
+                                    applyTickerSpecificConfig=applyTickerSpecificConfig)
+    else: 
+        df = signals.applyLFTStrategy(df,dataPopulators,signalGenerators)
+        
     perfTIME = perfProfiler("SIGNAL GENERATION", perfTIME)
 
 
@@ -406,8 +411,11 @@ def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
         plot_option_intrinsic(df.loc[firstTradeTime:])
 
     if 'adjCloseGraph' in plot:
-        plot_backtest(df.loc[firstTradeTime:],tearsheet['trades'] if 'trades' in tearsheet else None)
-    
+        if isinstance(df.index, pd.DatetimeIndex):
+            plot_backtest(df.loc[firstTradeTime:],tearsheet['trades'] if 'trades' in tearsheet else None)
+        else:
+            plot_backtest(df,tearsheet['trades'] if 'trades' in tearsheet else None)
+
     if 'trade_returns' in plot:
         plot_trades(tearsheet['trades'])
 
