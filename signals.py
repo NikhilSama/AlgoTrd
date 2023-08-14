@@ -1966,7 +1966,22 @@ def getSignal(row,signalGenerators, df):
     #     logTickerStatus(row.symbol)
     return (s,entry_price, exit_price, limit1, limit2, sl1, sl2)
 
+def getAanalytics(df,analyticsGenerators):
+    if analytics.hasCachedAnalytics(df):
+        df = analytics.getCachedAnalytics(df)
+    else:
+        df['signal'] = float("nan")
+        dfWithAnalytics = analytics.generateAnalytics(analyticsGenerators,df)
+                        
+        # Select the columns that are present in dfWithAnalytics but not in df
+        new_cols = [col for col in dfWithAnalytics.columns if col not in df.columns]
+        # Copy the new columns from dfWithAnalytics to df   
+        for col in new_cols:
+            df[col] = dfWithAnalytics[col]
 
+        #cache df with analytics for future
+        analytics.cacheAnalytics(df)
+    return df
 
 ## MAIN APPLY STRATEGY FUNCTION
 def applyIntraDayStrategy(df,analyticsGenerators, signalGenerators,
@@ -1983,21 +1998,7 @@ def applyIntraDayStrategy(df,analyticsGenerators, signalGenerators,
         tradingStartTime = datetime.datetime(2000,1,1,10,0,0) #Long ago :-)
         tradingStartTime = ist.localize(tradingStartTime)
       
-    if analytics.hasCachedAnalytics(df):
-        df = analytics.getCachedAnalytics(df)
-    else:
-        df['signal'] = float("nan")
-        dfWithAnalytics = analytics.generateAnalytics(analyticsGenerators,df)
-                        
-        # Select the columns that are present in dfWithAnalytics but not in df
-        new_cols = [col for col in dfWithAnalytics.columns if col not in df.columns]
-        # Copy the new columns from dfWithAnalytics to df   
-        for col in new_cols:
-            df[col] = dfWithAnalytics[col]
-
-        #cache df with analytics for future
-        analytics.cacheAnalytics(df)
-
+    df = getAanalytics(df,analyticsGenerators)
 
     initTickerStatus(df['symbol'][0])
     # df['SuperTrendDirection'] = dfWithAnalytics['SuperTrendDirection']

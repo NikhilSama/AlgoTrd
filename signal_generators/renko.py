@@ -451,7 +451,7 @@ class Renko(SignalGenerator):
             # the exit SL
             
             if row.pocShrtTrm > row.renko_brick_high and \
-                row.renko_static_candles >= 5 and abs(row.renko_brick_num) <= 3:
+                row.renko_static_candles >= 6 and abs(row.renko_brick_num) <= 3:
                 if row.High > row.renko_brick_high:
                     # We are truely close to exiting, poc and low are above brickHigh
                     l = min(brickHigh+.1,row.Low)
@@ -460,7 +460,7 @@ class Renko(SignalGenerator):
                 #     No Need to reset llimit value here, since we are already at a good price
                 #     l = row.Low
             elif row.pocShrtTrm < row.renko_brick_low and \
-                row.renko_static_candles >= 5 and abs(row.renko_brick_num) <= 3:
+                row.renko_static_candles >= 6 and abs(row.renko_brick_num) <= 3:
                 if row.Low < row.renko_brick_low:
                     # We are truely close to exiting, poc and low are below brickLow
                     h = max(brickLow-.1,row.High)
@@ -563,7 +563,7 @@ class Renko(SignalGenerator):
         if (not row['renko_uptrend']) and self.timeWindow(row) and (not self.marketIsBullish(row)) \
             and (slp < -10 or \
                 (slp < -5 and close > row.val) or \
-                (slp < 25 and row['Adj Close'] > row.vah)):
+                (slp < 25 and close > row.vah)):
                 return True
                     
         return False

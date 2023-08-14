@@ -406,22 +406,18 @@ def populateRenko(df):
     # df = df.drop(columns='unique_brick_id')
     # df['renko_brick_vol'] = df_renko_ohlc['brick_volume']
     
-    # Step 1: Filtering
-    filtered_series = df.loc[df['renko_brick_diff'] == 0, 'renko_brick_diff']
+    # Create a boolean mask where renko_brick_diff is non-zero
+    mask = df['renko_brick_diff'] != 0
 
-    # Step 2: Grouping
-    groups = (df['renko_brick_diff'] != 0).cumsum()
+    # Use cumsum on the mask to create groups
+    groups = mask.cumsum()
 
-    # Step 3: Cumulative Counting
-    cumulative_counts = filtered_series.groupby(groups).cumcount()
+    # Within each group, use cumcount to count consecutive zeros
+    df['renko_static_candles'] = df.groupby(groups).cumcount()
 
-    # Step 4: Applying Conditions
-    static_candles = cumulative_counts.where(df['renko_brick_diff'] == 0).fillna(0)
-
-    # Assigning back to DataFrame
-    df['renko_static_candles'] = static_candles
 
     df['renko_static_candles'].fillna(0)
+    # Set all values less than 1 to 0; should not happen, but just in case
     df['renko_static_candles'] = df['renko_static_candles'].where(df['renko_static_candles'] >= 1, 0)
 
     same_sign = np.sign(df['renko_brick_num']) == np.sign(df['renko_brick_num'].shift(1))

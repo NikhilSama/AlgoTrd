@@ -53,6 +53,24 @@ class DBBasic:
             print(dq)
             logging.error("DATABSE INCONSISTANT")
 
+    def tableNameForNiftyOption(self,d,m,y):
+        d = str(d).zfill(2)
+        m = str(m).zfill(2)
+        return f'GFDLNFO_NIFTY_OPT_{d}{m}{y}'
+    
+    def getNiftyOptionPrice (self,ticker,dt):
+        table = self.tableNameForNiftyOption(dt.date().day,dt.date().month,dt.date().year)
+        q = f'select * from {table} where symbol = \'{ticker}\' and Time = \'{dt.time()}\''
+        res = pd.read_sql(q, con=self.engine)
+        if len(res) > 0:
+            frm = res.iloc[0,0]
+            self.delAfter(frm)
+            frm = frm + timedelta(minutes=1)
+            frm = frm.to_pydatetime()
+            frm = ist.localize(frm)
+        else:
+            print("DATABASE INSCONSISTANT")
+
     def next_tick(self,now):
         q = 'select date from ohlcv1m order by date desc limit 1'
         res = pd.read_sql(q, con=self.engine)

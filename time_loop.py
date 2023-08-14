@@ -18,6 +18,7 @@ from datetime import date,timedelta,timezone
 import tickerdata as td
 import numpy as np
 import signals as signals
+import analytics as analytics
 import pandas as pd
 import DownloadHistorical as downloader
 import kite_init as ki 
@@ -432,21 +433,22 @@ def generateSignalsAndTrade(df,positions,stock,options,tradeStartTime=None, data
     #update moving averages and get signals
     dataPopulators = {
         'daily': [
-            signals.populateATR,
-            signals.populateRenko,
-            signals.populateRSI,
-            signals.populateBB,
-            # signals.populateADX, 
-            # signals.populateSuperTrend,
-            # signals.populateOBV,
-            # signals.vwap,
-            signals.populateSVP,
-            signals.populateVolDelta,
+            analytics.populateATR,
+            analytics.populateRenko,
+            analytics.populateRSI,
+            analytics.populateBB,
+            # analytics.populateADX, 
+            # analytics.populateSuperTrend,
+            # analytics.populateOBV,
+            # analytics.vwap,
+            analytics.populateSVP,
+            analytics.populateVolDelta,
 
-            # signals.populateCandleStickPatterns
+            # analytics.populateCandleStickPatterns
         ], 
         'hourly': [
-        ]
+        ],
+        'nofreq': []
     } if dataPopulators is None else dataPopulators
     
     signalGenerators = [    
