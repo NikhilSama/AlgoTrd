@@ -58,19 +58,128 @@ class DBBasic:
         m = str(m).zfill(2)
         return f'GFDLNFO_NIFTY_OPT_{d}{m}{y}'
     
-    def getNiftyOptionPrice (self,ticker,dt):
-        table = self.tableNameForNiftyOption(dt.date().day,dt.date().month,dt.date().year)
-        q = f'select * from {table} where symbol = \'{ticker}\' and Time = \'{dt.time()}\''
+    def getOptionChain(self,d):
+        table = self.tableNameForNiftyOption(d.day,d.month,d.year)
+        q = f'select * from {table}'
+        df = pd.read_sql(q, con=self.engine)
+        if len(df) > 0:
+            df['Ticker'] = df['Ticker'].str.replace('.NFO', '')
+            print(table)
+            print(df['Ticker'])
+            df['expiry'] = pd.to_datetime(df['Ticker'].str[5:12], format='%d%b%y')
+            df['strike'] = df['Ticker'].str[12:-2]
+            df['type'] = df['Ticker'].str[-2:]
+        return df
+    def getNiftyPrice(self,dt):
+        if dt.time() < datetime.time(9,30):
+            dt = dt.replace(hour=9, minute=30)
+        
+        start_datetime = dt - timedelta(minutes=2)
+        end_time = start_datetime + timedelta(minutes=2)
+        start_datetime_str = start_datetime.strftime("%Y-%m-%d %H:%M:%S")
+        end_time_str = end_time.strftime("%Y-%m-%d %H:%M:%S")
+        q = f'select `Adj Close` from  nifty where date between \'{start_datetime}\' and \'{end_time}\'  ORDER BY date DESC limit 1'
         res = pd.read_sql(q, con=self.engine)
         if len(res) > 0:
-            frm = res.iloc[0,0]
-            self.delAfter(frm)
-            frm = frm + timedelta(minutes=1)
-            frm = frm.to_pydatetime()
-            frm = ist.localize(frm)
+            price = res.iloc[0,0]
         else:
-            print("DATABASE INSCONSISTANT")
+            print("Not Found")
+            print(q)
+            price = 0
+        return price
+    
+    def getNiftyLTOptionPainAndPCR(self,start,end=None):
+        if type(start) == pd.DatetimeIndex:
+            start = start.replace(hour=9, minute=14, second=59)
+        else:
+            start = datetime.datetime(start.year, start.month, start.day, 9, 14, 59) 
+            
+        if end is None:
+            end = start + timedelta(minutes=60)
+        elif type(end) == pd.DatetimeIndex:
+            end = end.replace(hour=15, minute=29, second=59)
+        else:
+            end = datetime.datetime(end.year, end.month, end.day, 15, 29, 59)
+               
+        q = f'select * from  ltmaxpain where time between \'{start}\' and \'{end}\' ORDER BY time'
+        res = pd.read_sql(q, con=self.engine)
+        
+        if len(res) > 0:
+            res = pd.DataFrame(res)
+            res.index = res['time'].dt.date
+        else:
+            print("Not Found")
+            print(q)
+            price = 0
+        return res
 
+    def getNiftyOptionPainAndPCR(self,dt,end=None):
+        dt = dt.replace(tzinfo=None)
+        end = end.replace(tzinfo=None) if end is not None else None        
+        start_datetime = dt - timedelta(minutes=1)
+        end_time = start_datetime + timedelta(minutes=1) 
+        if end is None:
+            q = f'select maxPain,wmaxPain, pcr, atm_pcr from  maxpain where time = \'{dt}\'  ORDER BY time DESC limit 1'
+        else:
+            end_time = end
+            q = f'select time, maxPain,wmaxPain, pcr, atm_pcr from  maxpain where time between \'{start_datetime}\' and \'{end_time}\'  ORDER BY time ASC'
+
+        res = pd.read_sql(q, con=self.engine)
+        
+        if end is None and not len(res) > 0:
+            start_datetime = dt - timedelta(minutes=20)
+            end_time = start_datetime + timedelta(minutes=20)
+            q = f'select maxPain,wmaxPain, pcr, atm_pcr from  maxpain where time between \'{start_datetime}\' and \'{end_time}\'  ORDER BY time DESC limit 1'
+            res = pd.read_sql(q, con=self.engine)
+
+        if len(res) > 0:
+            print(q)
+            result = pd.DataFrame(res)
+            result = result.rename(columns={'time': 'date','maxPain': 'niftyMaxPain', 'wmaxPain': 'niftyWMaxPain', 'atm_pcr': 'niftyPCR'})
+            # Convert tz-native datetime to tz-aware in IST timezone
+            result['date'] = result['date'].dt.tz_localize('Asia/Kolkata')
+            result = result.set_index('date')
+            result.index = result.index.map(lambda x: x.replace(second=0))            
+        else:
+            print("Not Found")
+            print(q)
+            result = pd.DataFrame(columns=['maxPain','wmaxPain','pcr','atm_pcr'])
+        return result
+
+    
+    def getNiftyOptionPrice (self,ticker,dt,type = 'Close'):
+        oDate = dt.date() if isinstance(dt, pd.DatetimeIndex) else dt
+        if isinstance(dt, pd.DatetimeIndex):
+            oTime = dt.time() 
+        else:
+            oTime = datetime.datetime.strptime("9:30+05:30", "%H:%M%z").time() if type == 'Open' else datetime.datetime.strptime("15:29+05:30", "%H:%M%z").time()
+        #use today() jus to get to a datetime object, we will strip it out later and use just time
+        start_datetime = datetime.datetime.combine(datetime.datetime.today().date(), oTime) - timedelta(minutes=2)
+        end_time = start_datetime + timedelta(minutes=2)
+
+        table = self.tableNameForNiftyOption(oDate.day,oDate.month,oDate.year)
+        q = f'select {type} from {table} where Ticker = \'{ticker+".NFO"}\' and Time between \'{start_datetime.time()}\' and \'{end_time.time()}\'  ORDER BY Time DESC limit 1'
+        res = pd.read_sql(q, con=self.engine)
+        if len(res) > 0:
+            price = res.iloc[0,0]
+        else:
+            # try with a wider time range
+            start_datetime = datetime.datetime.combine(datetime.datetime.today().date(), oTime) - timedelta(minutes=30)
+            end_time = start_datetime + timedelta(minutes=30)
+            q = f'select {type} from {table} where Ticker = \'{ticker+".NFO"}\' and Time between \'{start_datetime.time()}\' and \'{end_time.time()}\'  ORDER BY Time DESC limit 1'
+            res = pd.read_sql(q, con=self.engine)
+            if len(res) > 0:
+                price = res.iloc[0,0]
+            else:
+                q = f'select {type} from {table} where Ticker = \'{ticker+".NFO"}\'  ORDER BY Time DESC limit 1'
+                res = pd.read_sql(q, con=self.engine)
+                if len(res) > 0:
+                    price = res.iloc[0,0]
+                else:
+                    print("DATABASE INSCONSISTANT")
+                    print(q)
+
+        return price
     def next_tick(self,now):
         q = 'select date from ohlcv1m order by date desc limit 1'
         res = pd.read_sql(q, con=self.engine)

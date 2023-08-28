@@ -7,6 +7,7 @@ import time
 import os
 from pyotp import TOTP
 import sys 
+from selenium.webdriver.chrome.service import Service
 
 chrome_driver_path = './Data/chromedriver' # Replace with the path to your ChromeDriver executable
 
@@ -29,6 +30,7 @@ if 'headless' in sys.argv:
     chrome_options.add_argument('--headless')
 
 browser = webdriver.Chrome(executable_path=chrome_driver_path, options=chrome_options)
+
 browser.get(kite.login_url())
 browser.implicitly_wait(5)
 username = browser.find_element("xpath", '/html/body/div[1]/div/div[2]/div[1]/div/div/div[2]/form/div[1]/input')

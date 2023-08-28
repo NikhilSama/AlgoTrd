@@ -14,6 +14,7 @@ import tickerdata as td
 import performance as perf
 import numpy as np
 import signals as signals
+import signal_option as signals_option
 import analytics as analytics
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -23,7 +24,7 @@ import DownloadHistorical as downloader
 import pytz
 import strategies15m as strat15m
 import ppprint
-from plotting import plot_backtest,plot_stock_and_option,plot_trades,plot_returns_on_nifty,plot_option_intrinsic,plot_option_vs_stock
+from plotting import plot_lt_option_strategy, plot_backtest,plot_stock_and_option,plot_trades,plot_returns_on_nifty,plot_option_intrinsic,plot_option_vs_stock
 import itertools 
 from sqlalchemy import create_engine
 import mysql.connector
@@ -98,20 +99,24 @@ index_tickers = td.get_index_tickers()
 # zgetTo = datetime.datetime(2021,12,31,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 
 #default weekly opt from db
-firstTradeTime = datetime.datetime(2022,5,1,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
-zgetTo = datetime.datetime(2023,4,1,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+firstTradeTime = datetime.datetime(2022,5,2,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
+zgetTo = datetime.datetime(2023,5,1,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+# zgetTo = datetime.datetime(2022,5,2,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+
+# firstTradeTime = datetime.datetime(2023,3,1,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
 
 #default NIFTY Day fut
-# firstTradeTime = datetime.datetime(2022,2,1,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
-# zgetTo = datetime.datetime(2023,8,11,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+# firstTradeTime = datetime.datetime(2022,5,1,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
+# # zgetTo = datetime.datetime(2022,10,31,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
+# zgetTo = datetime.datetime(2023,3,30,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 
 # #One day default
-# firstTradeTime = datetime.datetime(2022,5,2,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
-# zgetTo = datetime.datetime(2022,5,3,9,15)  if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+# firstTradeTime = datetime.datetime(2022,5,6,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
+# zgetTo = datetime.datetime(2022,5,6,15,30)  if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 
 
-# firstTradeTime = datetime.datetime(2023,3,21,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
-# zgetTo = datetime.datetime(2023,3,21,15,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
+# firstTradeTime = datetime.datetime(2023,8,14,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
+# zgetTo = datetime.datetime(2023,8,14,16,30) if cfgZGetStartDate == None else cfgZGetStartDate +  relativedelta(months=11)
 
 #3S 
 # firstTradeTime = da0tetime.datetime(2023,5,30,9,15) if cfgZGetStartDate == None else cfgZGetStartDate
@@ -129,7 +134,7 @@ zgetTo = ist.localize(zgetTo)
 #     lastCandleHigh = df.iloc[i-1, df.columns.get_loc('High')]
 #     lastCandleLow = df.iloc[i-1, df.columns.get_loc('Low')]
 
-#     High = row['High']
+#     High = row['High']c
 #     Low = row['Low']
 
 #     if High >= lastCandleHigh 
@@ -141,11 +146,11 @@ zgetTo = ist.localize(zgetTo)
 
 
 def dbget(t,s,e,offset=None,type='Call',interval=''):
-    df = downloader.getCachedTikerData(f'niftyITMN{type}{interval}{offset if offset is not None else ""}',s,e,'minute')
-    if not df.empty:
-        print("got from cache db")
-        # df.to_csv('temp.csv')
-        return df 
+    # df = downloader.getCachedTikerData(f'niftyITMN{type}{interval}{offset if offset is not None else ""}',s,e,'minute')
+    # if not df.empty:
+    #     print("got from cache db")
+    #     # df.to_csv('temp.csv')
+    #     return df 
     print("getting from db")
     db = DBBasic()
     q = f'select * from niftyITMN{type}{interval}{offset if offset is not None else ""} where date between "'+s.strftime('%Y-%m-%d %H:%M:%S')+'" and "'+e.strftime('%Y-%m-%d %H:%M:%S')+'"'
@@ -166,8 +171,14 @@ def dbget(t,s,e,offset=None,type='Call',interval=''):
     df['niftyLow'] = niftydf['Low'] if 'niftyLow' not in df.columns else df['niftyLow']
     df['niftyUpVol'] = df['niftyDnVol'] = df['niftyFutureUpVol'] = df['niftyFutureDnVol'] = 0
     df['futOrderBookBuyQt'] = df['futOrderBookSellQt'] = df['futOrderBookBuyQtLevel1'] = df['futOrderBookSellQtLevel1'] = 1
+    
+    # Get MaxPain and PCR from DB
+    pain = db.getNiftyOptionPainAndPCR(s,e)
+    df = df.join(pain, how='left')
+    
+    
+    
     df = utils.cleanDF(df)
-
     downloader.loadTickerCache(df,f'niftyITMN{type}{interval}{offset if offset is not None else ""}',s,e,'minute')
     return df
     
@@ -191,11 +202,12 @@ def zget(t,s,e,i):
         # print(df)
 
         df = df[(df.index >= s) & (df.index <= e)]
+        
         with open(pfname,"wb") as f:
             pickle.dump(df,f)
         return df
     #Get latest minute tick from zerodha
-    df = downloader.zget(s,e,t,i,includeOptions=includeOptions)
+    df = downloader.zSplitAndGet(s,e,t,i,includeOptions=includeOptions)
     df = downloader.zColsToDbCols(df)
     
     return df
@@ -220,16 +232,51 @@ def perfProfiler(name,t):
     print (f"{name} took {round((time.time() - t)*1000,2)}ms")
     return time.time()
 
+
+def printOptionStrategyTearsheet(tearsheet,df):
+    if tearsheet is None or tearsheet['num_trades'] == 0:
+        print("No trades")
+        return
+    prevPos = 0
+
+    print("TRADES: ")
+    for index,trade in tearsheet['trades'].iterrows():
+        opt1 = trade['opt1']
+        opt1_price = trade['opt1_price']
+        opt1_signal = trade['opt1_signal']
+        opt2 = trade['opt2']
+        opt2_price = trade['opt2_price']
+        opt2_signal = trade['opt2_signal']
+        if trade['position'] == 0:
+            exit_price = trade['Adj Close']
+            diff = round(exit_price - entry_price,2)*prevPos
+            print(f"\t\t{utils.timeToString(index,date=True,time=True)}: EXIT @ {exit_price:.2f}({diff} or {diff/entry_price:.2%})")
+            print(f"\t\t{opt1} {opt1_signal} @ {opt1_price} \t{opt2} {opt2_signal} @ {opt2_price}")
+            print("\n")
+        else:
+            entry_price = trade['Adj Close']
+            
+            print(f"\t{utils.timeToString(index,date=True)} {trade['i']} Position: {trade['signal']} @ {entry_price} \tReturn:{trade['return']:.2%} \tCUM=>{trade['sum_return']:.2%}")
+            print(f"\t\t{opt1} {opt1_signal} @ {opt1_price} \t{opt2} {opt2_signal} @ {opt2_price}")
+        prevPos = trade['position']
+
+    print(f"Total Return: {tearsheet['return']:.2%}")
+    # print(f"Drawdown: {tearsheet['max_drawdown_from_0_sum']:.2%}")
+    print(f"Drawdown from Prev Peak: {tearsheet['max_drawdown_from_prev_peak_sum']:.2%}")
+    print("Calamar: ", tearsheet['calamar_ratio'])
+    print(f"Trades: N:{tearsheet['num_trades']} W:{tearsheet['win_pct']:.1%} Norm-Hit-Ratio:{tearsheet['normalized_hit_ratio']:.1%}")
+    print(f"Av Ret Winners:{tearsheet['wins']['mean']:.1%} L: {tearsheet['loss']['mean']:.1%}")
+    print(f'winners: {tearsheet["num_winning_trades"]} losers; {tearsheet["num_losing_trades"]}')
+
 def printTearsheet(tearsheet,df):
     if tearsheet is None or tearsheet['num_trades'] == 0:
         print("No trades")
         return
     prevPos = 0
-    tearsheet['trades'].to_csv('trades.csv')
 
-    daily_returns = tearsheet['trades']['return'].resample('D').sum()
+    daily_returns = tearsheet['trades']['return'].resample('D').sum() if not perf.isOptionSpreadStrategy(df) else None
 
-    if daily_returns.shape[0] <= 1:
+    if perf.isOptionSpreadStrategy(df) or daily_returns.shape[0] <= 1:
         print("TRADES: ")
         for index,trade in tearsheet['trades'].iterrows():
             if trade['position'] == 0:
@@ -275,10 +322,105 @@ def printTearsheet(tearsheet,df):
     print(f"Worst Day ({tearsheet['worst_daily_return_date']}): {tearsheet['worst_daily_return']:.2%}")
     print(f"Best Day ({tearsheet['best_daily_return_date']}): {tearsheet['best_daily_return']:.2%}")
     print(f"Days: {tearsheet['num_days']} W:{tearsheet['numWinningDays']}({tearsheet['numWinningDays']/tearsheet['num_days']:.1%}) L:{tearsheet['numLosingDays']}")
+
+def opt_backtest(t,i='minute',start = zgetFrom, end = zgetTo ,src = 'z'):
+    perfTIME = time.time()    
+    startingTime = perfTIME
+    if src == 'db':
+        df = dbget(t,start,end,type=type,interval=interval,offset=offset)
+    else:
+        df = zget(t,start,end,i=i)
+    if df.empty:
+        print(f"No data for {t} start:{start} end:{end} i:{i}")
+        return
+
+    if i == 'minute':
+        if len(df) < cfgMaxLookbackCandles:
+            print(f"Skipping {t} as it has {len(df)} less than {cfgMaxLookbackCandles} candles at {tradingStartTime}")
+            print(df)
+        else:#trim the df to maxlookbackcandles
+            df_head = df.loc[:firstTradeTime].iloc[-cfgMaxLookbackCandles:]
+            df_tail = df.loc[firstTradeTime:]
+            df = pd.concat([df_head, df_tail])
+    perfTime = perfProfiler("ZGET", perfTIME)
+    dataPopulators = {
+        'daily': [
+            analytics.populateATR,
+            analytics.populateRenko,
+            analytics.populateRSI,
+            analytics.populateBB,     
+            # # analytics.populateADX, 
+            analytics.populateSuperTrend,
+            # analytics.populateOBV,
+            analytics.vwap,
+            analytics.populateSVP,
+            # analytics.populateCandleStickPatterns,
+            # analytics.populateVolDelta
+        ], 
+        'hourly': [
+        ],
+        'nofreq': [
+        ]
+
+    } if i == 'minute' else {
+        'hourly': [
+        ],
+        'daily': [
+        ],
+        'nofreq': [
+            analytics.populateATR,
+            # analytics.populateRenko,
+            analytics.populateRSI,
+            analytics.populateBB,     
+            # # analytics.populateADX, 
+            analytics.populateSuperTrend,
+            # analytics.populateOBV,
+            analytics.vwap,
+            # analytics.populateSVP,
+            # analytics.populateCandleStickPatterns,
+            # analytics.populateVolDelta
+        ], 
+        'hourly': [
+        ]
+    }
     
+    signalGenerators = [
+                    #    signals.randomSignalGenerator
+                    #    signals.followSuperTrend
+                        signals_option.verticalSpread
+                        # signals_option.shortStraddle
+                        # signals.followRenkoWithOBV
+                        #signals.followRenkoWithTargetedEntry
+                        # signals.followObvMA
+                        # ,signals.exitObvAdxMaTrend
+                        # signals.followMAandADX
+                     #   signals.justFollowFastMA
+                    #       signals.getSig_BB_CX
+                    #      ,signals.getSig_ADX_FILTER
+                    #      ,signals.getSig_MASLOPE_FILTER
+                    # #      ,signals.getSig_OBV_FILTER
+                    # #     ,signals.getSig_exitAnyExtremeADX_OBV_MA20_OVERRIDE
+                    #       ,signals.getSig_followAllExtremeADX_OBV_MA20_OVERRIDE
+                    # # # #     #,signals.followTrendReversal
+                    #       ,signals.exitTrendFollowing
+                           # signals.fastSlowMACX
+                        #       ,signals.exitCandleStickReversal
+                        #    ,signals.exitTargetOrSL
+
+                        ] 
+    
+    df = signals_option.applyOptionStrategy(df,dataPopulators,signalGenerators)
+    tearsheet,tearsheetdf,df = perf.tearsheet(df)
+    printOptionStrategyTearsheet(tearsheet,df) if isMain else None
+
+    perfTIME = perfProfiler("SIGNAL GENERATION", perfTIME)
+    df.to_csv("export.csv")
+    plot_lt_option_strategy(df,tearsheet['trades'] if 'trades' in tearsheet else None)
+
+
 def backtest(t,i='minute',start = zgetFrom, end = zgetTo, \
             exportCSV=True, tradingStartTime = firstTradeTime, \
-            applyTickerSpecificConfig = True, signalGenerators = None,
+            applyTickerSpecificConfig = True,   signalGenerators = None,
             src = 'z', type="Call", interval='',offset=None):
     perfTIME = time.time()    
     startingTime = perfTIME
@@ -639,6 +781,7 @@ def backtestCombinator(src='z'):
             print("WIERD NUMBER OF SIGNAL GENERATORS")
             exit(0)
         performance = pd.concat([performance, tearsheetdf]) if tearsheetdf['num_trades'][0] > 0 else performance
+        
 
     
     # write the DataFrame to a SQL table
@@ -655,6 +798,77 @@ def backtestCombinator(src='z'):
     performance.to_sql('PerfNiftyRenkov2', engine, if_exists='append')
     engine.dispose()
 
+
+def optionTest(t,datasource='z'):
+    start = datetime.datetime(2019, 1, 1, 9, 15, tzinfo=ist)
+    end = datetime.datetime(2023, 8, 21, 15, 30, tzinfo=ist)
+    if datasource=='z':
+        df = zget(t,start,end,i='day')
+    elif datasource == 'y':
+        df = td.yFin_get_ticker_data(t,period='4y',interval='1d')
+        
+    maslopeperiods = 5
+    # Calculate the moving average slope and generate signals based on it
+    # Positive slope generates a buy signal (1), negative slope generates a sell signal (-1)
+    # No slope or zero slope generates no signal (0)
+    df['ma'] = df['Adj Close'].rolling(window=7).mean()
+    df['maSlope'] = df['ma'].pct_change(maslopeperiods)*1000
+    df['maSlope'] = df['maSlope'].rolling(window=maslopeperiods).mean()
+    df['atr'] = analytics.ATR(df, 14)   
+    df.index = pd.to_datetime(df.index)
+
+    # Add a new column 'day_of_week' to the dataframe where the index is the day of the week
+    df['day_of_week'] = df.index.dayofweek
+
+    daysToHold = 1
+    
+    # projected prices based on ma slope after 4 days (friday)
+    df['projected'] = df['Open'] * ( 1 + (daysToHold * (df['maSlope']/(maslopeperiods*1000))))
+    
+    df['upper'] = df['projected'] + (df['atr'])
+    df['lower'] = df['projected'] - 2*(df['atr'])
+    
+    
+    
+    # If the 'day_of_week' is 4 (Friday), set the 'signal' to 0, else keep the original 'signal'
+    # df['signal'] = df.apply(lambda x: 0 if x['day_of_week'] == 4 else x['signal'], axis=1)
+    
+    # Create a new column 'friday_close' that gets the Adj Close value from the upcoming Friday
+    df['friday_close'] = df.loc[df['day_of_week'] == 4, 'Adj Close'].reindex(df.index).bfill() if daysToHold > 1 else df['Adj Close']
+    
+    if daysToHold > 1:
+        df.loc[df['day_of_week'] != 0, ['upper', 'lower', 'friday_close']] = np.nan
+
+        df['result'] = np.nan
+        df.loc[(df['day_of_week'] == 0) & (df['friday_close'] > df['lower']) & (df['friday_close'] < df['upper']), 'result'] = 0
+        df.loc[(df['day_of_week'] == 0) & (df['friday_close'] > df['upper']), 'result'] = (df['friday_close'] - df['upper'])
+        df.loc[(df['day_of_week'] == 0) & (df['friday_close'] < df['lower']), 'result'] = -(df['lower'] - df['friday_close'])
+
+    else:
+        df['result'] = np.nan
+        df.loc[(df['friday_close'] > df['lower']) & (df['friday_close'] < df['upper']), 'result'] = 0
+        df.loc[(df['friday_close'] > df['upper']), 'result'] = (df['friday_close'] - df['upper'])
+        df.loc[(df['friday_close'] < df['lower']), 'result'] = -(df['lower'] - df['friday_close'])
+        
+
+    
+    # # # Drop the 'day_of_week' column as it's no longer needed
+    # # df.drop(columns=['day_of_week'], inplace=True)
+    
+    # df['signal_change'] = df['signal'].diff()
+    # df['signal'] = df['signal'].where(df['signal_change'] != 0, np.nan)
+    # df['result'] = df.apply(lambda x: -10 if pd.notnull(x['signal']) and x['signal'] > 0 and (x['friday_change'] < -1 * x['atr']) else 1, axis=1)
+    # df['result'] = df['result'].where(df['signal'].abs() == 1, np.nan)
+
+    df.drop(columns=['i','Close','High','Low','Volume','symbol'], inplace=True)
+    print(df[df['result'].notnull()])
+    print(f"Average mslope: {df['maSlope'].mean()} std dev: {df['maSlope'].std()}")
+    print(f"ATR: {df['atr'].mean()} ({df['atr'].mean()/df['Adj Close'].mean():.2%})")
+    print(f"WINS: {len(df[df['result'] == 0])} LOSSES-Upper: {len(df[df['result'] > 0])} LOSSES-Lower: {len(df[df['result'] < 0])}")
+    print(f"WIN RATE: {len(df[df['result'] == 0])/(len(df[df['result'] == 0])+len(df[df['result'] < 0])+len(df[df['result'] > 0])):.1%}")
+    # Print the last row of the dataframe
+    print(df.iloc[-1])
+    df.to_csv('optionstst.csv')
 if isMain:
     #backtestCombinator()       
     #backtestCombinator()       
@@ -663,13 +877,15 @@ if isMain:
     # isMain = False
     t = perfProfiler("Start", time.time())
     # backtest('NIFTY23AUGFUT','day')
-
+    # opt_backtest('NIFTY 50','60minute') 
+    # optionTest('ITC')  
+    # optionTest('SPY','y')  
     backtest('NIFTYWEEKLYOPTION','minute',src="db", type='Call', interval='',offset='')
     t = perfProfiler("End", t)
 
     #oneThousandRandomTests()
 
-#    backtest('NIFTY23APR17750CE','minute') 
+#    
     #backtest(cfgTicker,'minute')
     #backtest_daybyday('NIFTY23APRFUT','minute')
 

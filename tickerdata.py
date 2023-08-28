@@ -66,6 +66,8 @@ def yFin_get_ticker_data(ticker, period='1y', interval='1d'):
         #get from yf
         temp=yf.download(ticker, period=period, interval=interval)
         temp.dropna(how="any", inplace=True)
+        temp.insert(0, 'i', range(1, 1 + len(temp)))
+        temp['symbol'] = ticker
         with open(file_name,"wb") as f:
             pickle.dump(temp,f)
     return temp

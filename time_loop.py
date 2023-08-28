@@ -355,11 +355,11 @@ def placeExitOrder(df,positions):
         #If ticker is an option, or if ticker is an option then df has the exit price            
         # price = df['upper_band'][-1] if pos['quantity'] > 0 \
         #     else df['lower_band'][-1]
-        (longTarget,longSL,shortTarget,shortSL) = signals.getTickerRenkoTargetPrices(df.iloc[-1])
+        # (longTarget,longSL,shortTarget,shortSL) = signals.getTickerRenkoTargetPrices(df.iloc[-1])
         if pos['quantity'] > 0:
             # logging.info("Long Target Exit Order target is {longTarget} close: {df['Adj Close'][-1]} sl: {longSL}")
-            target = max(longTarget,df['Adj Close'][-1]) if np.isnan(df['limit1'][-1]) else abs(df['limit1'][-1])
-            sl = longSL if np.isnan(df['sl1'][-1]) else abs(df['sl1'][-1])
+            target = abs(df['limit1'][-1]) #max(longTarget,df['Adj Close'][-1]) if np.isnan(df['limit1'][-1]) else abs(df['limit1'][-1])
+            sl = abs(df['sl1'][-1]) #longSL if np.isnan(df['sl1'][-1]) else abs(df['sl1'][-1])
             if not np.isnan(df['sl1'][-1]) and df['sl1'][-1] > 0:
                 print("ERROR: SL is positive(buy) when we have a long position")
             if not np.isnan(df['limit1'][-1]) and df['limit1'][-1] > 0:
@@ -367,8 +367,8 @@ def placeExitOrder(df,positions):
 
         else:
             # logging.info(f"Short Target Exit Order. target is {shortTarget} close: {df['Adj Close'][-1]} sl: {shortSL}")
-            target= min(shortTarget,df['Adj Close'][-1]) if np.isnan(df['limit1'][-1]) else abs(df['limit1'][-1])
-            sl = shortSL if np.isnan(df['sl1'][-1]) else abs(df['sl1'][-1])
+            target= abs(df['limit1'][-1]) #min(shortTarget,df['Adj Close'][-1]) if np.isnan(df['limit1'][-1]) else abs(df['limit1'][-1])
+            sl = abs(df['sl1'][-1])# shortSL if np.isnan(df['sl1'][-1]) else abs(df['sl1'][-1])
             if not np.isnan(df['sl1'][-1]) and df['sl1'][-1] < 0:
                 print("ERROR: SL is negative(sell) when we have a short position")
             if not np.isnan(df['limit1'][-1]) and df['limit1'][-1] < 0:
@@ -381,7 +381,7 @@ def placeExitOrder(df,positions):
         else:
             logging.info(f"ExitOrders => {t}:{oType}  Target:{targetqt} @ {target} SL:{slqt} @ {sl} brick diff:{df['renko_brick_diff'][-1]}")
             (lim1OrderId,SL1OrderId) = ki.exec(kite,ticker,exch,oType,lot_size=lot_size,tick_size=tick_size,
-                    q=targetqt,p=target,tag="Exit1",sl=1,sltrigger=sl,slTxType=oType,slqt=slqt)
+                    q=targetqt,p=target,tag="Exit1",sl=1 if not np.isnan(sl) else 0,sltrigger=sl,slTxType=oType,slqt=slqt)
     else: #ticker is equity underlying, and we are trading its option
         # df does not have the bb exit price, so we can skip for now
         #TODO: Calculate exit price

@@ -208,7 +208,25 @@ def zget_w_db_save(from_date, to_date, symbol,interval='minute',continuous=False
     df = zget(from_date, to_date, symbol,interval,continuous)
     db.toDB('ohlcv1m',df)
     
-            
+def zSplitAndGet(from_date, to_date, symbol,interval='minute',
+         includeOptions=False, continuous=True, instrumentToken=None):
+    days = 60
+    df = pd.DataFrame()
+    if from_date.date() < (to_date.date() - timedelta(days=days)):
+        iterFrom = from_date
+        while True:
+            iterTo = iterFrom + timedelta(days=days)
+            if iterTo > to_date:
+                iterTo = to_date
+            iter_df = zget(iterFrom, iterTo, symbol,interval,includeOptions,continuous,instrumentToken)
+            df = df.append(iter_df)
+            if iterTo == to_date:
+                return df
+                break
+            else:
+                iterFrom = iterTo + timedelta(minutes=1)
+    else:
+        return zget(from_date, to_date, symbol,interval,includeOptions,continuous,instrumentToken)
 def zsplit_and_get(from_date, symbol, interval = 'minute', continuous = False):
 #    token = db.get_instrument_token(symbol)
     to_date = dt.datetime.now(ist)

@@ -3,7 +3,7 @@ import os
 import re
 import pandas as pd
 import numpy as np
-from datetime import datetime
+from datetime import datetime as datetime_class, timedelta, date
 import time
 import tickerCfg
 import calendar
@@ -160,8 +160,9 @@ def cleanDF(df,interval='minute'):
     return df
 
 def isTradingDay(date):
+    date = date.date() if isinstance(date, datetime_class) else date
     is_weekend = date.weekday() >= 5
-    is_holiday = date.date() in getNSEHolidays()
+    is_holiday = date in getNSEHolidays()
     return not (is_weekend or is_holiday)
 
 def priceWithSlippage(slPrice, type='longEntry'):
@@ -175,9 +176,10 @@ def get_last_thursday(year, month):
     This function returns the last Thursday of the given month and year.
     """
     last_day_of_month = calendar.monthrange(year, month)[1]
-    last_day_date = datetime.date(year, month, last_day_of_month)
+    # last_day_date = datetime_class.date(year, month, last_day_of_month)
+    last_day_date = date(year, month, last_day_of_month)
     while last_day_date.weekday() != calendar.THURSDAY:
-        last_day_date -= datetime.timedelta(days=1)
+        last_day_date -= timedelta(days=1)
     return last_day_date
 
 def getImmidiateFutureTicker(index='NIFTY'):
@@ -185,7 +187,7 @@ def getImmidiateFutureTicker(index='NIFTY'):
     This function generates the next month NIFTY Future ticker.
     """
     # Get current date
-    today = datetime.date.today()
+    today = datetime_class.today().date()
     
     # Get last Thursday of the current month
     last_thursday = get_last_thursday(today.year, today.month)
@@ -209,3 +211,38 @@ def getImmidiateFutureTicker(index='NIFTY'):
     ticker = f"{index}{year_str}{month_str}FUT"
     
     return ticker
+
+def getNextThursday(d):
+    weekday=d.weekday()
+    if weekday == 3:
+        return d
+    if weekday < 3:
+        next_thursday = d + timedelta(days=(3-weekday))
+    else:
+        next_thursday = d + timedelta(days=(10-weekday))
+    return next_thursday
+
+def getWeeklyOptionExpiryDate(dt,minDaysToExpiry=0):
+    t = dt.time() if isinstance(dt,pd.DatetimeIndex) else None
+    dt = dt.date() if isinstance(dt, pd.DatetimeIndex) else dt
+    expiry = getNextThursday(dt + timedelta(days=minDaysToExpiry))
+    expiry = expiry if isTradingDay(expiry) else expiry - timedelta(days=1)
+    return expiry
+def getOptionTicker(dt,ticker,strike,type,minDaysToExpiry=0):
+    date = getWeeklyOptionExpiryDate(dt,minDaysToExpiry)
+    return f"{ticker}{date.strftime('%d%b%y').upper()}{strike}{type}"
+
+
+
+def getNiftyOptionStocks():
+    return ['RELIANCE','INFY','BAJFINANCE','SBIN', 'TCS', 'KOTAKBANK', 'ICICIBANK', 'HDFCBANK', 'MARUTI']
+
+def getNASDAQStockTickers():
+    return ['AAPL', 'MSFT', 'AMZN', 'GOOGL', 'FB', 'TSLA', 'NVDA', 'PYPL', 'ADBE', 'CMCSA', 'INTC', 'CSCO', 'PEP', 'NFLX', 'AVGO', 'TXN', 'COST', 'TMUS', 'QCOM', 'CHTR', 'INTU', 'AMGN', 'SBUX', 'AMD', 'ISRG', 'VRTX', 'BKNG', 'GILD', 'MDLZ', 'FISV', 'ADP', 'REGN', 'ATVI', 'CSX', 'ILMN', 'ADI', 'MELI', 'LRCX', 'ADI', 'MELI', 'LRCX', 'ADSK', 'BIIB', 'NXPI', 'CTSH', 'KLAC', 'EXC', 'WBA', 'ASML', 'IDXX', 'EA', 'MAR', 'XEL', 'WDAY', 'CDNS', 'NTES', 'SNPS', 'CTAS', 'VRSK', 'ALGN', 'DOCU', 'SPLK', 'DXCM', 'ANSS', 'CDW', 'PAYX', 'XLNX', 'FAST', 'SWKS', 'CPRT', 'MXIM', 'CERN', 'INCY', 'CHKP', 'ULTA', 'MNST', 'TTWO', 'ALXN', 'WDC', 'NTAP', 'FOXA', 'FOX', 'LULU', 'BMRN', 'EXPE', 'KLAC', 'EXC', 'WBA', 'ASML', 'IDXX', 'EA', 'MAR', 'XEL', 'WDAY', 'CDNS', 'NTES', 'SNPS', 'CTAS', 'VRSK', 'ALGN', 'DOCU', 'SPLK', 'DXCM', 'ANSS', 'CDW', 'PAYX', 'XLNX', 'FAST', 'SWKS', 'CPRT', 'MXIM', 'CERN', 'INCY', 'CHKP', 'ULTA', 'MNST', 'TTWO', 'ALXN', 'WDC', 'NTAP', 'FOXA', 'FOX', 'LULU', 'BMRN', 'EXPE']
+
+def getSP500Tickers():
+    return ['AAPL', 'MSFT', 'AMZN', 'GOOGL', 'FB', 'TSLA', 'NVDA', 'PYPL', 'ADBE', 'CMCSA', 'INTC', 'CSCO', 'PEP', 'NFLX', 'AVGO', 'TXN', 'COST', 'TMUS', 'QCOM', 'CHTR', 'INTU', 'AMGN', 'SBUX', 'AMD', 'ISRG', 'VRTX', 'BKNG', 'GILD', 'MDLZ', 'FISV', 'ADP', 'REGN', 'ATVI', 'CSX', 'ILMN', 'ADI', 'MELI', 'LRCX', 'ADI', 'MELI', 'LRCX', 'ADSK', 'BIIB', 'NXPI', 'CTSH', 'KLAC', 'EXC', 'WBA', 'ASML', 'IDXX', 'EA', 'MAR', 'XEL', 'WDAY', 'CDNS', 'NTES', 'SNPS', 'CTAS', 'VRSK', 'ALGN', 'DOCU', 'SPLK', 'DXCM', 'ANSS', 'CDW', 'PAYX', 'XLNX', 'FAST', 'SWKS', 'CPRT', 'MXIM', 'CERN', 'INCY', 'CHKP', 'ULTA', 'MNST', 'TTWO', 'ALXN', 'WDC', 'NTAP', 'FOXA', 'FOX', 'LULU', 'BMRN', 'EXPE', 'KLAC', 'EXC', 'WBA', 'ASML', 'IDXX', 'EA', 'MAR', 'XEL', 'WDAY', 'CDNS', 'NTES', 'SNPS', 'CTAS', 'VRSK', 'ALGN', 'DOCU', 'SPLK', 'DXCM', 'ANSS', 'CDW', 'PAYX', 'XLNX', 'FAST', 'SWKS', 'CPRT', 'MXIM', 'CERN', 'INCY', 'CHKP', 'ULTA', 'MNST', 'TTWO', 'ALXN', 'WDC', 'NTAP', 'FOXA', 'FOX', 'LULU', 'BMRN', 'EXPE']
+
+# Function to get the list of Nifty 50 stock tickers
+def getNifty50Tickers():
+    return ['RELIANCE', 'HDFC', 'INFY', 'HDFCBANK', 'TCS', 'ICICIBANK', 'KOTAKBANK', 'HINDUNILVR', 'ITC', 'SBIN', 'ASIANPAINT', 'MARUTI', 'HCLTECH', 'LT', 'BAJFINANCE', 'WIPRO', 'AXISBANK', 'ONGC', 'SUNPHARMA', 'RBLBANK', 'BAJAJFINSV', 'TATAMOTORS', 'ULTRACEMCO', 'BHARTIARTL', 'TATASTEEL', 'CIPLA', 'GAIL', 'GRASIM', 'VEDL', 'ADANIPORTS', 'JSWSTEEL', 'HEROMOTOCO', 'COALINDIA', 'IOC', 'DRREDDY', 'TITAN', 'BAJAJ-AUTO', 'HINDALCO', 'BPCL', 'UPL', 'NESTLEIND', 'BRITANNIA', 'INDUSINDBK', 'EICHERMOT', 'SHREECEM', 'BAJAJHLDNG', 'DIVISLAB', 'HDFCLIFE', 'ICICIPRULI', 'HDFCAMC', 'SBILIFE', 'DMART', 'ICICIGI', 'BANDHANBNK', 'PIDILITIND', 'PEL', 'BERGEPAINT', 'CONCOR', 'HAVELLS', 'DABUR', 'COLPAL', 'ACC', 'LUPIN', 'M_M', 'AUROPHARMA', 'AMBUJACEM', 'PGHH', 'MARICO', 'BOSCHLTD', 'MCDOWELL-N', 'SIEMENS', 'GODREJCP', 'DLF', 'ABBOTINDIA', 'TORNTPHARM', 'NIACL', 'MRF', 'SRTRANSFIN', 'CADILAHC', 'LICHSGFIN', 'GICRE', 'BIOCON', 'MUTHOOTFIN', 'CUMMINSIND', 'NMDC', 'BANKBARODA', 'TATACHEM', 'BATAINDIA', 'ADANITRANS', 'BALKRISIND', 'GODREJPROP', 'TATAPOWER', 'MOTHERSUMI', 'OFSS', 'L_TFH', 'IGL', 'GLAXO', 'HINDPETRO', 'MGL', 'SRF', 'CHOLAFIN', 'HDFC', 'INFY', 'HDFCBANK', 'TCS', 'ICICIBANK', 'KOTAKBANK', 'HINDUNILVR', 'ITC', 'SBIN', 'ASIANPAINT', 'MARUTI', 'HCLTECH', 'LT', 'BAJFINANCE', 'WIPRO', 'AXISBANK', 'ONGC', 'SUNPHARMA', 'RBLBANK', 'BAJAJFINSV', 'TATAMOTORS', 'ULTRACEMCO', 'BHARTIARTL', 'TATASTEEL', 'CIPLA', 'GAIL', 'GRASIM', 'VEDL', 'ADANIPORTS', 'JSWSTEEL', 'HEROMOTOCO', 'COALINDIA', 'IOC', 'DRREDDY', 'TITAN', 'BAJAJ-AUTO', 'HINDALCO', 'BPCL', 'UPL', 'NESTLEIND', 'BRITANNIA', 'INDUSINDBK', 'EICHERMOT', 'SHREECEM', 'BAJAJHLDNG', 'DIVISLAB', 'HDFCLIFE', 'ICICIPRULI', 'HDFCAMC', 'SBILIFE', 'DMART', 'ICICIGI', 'BANDHANBNK', 'PIDILITIND', 'PEL', 'BERGEPAINT', 'CONCOR', 'HAVELLS', 'DABUR', 'COLPAL', 'ACC', 'LUPIN', 'M_M', 'AUROPHARMA', 'AMBUJACEM', 'PGHH', 'MARICO', 'BOSCHLTD', 'MCDOWELL-N', 'SIEMENS', 'GODREJCP', 'DLF', 'ABBOTINDIA', 'TORNTPHARM', 'NIACL', 'MRF', 'SRTRANSFIN', 'CADILAHC', 'LICHSGFIN', 'GICRE', 'BIOCON', 'MUTHOOTFIN', 'CUMMINSIND', 'NMDC', 'BANKBARODA', 'TATACHEM', 'BATAINDIA', 'ADANITRANS', 'BALKRISIND', 'GODREJPROP', 'TATAPOWER', 'MOTHERSUMI', 'OFSS', 'L_TFH', 'IGL', 'GLAXO', 'HINDPETRO', 'MGL', 'SRF', 'CHOLAFIN']

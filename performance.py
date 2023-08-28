@@ -62,7 +62,8 @@ def calculate_positions (df,close_at_end=True):
     
     # if signal is generated on the nth bar, then position will be taken
     # on next n+1th bar, and return of n+1th bar is what we will get
-    df['position'] = df['position'].shift(1)
+    if not isOptionSpreadStrategy(df):
+        df['position'] = df['position'].shift(1)
 
     #CLOSE all positions at end of df; this will always be the last trade
     #return on last candle will always be zero
@@ -104,11 +105,14 @@ def calculate_strategy_returns (df):
     return df
 
 def prep_dataframe (df, close_at_end=True):
-    df = duplicateDFRowsWithMultipleTrades(df)
+    if not isOptionSpreadStrategy(df):
+        #right now duplication only works for non option spread DF's
+        df = duplicateDFRowsWithMultipleTrades(df)
     
     #calc returns if not already calculated
     if not set(['position','cum_bnh_returns']).issubset(df.columns):
-        df = calculate_bnh_returns(df)
+        if not isOptionSpreadStrategy(df):
+            df = calculate_bnh_returns(df)
         
     #calc positions if not already calculated
     if not set(['position']).issubset(df.columns):
@@ -116,7 +120,8 @@ def prep_dataframe (df, close_at_end=True):
     
     #calc strategy returns if not already calculated
     if not set(['strategy_returns','cum_strategy_returns']).issubset(df.columns):
-        df = calculate_strategy_returns(df)
+        if not isOptionSpreadStrategy(df):
+            df = calculate_strategy_returns(df)
     return df
 #### END OF GLOBAL prep functions
 
@@ -248,19 +253,43 @@ def calc_trade_returns (date, trades, ticker_data):
 #    ticker_data['cum_trade_returns'] =  (1+ticker_data['strategy_returns']).cumprod() - 1
 #   trades.loc[date, 'return'] = ticker_data.iloc[-1]['cum_trade_returns']
 
-    tradeEntry = ticker_data.iloc[0, ticker_data.columns.get_loc('entry_price')] if 'entry_price' in ticker_data.columns else float('nan')
-    tradeEntry = ticker_data.iloc[0, ticker_data.columns.get_loc('Open')] if np.isnan(tradeEntry) else tradeEntry
-    tradeEntry = abs(tradeEntry)
-    
-    
-    tradeExit  = ticker_data.iloc[-1, ticker_data.columns.get_loc('exit_price')] if 'exit_price' in ticker_data.columns else float('nan')
-    tradeExit  = ticker_data.iloc[-1, ticker_data.columns.get_loc('Open')] if np.isnan(tradeExit) else tradeExit
-    
-    tradePNL = (tradeExit - tradeEntry) * ticker_data.iloc[0, ticker_data.columns.get_loc('position')]
-    
-    tradeReturn = tradePNL/tradeEntry
-    # subtract trade costs from tradePNL
-    tradeReturn = tradeReturn - (cfgTradingCost*2) if tradeReturn != 0 else tradeReturn#2 trades, entry and exit
+    if 'opt1' in ticker_data.columns:
+        # this is an option spread
+        tradeEntry1 =  ticker_data.iloc[0, ticker_data.columns.get_loc('opt1_price')] 
+        tradeExit1 =  ticker_data.iloc[-1, ticker_data.columns.get_loc('opt1_price')] 
+        position1 = ticker_data.iloc[0, ticker_data.columns.get_loc('opt1_signal')] 
+        tradeEntry2 =  ticker_data.iloc[0, ticker_data.columns.get_loc('opt2_price')]         
+        tradeExit2 =  ticker_data.iloc[-1, ticker_data.columns.get_loc('opt2_price')] 
+        position2 = ticker_data.iloc[0, ticker_data.columns.get_loc('opt2_signal')] 
+        strike1 = ticker_data.iloc[0, ticker_data.columns.get_loc('opt1_strike')] 
+        strike2 = ticker_data.iloc[0, ticker_data.columns.get_loc('opt2_strike')] 
+        premiumEarned = tradeEntry1 - tradeEntry2
+        pnl1 = position1 * (tradeExit1 - tradeEntry1)
+        pnl2 = position2 * (tradeExit2 - tradeEntry2)
+        pnl = pnl1 + pnl2 
+        margin = abs(strike1-strike2) - premiumEarned
+        tradeReturn = pnl / margin
+        trades.loc[date, 'pnl1'] = pnl1
+        trades.loc[date, 'pnl2'] = pnl2
+        trades.loc[date, 'pnl'] = pnl
+        trades.loc[date, 'premiumEarned'] = premiumEarned
+        trades.loc[date, 'margin'] = margin
+
+    else:
+
+        tradeEntry = ticker_data.iloc[0, ticker_data.columns.get_loc('entry_price')] if 'entry_price' in ticker_data.columns else float('nan')
+        tradeEntry = ticker_data.iloc[0, ticker_data.columns.get_loc('Open')] if np.isnan(tradeEntry) else tradeEntry
+        tradeEntry = abs(tradeEntry)
+        
+        
+        tradeExit  = ticker_data.iloc[-1, ticker_data.columns.get_loc('exit_price')] if 'exit_price' in ticker_data.columns else float('nan')
+        tradeExit  = ticker_data.iloc[-1, ticker_data.columns.get_loc('Open')] if np.isnan(tradeExit) else tradeExit
+        
+        tradePNL = (tradeExit - tradeEntry) * ticker_data.iloc[0, ticker_data.columns.get_loc('position')]
+        
+        tradeReturn = tradePNL/tradeEntry
+        # subtract trade costs from tradePNL
+        tradeReturn = tradeReturn - (cfgTradingCost*2) if tradeReturn != 0 else tradeReturn#2 trades, entry and exit
     trades.loc[date, 'return'] = tradeReturn
     return
 
@@ -302,6 +331,7 @@ def get_trades (df):
     trades["cum_return"] = (1+trades['return']).cumprod() - 1
     trades["sum_return"] = trades['return'].cumsum() #more appropriate since our bet_size doesnt change based on prev trade performance
 
+    trades.to_csv("trades.csv")
     return trades
 
 def get_trade_stats (df):
@@ -355,7 +385,8 @@ def addDailyReturns(trades,tearsheet):
     
     return tearsheet
 
-
+def isOptionSpreadStrategy(df):
+    return 'opt1' in df.columns
 
 def tearsheet (df):
     df = prep_dataframe(df)
@@ -377,7 +408,8 @@ def tearsheet (df):
         trades['drawdown_from_prev_peak'] = trades['cum_return'] - trades['prev_peak_cum_return']
         trades['prev_peak_sum_return'] = trades['sum_return'].cummax()
         trades['drawdown_from_prev_peak_sum'] = trades['sum_return'] - trades['prev_peak_sum_return']
-        tearsheet = addDailyReturns(trades, tearsheet)
+        if not isOptionSpreadStrategy(df): 
+            tearsheet = addDailyReturns(trades, tearsheet)
         tearsheet["num_winning_trades"] = len(trades[trades['return'] > 0])
         tearsheet["num_losing_trades"] = len(trades[trades['return'] < 0])
         tearsheet["win_pct"] = tearsheet["num_winning_trades"]/tearsheet["num_trades"]
@@ -391,8 +423,12 @@ def tearsheet (df):
         tearsheet['max_drawdown_from_prev_peak_sum'] = trades['drawdown_from_prev_peak_sum'].min()
         tearsheet["average_per_trade_return"] = trades[trades['return'] != 0]['return'].mean()
         tearsheet["std_dev_pertrade_return"] = trades[trades['return'] != 0]['return'].std()
-        tearsheet["sharpe_ratio"] = round(tearsheet['avg_daily_return'] * math.sqrt(252) / tearsheet['std_daily_return'],1)
-        tearsheet['calamar_ratio'] = -round(tearsheet['avg_daily_return'] * 252 / tearsheet['max_drawdown_from_prev_peak_sum'],1)
+        if isOptionSpreadStrategy(df):
+            tearsheet["sharpe_ratio"] = 0
+            tearsheet['calamar_ratio'] = -round(tearsheet['return'] / tearsheet['max_drawdown_from_prev_peak_sum'],1)
+        else:
+            tearsheet["sharpe_ratio"] = round(tearsheet['avg_daily_return'] * math.sqrt(252) / tearsheet['std_daily_return'],1)
+            tearsheet['calamar_ratio'] = -round(tearsheet['avg_daily_return'] * 252 / tearsheet['max_drawdown_from_prev_peak_sum'],1)
         tearsheet["skewness_pertrade_return"] = trades[trades['return'] != 0]['return'].skew()
         tearsheet["kurtosis_pertrade_return"] = trades[trades['return'] != 0]['return'].kurtosis()
         tearsheet["wins"] = get_trade_stats(trades.loc[trades['return'] > 0, 'return'])

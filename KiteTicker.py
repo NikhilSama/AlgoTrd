@@ -129,6 +129,8 @@ def getTickersToTrack():
         tickersToTrack[token]['df'] = pd.DataFrame(columns=columns, index=index)
         tickersToTrack[token]['ticks'] = pd.DataFrame(columns=columns, index=index)
         tickersToTrack[token]['targetExitAchieved'] = []
+        tickersToTrack[token]['minHigh'] = float('nan')
+        tickersToTrack[token]['minLow'] = float('nan')
 # def trimMinuteDF(t):
 #     #trim the minute df to last cfgMaxLookbackCandles minutes
 #     tickersToTrack[t]['df'] = tickersToTrack[t]['df'].iloc[-cfgMaxLookbackCandles:]
@@ -222,7 +224,7 @@ def getLazyData():
     time_difference = time_difference.total_seconds()
     if time_difference > 60:
         tickerlog(f"getLazyData: File '{file_path}' is stale. Last Modified: {file_modified_time}.")
-        return (0,0,0,0,0)
+        return (0,0,0,0,0,0,0)
     
     try:
         with open(file_path, 'r') as file:
@@ -238,22 +240,24 @@ def getLazyData():
             dnVolNifty = split_values[2].strip()
             upVolFut = split_values[3].strip()
             dnVolFut = split_values[4].strip()
-            
+            maxpain = split_values[5].strip()
+            weightedAvMaxPain = split_values[6].strip()
             dnVolNifty = float(dnVolNifty)
             upVolNifty = float(upVolNifty)
             pcr = float(pcr)
             dnVolFut = float(dnVolFut)
             upVolFut = float(upVolFut)
-            
+            maxpain = float(maxpain)
+            weightedAvMaxPain = float(weightedAvMaxPain)
             # tickerlog(f"getSpaceMVolDelta: {upVol} {dnVol}")
     except FileNotFoundError:
         tickerlog(f"File '{file_path}' not found.")
-        return (0,0,0,0,0)
+        return (0,0,0,0,0,0,0)
     except Exception as e:
         tickerlog(f"Error occurred while reading the file: {str(e)}")
-        return (0,0,0,0,0)
+        return (0,0,0,0,0,0,0)
 
-    return (pcr,upVolNifty,dnVolNifty,upVolFut,dnVolFut)
+    return (pcr,upVolNifty,dnVolNifty,upVolFut,dnVolFut,maxpain,weightedAvMaxPain)
 
 def getVolDelta(token,tick):
     tickTimeStamp = tick['exchange_timestamp']
@@ -407,6 +411,16 @@ def resampleToMinDF():
               'obSTImabalance': 'mean',
               'obSTImabalanceRatio': 'mean'
             })
+
+            #minHigh/minLow are used to note the actual execution prices of limit and SL orders.  Sometimes these orders get hit
+            #intra-second, and we never get these extreme prices in our second tick snapshot.  So, these High/Low prices
+            #never make it to our minute df.  Here we synthetically add them to High/Low values so that our signal's
+            #df is aware that these were actual High/Low values and our limit/SL orders have indeed fired. This is important
+            resampled_ticks_upto_this_minute['High'] = resampled_ticks_upto_this_minute['High'].combine(tickersToTrack[token]['minHigh'], max)
+            resampled_ticks_upto_this_minute['Low'] = resampled_ticks_upto_this_minute['Low'].combine(tickersToTrack[token]['minLow'], min)
+            tickerlog(f"minHigh: {tickersToTrack[token]['minHigh']} minLow: {tickersToTrack[token]['minLow']} High: {resampled_ticks_upto_this_minute['High']} Low: {resampled_ticks_upto_this_minute['Low']}")
+            tickersToTrack[token]['minHigh'] = tickersToTrack[token]['minLow'] = float('nan')
+            
             resampled_ticks_upto_this_minute['maxVolDelta'] = ticks_upto_this_minute['volDelta'].max()
             resampled_ticks_upto_this_minute['minVolDelta'] = ticks_upto_this_minute['volDelta'].min()
             # ratio = resampled_ticks_upto_this_minute['buyQtLvl2']/resampled_ticks_upto_this_minute['sellQtLvl2']
@@ -421,7 +435,7 @@ def resampleToMinDF():
                 'maxVolDelta','minVolDelta','bid','ask','oi','buyQt', 'sellQt', 'obImabalance', 'obImabalanceRatio', 'buyQtLvl2', \
                     'sellQtLvl2', 'obSTImabalance', 'obSTImabalanceRatio', 'futOrderBookBuyQt', 'futOrderBookSellQt', \
                         'futOrderBookBuyQtLevel1', 'futOrderBookSellQtLevel1', 'niftyUpVol', \
-                        'niftyDnVol', 'niftyFutureUpVol', 'niftyFutureDnVol', 'nifty']
+                        'niftyDnVol', 'niftyFutureUpVol', 'niftyFutureDnVol', 'nifty', 'niftyPCR', 'niftyMaxPain', 'niftyWMaxPain']
             drop_columns = list(set(minute_candle_df.columns) - set(keep_columns))
             minute_candle_df.drop(columns=drop_columns, inplace=True)
             
@@ -459,11 +473,12 @@ def addNiftyVolDelta(token):
     if not 'futOrderBookBuyQt' in df.columns:
         #initialize if it doesnt already exist
         df['futOrderBookBuyQt'] = df['futOrderBookSellQt'] = df['futOrderBookBuyQtLevel1'] = df['futOrderBookSellQtLevel1'] \
-            = df['niftyUpVol'] = df['niftyDnVol'] = df['niftyFutureUpVol'] = df['niftyFutureDnVol'] = 0
+            = df['niftyUpVol'] = df['niftyDnVol'] = df['niftyFutureUpVol'] = df['niftyFutureDnVol'] = df['niftyPCR'] = \
+                df['niftyMaxPain'] = df['niftyWMaxPain'] = 0
         
     (df['futOrderBookBuyQt'][-1],df['futOrderBookSellQt'][-1],df['futOrderBookBuyQtLevel1'][-1],df['futOrderBookSellQtLevel1'][-1]) =\
         getFutOrderBookBuySellQt(niftyFutureTicker)
-    (df['niftyPCR'],df['niftyUpVol'][-1],df['niftyDnVol'][-1],df['niftyFutureUpVol'][-1],df['niftyFutureDnVol'][-1]) = \
+    (df['niftyPCR'][-1],df['niftyUpVol'][-1],df['niftyDnVol'][-1],df['niftyFutureUpVol'][-1],df['niftyFutureDnVol'][-1],df['niftyMaxPain'],df['niftyWMaxPain']) = \
         getLazyData()
 
 
@@ -559,20 +574,28 @@ def on_order_update(ws, data):
     if timestamp_str is None:
         tickerlog(f"Got order with None stimestamp. Ignoring. {data}")
         return
+    token = data['instrument_token']
+    ticker = data['tradingsymbol']
+
+    if not token in tickersToTrack.keys():
+        # could be a manual trade
+        tickerlog(f"Got order for token {token} : {ticker} that we are not tracking. Ignoring. {data}")
+        return
+    
     format_str = '%Y-%m-%d %H:%M:%S'
     timestamp = datetime.datetime.strptime(timestamp_str, format_str)
     rounded_timestamp = datetime.datetime(timestamp.year, timestamp.month, timestamp.day, timestamp.hour, timestamp.minute)
     localized_timestamp = ist.localize(rounded_timestamp)
     oid = data['order_id']
-    ticker = data['tradingsymbol']
     exchange = data['exchange']
-    token = data['instrument_token']
     status = data['status']
     tx = data['transaction_type']
     q = data['quantity']
     p = data['price']
     tag = data['tag']
     filled = data['filled_quantity']
+    order_type = data['order_type']
+    trigger_price = data['trigger_price']   
     
 #    tickerlog("Order update: {}".format(data))  
     #tickerlog(f"Order update: {tx} {q} {ticker}@{q} {status} filledQ:{filled}")
@@ -583,6 +606,29 @@ def on_order_update(ws, data):
         tickerlog(f"TargetExit order complete. Adding {localized_timestamp} to targetExitAchieved")
         tickersToTrack[token]['targetExitAchieved'].append(localized_timestamp)
 
+    minHigh = minLow = float('nan')
+    if order_type == 'LIMIT' and status == 'COMPLETE':
+        if tx == 'BUY':
+            minHigh = p+.1
+            tickerlog(f"Limit Order update: {tx} {q} {ticker}@{q} {status} filledQ:{filled} minHigh:{minHigh}")
+        else:
+            minLow = p-.1
+            tickerlog(f"Limit Order update: {tx} {q} {ticker}@{q} {status} filledQ:{filled} minLow:{minLow}")
+    elif order_type == 'SL' and status == 'COMPLETE':
+        if tx == 'BUY':
+            minLow = trigger_price
+            tickerlog(f"SL Order update: {tx} {q} {ticker}@{q} {status} filledQ:{filled} minLow:{minLow}")
+        else:
+            minHigh = trigger_price
+            tickerlog(f"SL Order update: {tx} {q} {ticker}@{q} {status} filledQ:{filled} minHigh:{minHigh}")
+    
+    # Set minHigh/minLow for the minute, we want to ensure that the minute candles
+    # we build have at least these as high/Low value.  Sometimes these orders get executed intra-second, 
+    # but the ltp second snapshot we get in KitTicker does not see/capture these extreme values, 
+    # so our signal's df is not aware that these orders have been
+    # executed, so we synthetically insert these as minHigh/minLow for the minute
+    tickersToTrack[token]['minHigh'] = max(minHigh,tickersToTrack[token]['minHigh']) if not math.isnan(minHigh) else tickersToTrack[token]['minHigh']
+    tickersToTrack[token]['minLow'] = min(minLow,tickersToTrack[token]['minLow']) if not math.isnan(minLow) else tickersToTrack[token]['minLow']
     # { #NOTE:SAMPLE DATA
     # 'account_id': 'ZT1533', 'unfilled_quantity': 0, 'checksum': '', 'placed_by': 'ZT1533', 'order_id': '230411401989627', 'exchange_order_id': '2500000086137901', 'parent_order_id': None, 'status': 'OPEN', 'status_message': None, 'status_message_raw': None, 'order_timestamp': '2023-04-11 14:21:05', 'exchange_update_timestamp': '2023-04-11 14:21:05', 'exchange_timestamp': '2023-04-11 14:21:05', 'variety': 'regular', 'exchange': 'NFO', 'tradingsymbol': 'RELIANCE23APR2340PE', 'instrument_token': 36528898, 'order_type': 'LIMIT', 'transaction_type': 'BUY', 'validity': 'TTL', 'product': 'MIS', 'quantity': 250, 'disclosed_quantity': 0, 'price': 38, 'trigger_price': 0, 'average_price': 0, 'filled_quantity': 0, 'pending_quantity': 250, 'cancelled_quantity': 0, 'market_protection': 0, 'meta': {}, 'tag': None, 'guid': '71318X4ytREEwqnRDj'
     # }

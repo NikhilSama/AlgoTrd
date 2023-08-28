@@ -122,7 +122,39 @@ def plot_option_vs_stock(df):
     madiff = diff.rolling(window=2000,min_periods=10).mean()
     ax2.plot(df['i'], diff, color='black', linewidth=1)
     ax2.plot(df['i'], madiff, color='red', linewidth=1)
-    
+
+def plot_lt_option_strategy(df, trades):
+    fig, (ax1, ax2, ax3, ax4) = \
+        plt.subplots(4, 1, figsize=(8, 8), sharex=True, 
+                     gridspec_kw={'height_ratios': [4, 0.5, 1,1]})
+    plt.subplots_adjust(left=0.1, bottom=0.1)
+    df = df.loc[df.index.dropna()]
+    df['opt1_strike'].fillna(method='ffill', inplace=True)
+    trades = trades.loc[trades.index.dropna()] if not trades is None else None
+
+    ax1.plot(df.index, df['Adj Close'], color='black', linewidth=1)
+    ax1.plot(df.index, df['ma20'], color='blue', linewidth=1)
+    ax1.plot(df.index, df['upper_band'], color='green', linewidth=1)
+    ax1.plot(df.index, df['lower_band'], color='red', linewidth=1)
+    ax1.plot(df.index, df['opt1_strike'], color='red', linewidth=1)
+    df['maxpain'] = df['maxpain'].fillna(method='ffill').astype(int)
+    df['wmaxpain'] = df['wmaxpain'].fillna(method='ffill').astype(int)
+
+    ax1.plot(df.index, df['maxpain'], color='red', linewidth=1)
+    # ax1.plot(df['i'], df['wmaxpain'], color='red', linewidth=1, linestyle='--')
+
+    ax2.plot(df.index, df['position'], color='green', linewidth=2)
+    ax2.set_title('Position↓', loc='right')
+
+    if not trades is None:
+        ax3.plot(trades.index, trades['sum_return'], color='blue', linewidth=2)
+        ax3.set_title('returns ↓', loc='right')
+    ax4.plot(df.index, df['pcr'], color='green', linewidth=2)
+    ax4.plot(df.index, df['atm_pcr'], color='red', linewidth=2)
+    ax4.set_title('pcr ↓', loc='right')
+
+    plt.show()
+
 def plot_backtest(df,trades=None):
     applyTickerSpecificCfg(df['symbol'][0])
     # Plot trades 
@@ -157,7 +189,7 @@ def plot_backtest(df,trades=None):
     # ax1.plot(df['i'], df['VWAP'], color='gold', linewidth=2)
     ax1.plot(df['i'], df['Adj Close'], color='black', linewidth=2)
     # ax1.plot(df['i'], iv, color='red', linewidth=2)
-    ax1.plot(df['i'], df['MA-FAST'], color='green', linewidth=1)
+    # ax1.plot(df['i'], df['MA-FAST'], color='green', linewidth=1)
     # ax1.plot(df['i'], df['renko_brick_high'], color='green', linewidth=1)
     # ax1.plot(df['i'], df['renko_brick_low'], color='red', linewidth=1)
     # ax1.plot(df['i'], df['pocShrtTrm'], color='black', linewidth=1)
@@ -174,9 +206,13 @@ def plot_backtest(df,trades=None):
     # ax1.plot(df['i'], df['lower_band'], color='red', linewidth=1)
     # ax1.plot(df['i'], df['SuperTrendUpper'], color='green', linewidth=1)
     # ax1.plot(df['i'], df['SuperTrendLower'], color='red', linewidth=1)
-    ax1.plot(df['i'], df['vah'], color='green', linewidth=3)
-    ax1.plot(df['i'], df['val'], color='red', linewidth=3)
-    ax1.plot(df['i'], df['poc'], color='yellow', linewidth=3)
+    convertedMaxPain = df['niftyMaxPain'].fillna(method='bfill').astype(int) - df['nifty'] + df['Adj Close'] 
+    convertedwMaxPain = df['niftyWMaxPain'].fillna(method='bfill').astype(int) - df['nifty'] + df['Adj Close'] 
+    ax1.plot(df['i'],convertedMaxPain , color='red', linewidth=3)
+    ax1.plot(df['i'], convertedwMaxPain, color='gold', linewidth=3)
+    ax1.plot(df['i'], df['vah'], color='green', linewidth=1)
+    ax1.plot(df['i'], df['val'], color='red', linewidth=1)
+    ax1.plot(df['i'], df['poc'], color='yellow', linewidth=1)
 
     #Draw horizontal lines at renko bricks
     # start = df['renko_brick_low'].min()
@@ -227,8 +263,10 @@ def plot_backtest(df,trades=None):
     # ax4.axhlinep(y=1, color='green', linestyle='--')
     # ax4.axhline(y=2, color='blue', linestyle='--')
     # ax4.axhline(y=.1, color='green', linestyle='--')
-    # ax4.axhline(y=.2, color='blue', linestyle='--')
-    ax4.set_title('OI↓', loc='right')    
+    ax4.plot(df['i'], df['pcr'], color='black', linewidth=2)
+    ax4.plot(df['i'], df['niftyPCR'], color='red', linewidth=2)
+    ax4.axhline(y=.8, color='blue', linestyle='--')
+    ax4.set_title('PCR↓', loc='right')    
     
     # ivma = iv.rolling(window=20,min_periods=10).mean()
     # diff = iv - ivma
@@ -238,15 +276,15 @@ def plot_backtest(df,trades=None):
     # # ax5.plot(df['i'], df['slpVah'], color='green', linewidth=1)
     # # ax5.plot(df['i'], df['slpVal'], color='red', linewidth=1)
     # ax5.set_title('iv↓', loc='right')
-    # ax5.axhline(y=0, color='red', linestyle='--')
-    ax5.axhline(y=.1, color='red', linestyle='--')
-    ax5.axhline(y=-0.1, color='red', linestyle='--')
+    ax5.axhline(y=0, color='red', linestyle='--')
+    ax5.axhline(y=.8, color='red', linestyle='--')
+    # ax5.axhline(y=-0.1, color='red', linestyle='--')
     # ax5.axhline(y=-50000, color='red', linestyle='--')
 
 
-    ax6.plot(df['i'], df['MA-FAST-SLP'], color='green', linewidth=2)
+    ax6.plot(df['i'], df['VWAP-SLP'], color='green', linewidth=2)
     # ax6.plot(df['i'], df['Volume'], color='green', linewidth=2)
-    ax6.set_title('MA-FAST-SLP ↓', loc='right')
+    ax6.set_title('VWAP-SLP ↓', loc='right')
     # ax6.axhline(y=av, color='red', linestyle='--')
     # ax6.axhline(y=-av, color='red', linestyle='--')
     ax6.axhline(y=.1, color='red', linestyle='--')

@@ -626,6 +626,7 @@ def rndLog(n):
     else:
         return f"{round(n)}"
 def logVolDelta(row):
+    str = ''
     if 'volDelta' in row:
         niftyVolDelta = rndLog(row.niftyUpVol-row.niftyDnVol)
         futVolDelta = rndLog(row.niftyFutureUpVol-row.niftyFutureDnVol)
@@ -633,7 +634,6 @@ def logVolDelta(row):
         str = ''
         str += f"niftyVolDelta {niftyVolDelta} " if niftyVolDelta != '0' else ''
         str += f"futVolDelta: {futVolDelta} | " if futVolDelta != '0' else ''
-        
         fullOderImbalance = f"{round(row.futOrderBookBuyQt-row.futOrderBookSellQt)}({round(row.futOrderBookBuyQt/row.futOrderBookSellQt, 1) if row.futOrderBookSellQt!=0 else 'nan'})" if (not np.isnan(row.futOrderBookBuyQt)) and (not np.isnan(row.futOrderBookSellQt)) else 'nan'
         stOderImbalance = f"{round(row.futOrderBookBuyQtLevel1-row.futOrderBookSellQtLevel1)}({round(row.futOrderBookBuyQtLevel1/row.futOrderBookSellQtLevel1,1) if row.futOrderBookSellQtLevel1 != 0 else 'nan'})" if (not np.isnan(row.futOrderBookBuyQtLevel1)) and (not np.isnan(row.futOrderBookSellQtLevel1)) else 'nan'
         # str += f"fullOrderImbalance: {round(row.futOrderBookBuyQt/row.futOrderBookSellQt, 1) if (not np.isnan(row.futOrderBookSellQt)) and row.futOrderBookSellQt!=0 else 'nan'} |" 
@@ -641,8 +641,10 @@ def logVolDelta(row):
         str += f"OderImbalance F:{fullOderImbalance} | S:{stOderImbalance} | "
         # str= f"VolDelta {rndLog(row.volDelta)} VolThresh: {rndLog(row.volDeltaThreshold)} Cum: {rndLog(row.cumVolDelta)} Max: {rndLog(row.maxVolDelta)} Min: {rndLog(row.minVolDelta)} | "
         # str+=f"stOrderImbalance: {round(row.obSTImabalance) if not np.isnan(row.obSTImabalance) else 'nan'}({round(row.volDeltaRatio2,1)  if not np.isnan(row.volDeltaRatio2) else 'nan'}) | fulldOrderImbalance: {rndLog(row.obImabalance)}({round(row.volDeltaRatio1,1)})) | " if 'obSTImabalance' in row else ''
-    else:
-        return ''
+
+    str += f"PCR: {row.niftyPCR} | " if 'niftyPCR' in row else ''
+    str += f"MaxPain: {row.niftyMaxPain} W:{row.niftyWMaxPain}| " if 'niftyMaxPain' in row else ''
+
     return str
     
 def logBB(row):
